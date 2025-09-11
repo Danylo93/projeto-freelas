@@ -322,12 +322,12 @@ async def create_service_request(
 async def get_requests(current_user: UserInDB = Depends(get_current_user)):
     if current_user.user_type == UserType.PRESTADOR:
         # Get requests for this provider
-        requests = await db.service_requests.find({"provider_id": current_user.id}).to_list(100)
+        requests = await db.service_requests.find({"provider_id": current_user.id}, {"_id": 0}).to_list(100)
         
         # Get client data for each request
         result = []
         for request in requests:
-            client_data = await db.users.find_one({"id": request["client_id"]})
+            client_data = await db.users.find_one({"id": request["client_id"]}, {"_id": 0})
             if client_data:
                 request_info = {
                     **request,
@@ -339,14 +339,14 @@ async def get_requests(current_user: UserInDB = Depends(get_current_user)):
         
     else:  # Cliente
         # Get requests made by this client
-        requests = await db.service_requests.find({"client_id": current_user.id}).to_list(100)
+        requests = await db.service_requests.find({"client_id": current_user.id}, {"_id": 0}).to_list(100)
         
         # Get provider data for each request
         result = []
         for request in requests:
-            provider_profile = await db.provider_profiles.find_one({"user_id": request["provider_id"]})
+            provider_profile = await db.provider_profiles.find_one({"user_id": request["provider_id"]}, {"_id": 0})
             if provider_profile:
-                provider_user = await db.users.find_one({"id": request["provider_id"]})
+                provider_user = await db.users.find_one({"id": request["provider_id"]}, {"_id": 0})
                 if provider_user:
                     request_info = {
                         **request,
