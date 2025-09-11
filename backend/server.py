@@ -137,6 +137,20 @@ class ServiceRequestCreate(BaseModel):
     client_latitude: float
     client_longitude: float
 
+class ServiceProviderProfileCreate(BaseModel):
+    category: str
+    price: float
+    description: str
+    status: ServiceStatus = ServiceStatus.AVAILABLE
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class RatingCreate(BaseModel):
+    request_id: str
+    provider_id: str
+    rating: int  # 1-5
+    comment: str
+
 class Rating(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     request_id: str
