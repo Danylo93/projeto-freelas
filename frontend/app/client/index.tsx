@@ -90,6 +90,10 @@ export default function ClientHome() {
     }
 
     try {
+      console.log('🛠️ Iniciando solicitação de serviço...');
+      console.log('Provider:', selectedProvider);
+      console.log('Description:', serviceDescription);
+      
       const requestData = {
         provider_id: selectedProvider.user_id,
         category: selectedProvider.category,
@@ -99,7 +103,9 @@ export default function ClientHome() {
         client_longitude: -46.6333,
       };
 
-      await axios.post(`${API_BASE_URL}/requests`, requestData);
+      console.log('🚀 Enviando request:', requestData);
+      const response = await axios.post(`${API_BASE_URL}/requests`, requestData);
+      console.log('✅ Resposta da API:', response.data);
       
       Alert.alert(
         'Solicitação Enviada!',
@@ -116,6 +122,8 @@ export default function ClientHome() {
         ]
       );
     } catch (error: any) {
+      console.error('❌ Erro na solicitação:', error);
+      console.error('❌ Detalhes do erro:', error.response?.data);
       Alert.alert('Erro', error.response?.data?.detail || 'Erro ao solicitar serviço');
     }
   };
