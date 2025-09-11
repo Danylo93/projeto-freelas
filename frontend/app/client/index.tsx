@@ -36,7 +36,26 @@ export default function ClientHome() {
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [serviceDescription, setServiceDescription] = useState('');
-  const { user, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      'Confirmar Logout',
+      'Tem certeza que deseja sair?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/auth');
+          },
+        },
+      ]
+    );
+  };
 
   const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
 
