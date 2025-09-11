@@ -234,16 +234,22 @@ export default function ClientHome() {
   }, []);
 
   if (showProfile) {
+    console.log('🔄 Mostrando tela de perfil');
     return <ProfileScreen onBack={() => setShowProfile(false)} />;
   }
 
   if (isLoading) {
+    console.log('🔄 Mostrando loading...');
     return (
       <SafeAreaView style={styles.container}>
         <LoadingAnimation />
       </SafeAreaView>
     );
   }
+
+  console.log('🎯 Renderizando tela principal do cliente');
+  console.log('👥 Número de prestadores:', providers.length);
+  console.log('🔌 Socket conectado:', isConnected);
 
   return (
     <SafeAreaView style={styles.container}>
