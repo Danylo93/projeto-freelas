@@ -34,7 +34,6 @@ export default function ProviderHome() {
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const { user, logout } = useAuth();
-  const router = useRouter();
 
   const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
 
