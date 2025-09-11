@@ -53,7 +53,6 @@ export default function ProviderHome() {
           style: 'destructive',
           onPress: async () => {
             await logout();
-            router.replace('/auth/');
           },
         },
       ]
