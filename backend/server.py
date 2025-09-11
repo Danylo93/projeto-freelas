@@ -323,7 +323,7 @@ async def get_providers(current_user: User = Depends(get_current_user)):
                 "description": provider["description"],
                 "latitude": provider["latitude"],
                 "longitude": provider["longitude"],
-                "address": provider["address"],
+                "address": provider.get("address", f"Lat: {provider['latitude']}, Lng: {provider['longitude']}"),
                 "status": provider["status"],
                 "rating": provider["rating"],
                 "distance": round(distance, 1),
