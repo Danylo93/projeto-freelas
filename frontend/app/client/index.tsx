@@ -357,6 +357,23 @@ const styles = StyleSheet.create({
   profileButton: { padding: 4 },
   greeting: { fontSize: 20, fontWeight: 'bold', color: '#333' },
   subtitle: { fontSize: 14, color: '#666', marginTop: 4 },
+  subtitleContainer: { marginTop: 4 },
+  connectionIndicator: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginTop: 4 
+  },
+  connectionDot: { 
+    width: 8, 
+    height: 8, 
+    borderRadius: 4, 
+    marginRight: 6 
+  },
+  connectionText: { 
+    fontSize: 12, 
+    color: '#666', 
+    fontWeight: '500' 
+  },
   logoutButton: { padding: 8 },
   listContainer: { padding: 16 },
   providerCard: {
