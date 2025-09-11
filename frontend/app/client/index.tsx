@@ -385,63 +385,96 @@ export default function ClientHome() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Modal de Confirmação */}
+      {/* Modal de Confirmação com KeyboardAvoidingView */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Confirmar Solicitação</Text>
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+              <View style={styles.modalOverlay}>
+                <TouchableWithoutFeedback onPress={() => {}}>
+                  <Animated.View 
+                    style={[
+                      styles.modalContent,
+                      {
+                        transform: [{ scale: scaleAnim }],
+                        marginBottom: keyboardHeight > 0 ? keyboardHeight : 0,
+                      }
+                    ]}
+                  >
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle}>🛠️ Confirmar Solicitação</Text>
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(false)}
+                        style={styles.closeButton}
+                      >
+                        <Ionicons name="close" size={24} color="#666" />
+                      </TouchableOpacity>
+                    </View>
 
-            {selectedProvider && (
-              <View style={styles.modalProviderInfo}>
-                <Text style={styles.modalProviderName}>{selectedProvider.name}</Text>
-                <Text style={styles.modalProviderCategory}>{selectedProvider.category}</Text>
-                <Text style={styles.modalProviderPrice}>
-                  R$ {selectedProvider.price.toFixed(2)}
-                </Text>
+                    {selectedProvider && (
+                      <View style={styles.modalProviderInfo}>
+                        <View style={styles.providerAvatar}>
+                          <Ionicons name="construct" size={32} color="#007AFF" />
+                        </View>
+                        <Text style={styles.modalProviderName}>{selectedProvider.name}</Text>
+                        <Text style={styles.modalProviderCategory}>🔧 {selectedProvider.category}</Text>
+                        <Text style={styles.modalProviderPrice}>
+                          💰 R$ {selectedProvider.price.toFixed(2)}
+                        </Text>
+                        <View style={styles.providerStats}>
+                          <View style={styles.statItem}>
+                            <Ionicons name="star" size={16} color="#FFD700" />
+                            <Text style={styles.statText}>{selectedProvider.rating.toFixed(1)}</Text>
+                          </View>
+                          <View style={styles.statItem}>
+                            <Ionicons name="location" size={16} color="#666" />
+                            <Text style={styles.statText}>4km</Text>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
+                    <Text style={styles.inputLabel}>✍️ Descreva o serviço:</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      multiline
+                      numberOfLines={4}
+                      placeholder="Ex: Minha pia quebrou, precisa refazer o encanamento..."
+                      value={serviceDescription}
+                      onChangeText={setServiceDescription}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.cancelButton]}
+                        onPress={() => setModalVisible(false)}
+                      >
+                        <Text style={styles.cancelButtonText}>Cancelar</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.confirmButton]}
+                        onPress={handleConfirmService}
+                      >
+                        <Ionicons name="checkmark" size={20} color="#fff" />
+                        <Text style={styles.confirmButtonText}>Confirmar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </Animated.View>
+                </TouchableWithoutFeedback>
               </View>
-            )}
-
-            <Text style={styles.inputLabel}>Descreva o serviço:</Text>
-            <TextInput
-              style={styles.textInput}
-              multiline
-              numberOfLines={4}
-              placeholder="Ex: Minha pia quebrou, precisa refazer o encanamento..."
-              value={serviceDescription}
-              onChangeText={setServiceDescription}
-              textAlignVertical="top"
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleConfirmService}
-              >
-                <Text style={styles.confirmButtonText}>Confirmar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );
