@@ -46,7 +46,6 @@ export default function ClientHome() {
   const [showProfile, setShowProfile] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { user, logout } = useAuth();
-  const { socket, isConnected } = useSocket();
 
   // Animações
   const fadeAnim = new Animated.Value(0);
