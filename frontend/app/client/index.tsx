@@ -9,10 +9,17 @@ import {
   RefreshControl,
   Modal,
   TextInput,
+  Animated,
+  Easing,
+  Keyboard,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import ProfileScreen from '../profile/index';
 import axios from 'axios';
 
 interface Provider {
