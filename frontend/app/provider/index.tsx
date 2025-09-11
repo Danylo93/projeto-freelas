@@ -89,6 +89,7 @@ export default function ProviderHome() {
     if (!selectedRequest) return;
 
     try {
+      console.log('✅ Aceitando solicitação...');
       await axios.put(`${API_BASE_URL}/requests/${selectedRequest.id}/accept`);
       
       Alert.alert(
@@ -105,6 +106,7 @@ export default function ProviderHome() {
         ]
       );
     } catch (error: any) {
+      console.error('❌ Erro ao aceitar:', error);
       Alert.alert('Erro', error.response?.data?.detail || 'Erro ao aceitar solicitação');
     }
   };
