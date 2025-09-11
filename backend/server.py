@@ -281,12 +281,12 @@ async def get_providers(
     if category:
         filter_query["category"] = category
     
-    providers = await db.provider_profiles.find(filter_query).to_list(100)
+    providers = await db.provider_profiles.find(filter_query, {"_id": 0}).to_list(100)
     
     # Get user data for each provider
     result = []
     for provider in providers:
-        user_data = await db.users.find_one({"id": provider["user_id"]})
+        user_data = await db.users.find_one({"id": provider["user_id"]}, {"_id": 0})
         if user_data:
             provider_info = {
                 **provider,
