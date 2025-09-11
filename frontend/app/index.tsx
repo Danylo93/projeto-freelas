@@ -67,34 +67,6 @@ export default function Index() {
     );
   };
 
-  const LoadingDots = () => {
-    const dot1 = new Animated.Value(0);
-    const dot2 = new Animated.Value(0);
-    const dot3 = new Animated.Value(0);
-
-    React.useEffect(() => {
-      const animate = () => {
-        Animated.sequence([
-          Animated.timing(dot1, { toValue: 1, duration: 300, useNativeDriver: true }),
-          Animated.timing(dot2, { toValue: 1, duration: 300, useNativeDriver: true }),
-          Animated.timing(dot3, { toValue: 1, duration: 300, useNativeDriver: true }),
-          Animated.timing(dot1, { toValue: 0, duration: 300, useNativeDriver: true }),
-          Animated.timing(dot2, { toValue: 0, duration: 300, useNativeDriver: true }),
-          Animated.timing(dot3, { toValue: 0, duration: 300, useNativeDriver: true }),
-        ]).start(() => animate());
-      };
-      animate();
-    }, []);
-
-    return (
-      <View style={styles.dotsContainer}>
-        <Animated.View style={[styles.dot, { opacity: dot1 }]} />
-        <Animated.View style={[styles.dot, { opacity: dot2 }]} />
-        <Animated.View style={[styles.dot, { opacity: dot3 }]} />
-      </View>
-    );
-  };
-
   // Mostrar splash screen enquanto está carregando ou durante animação
   if (isLoading || showSplash) {
     return <SplashScreen />;
