@@ -158,6 +158,70 @@ export default function ClientHome() {
         contentContainerStyle={styles.listContainer}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchProviders} />}
       />
+
+      {/* Modal de Confirmação */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>🛠️ Confirmar Solicitação</Text>
+                <TouchableOpacity
+                  onPress={() => setModalVisible(false)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              {selectedProvider && (
+                <View style={styles.modalProviderInfo}>
+                  <Text style={styles.modalProviderName}>{selectedProvider.name}</Text>
+                  <Text style={styles.modalProviderCategory}>{selectedProvider.category}</Text>
+                  <Text style={styles.modalProviderPrice}>
+                    R$ {selectedProvider.price.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              <Text style={styles.inputLabel}>Descreva o serviço:</Text>
+              <TextInput
+                style={styles.textInput}
+                multiline
+                numberOfLines={4}
+                placeholder="Ex: Minha pia quebrou, precisa refazer o encanamento..."
+                value={serviceDescription}
+                onChangeText={setServiceDescription}
+                textAlignVertical="top"
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmButton]}
+                  onPress={handleConfirmService}
+                >
+                  <Text style={styles.confirmButtonText}>Confirmar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
