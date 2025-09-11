@@ -219,28 +219,6 @@ export default function ClientHome() {
         </View>
       </Animated.View>
 
-      <Animated.View 
-        style={[
-          styles.listContainer,
-          {
-            opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }],
-          }
-        ]}
-      >
-        <FlatList
-          data={providers}
-          renderItem={renderProvider}
-          keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={fetchProviders} />
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      </Animated.View>
-    fetchProviders();
-  }, []);
-
   const fetchProviders = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/providers`);
@@ -340,6 +318,38 @@ export default function ClientHome() {
     }
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Confirmar Logout',
+      'Tem certeza que deseja sair?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+          },
+        },
+      ]
+    );
+  };
+
+  if (showProfile) {
+    return <ProfileScreen onBack={() => setShowProfile(false)} />;
+  }
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LoadingAnimation />
+      </SafeAreaView>
+    );
+  }
+
   const renderProvider = ({ item }: { item: Provider }) => (
     <TouchableOpacity
       style={styles.providerCard}
@@ -382,26 +392,52 @@ export default function ClientHome() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <Animated.View 
+        style={[
+          styles.header,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          }
+        ]}
+      >
         <View>
-          <Text style={styles.greeting}>Olá, {user?.name}!</Text>
+          <Text style={styles.greeting}>Olá, {user?.name}! 👋</Text>
           <Text style={styles.subtitle}>Encontre o serviço que você precisa</Text>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#F44336" />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            onPress={() => setShowProfile(true)} 
+            style={styles.profileButton}
+          >
+            <Ionicons name="person-circle" size={32} color="#007AFF" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={24} color="#F44336" />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
 
-      <FlatList
-        data={providers}
-        renderItem={renderProvider}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={fetchProviders} />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      <Animated.View 
+        style={[
+          {
+            flex: 1,
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          }
+        ]}
+      >
+        <FlatList
+          data={providers}
+          renderItem={renderProvider}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={fetchProviders} />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      </Animated.View>
 
       {/* Modal de Confirmação com KeyboardAvoidingView */}
       <Modal
