@@ -47,6 +47,7 @@ export default function ClientHome() {
   const [showProfile, setShowProfile] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { user, logout } = useAuth();
+  const { socket, isConnected } = useSocket();
 
   // Animações
   const fadeAnim = new Animated.Value(0);
@@ -58,9 +59,16 @@ export default function ClientHome() {
   // Todas as funções dentro do componente
   const fetchProviders = async () => {
     try {
+      console.log('🔄 Buscando prestadores...');
+      console.log('🔑 Header Authorization:', axios.defaults.headers.common['Authorization']);
+      
       const response = await axios.get(`${API_BASE_URL}/providers`);
+      console.log('✅ Prestadores carregados:', response.data.length);
       setProviders(response.data);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar prestadores:', error);
+      console.error('❌ Status:', error.response?.status);
+      console.error('❌ Data:', error.response?.data);
       Alert.alert('Erro', 'Não foi possível carregar os prestadores');
     } finally {
       setIsLoading(false);
