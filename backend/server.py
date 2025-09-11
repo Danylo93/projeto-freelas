@@ -384,8 +384,8 @@ async def get_requests(current_user: User = Depends(get_current_user)):
     
     if current_user.user_type == UserType.PRESTADOR:
         # Providers see requests made to them
-        async for request in db.service_requests.find({"provider_id": current_user.id}):
-            client = await db.users.find_one({"id": request["client_id"]})
+        async for request in db.service_requests.find({"provider_id": current_user.id}, {"_id": 0}):
+            client = await db.users.find_one({"id": request["client_id"]}, {"_id": 0})
             if client:
                 requests.append({
                     **request,
@@ -394,9 +394,9 @@ async def get_requests(current_user: User = Depends(get_current_user)):
                 })
     else:
         # Clients see their own requests
-        async for request in db.service_requests.find({"client_id": current_user.id}):
-            provider_profile = await db.provider_profiles.find_one({"user_id": request["provider_id"]})
-            provider_user = await db.users.find_one({"id": request["provider_id"]})
+        async for request in db.service_requests.find({"client_id": current_user.id}, {"_id": 0}):
+            provider_profile = await db.provider_profiles.find_one({"user_id": request["provider_id"]}, {"_id": 0})
+            provider_user = await db.users.find_one({"id": request["provider_id"]}, {"_id": 0})
             if provider_profile and provider_user:
                 requests.append({
                     **request,
