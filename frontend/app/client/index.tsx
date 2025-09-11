@@ -43,9 +43,121 @@ export default function ClientHome() {
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [serviceDescription, setServiceDescription] = useState('');
+  const [showProfile, setShowProfile] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { user, logout } = useAuth();
 
+  // Animações
+  const fadeAnim = new Animated.Value(0);
+  const scaleAnim = new Animated.Value(0.9);
+  const slideAnim = new Animated.Value(50);
+
   const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
+
+  useEffect(() => {
+    fetchProviders();
+    
+    // Animação de entrada
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        easing: Easing.out(Easing.back(1.5)),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Listeners do teclado
+    const keyboardWillShow = Keyboard.addListener('keyboardWillShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const keyboardWillHide = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
+
+  const LoadingAnimation = () => {
+    const rotateAnim = new Animated.Value(0);
+    const bounceAnim = new Animated.Value(0);
+
+    React.useEffect(() => {
+      const rotate = () => {
+        rotateAnim.setValue(0);
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }).start(() => rotate());
+      };
+
+      const bounce = () => {
+        Animated.sequence([
+          Animated.timing(bounceAnim, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(bounceAnim, {
+            toValue: 0,
+            duration: 1000,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]).start(() => bounce());
+      };
+
+      rotate();
+      bounce();
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    const bounceY = bounceAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, -20],
+    });
+
+    return (
+      <View style={styles.loadingContainer}>
+        <Animated.View 
+          style={[
+            styles.loadingIcon,
+            {
+              transform: [
+                { rotate: spin },
+                { translateY: bounceY },
+              ],
+            }
+          ]}
+        >
+          <Ionicons name="construct" size={48} color="#007AFF" />
+        </Animated.View>
+        <Text style={styles.loadingText}>Carregando prestadores...</Text>
+        <Text style={styles.loadingSubtext}>🔧 Conectando você aos melhores profissionais</Text>
+      </View>
+    );
+  };
 
   const handleLogout = () => {
     Alert.alert(
