@@ -189,7 +189,7 @@ export default function ClientHome() {
           <Text style={styles.greeting}>Olá, {user?.name}!</Text>
           <Text style={styles.subtitle}>Encontre o serviço que você precisa</Text>
         </View>
-        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
           <Ionicons name="log-out-outline" size={24} color="#F44336" />
         </TouchableOpacity>
       </View>
