@@ -74,11 +74,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      console.log('🔐 Tentando fazer login com:', email);
+      console.log('🌐 URL da API:', `${API_BASE_URL}/auth/login`);
+      
       const response = await axios.post(`${API_BASE_URL}/auth/login`, {
         email,
         password,
       });
 
+      console.log('✅ Login bem-sucedido:', response.data);
       const { access_token, user_data } = response.data;
       
       // Store in AsyncStorage
