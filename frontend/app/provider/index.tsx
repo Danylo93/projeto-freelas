@@ -211,15 +211,33 @@ export default function ProviderHome() {
     </TouchableOpacity>
   );
 
+  if (isLoading) {
+    console.log('🔄 [PROVIDER] Mostrando loading...');
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text>Carregando solicitações...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  console.log('🎯 [PROVIDER] Renderizando lista com', requests.length, 'solicitações');
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Olá, {user?.name}!</Text>
-          <Text style={styles.subtitle}>Solicitações disponíveis</Text>
+          <Text style={styles.title}>Prestador - {user?.name}</Text>
+          <View style={styles.connectionIndicator}>
+            <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }]} />
+            <Text style={styles.connectionText}>
+              {isConnected ? '🟢 Socket Conectado' : '🔴 Socket Desconectado'}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#F44336" />
+        <TouchableOpacity onPress={logout}>
+          <Text style={styles.logoutText}>Sair</Text>
         </TouchableOpacity>
       </View>
 
@@ -228,10 +246,7 @@ export default function ProviderHome() {
         renderItem={renderRequest}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={fetchRequests} />
-        }
-        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchRequests} />}
       />
 
       {/* Modal de Detalhes */}
