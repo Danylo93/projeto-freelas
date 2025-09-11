@@ -11,6 +11,7 @@ import {
   Animated,
   Dimensions,
   StatusBar,
+  TextInput,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
