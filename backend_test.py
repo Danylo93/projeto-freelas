@@ -14,7 +14,7 @@ import sys
 import os
 
 # Get backend URL from environment
-BACKEND_URL = "https://fixerapp.preview.emergentagent.com/api"
+BACKEND_URL = "https://jobber.preview.emergentagent.com/api"
 
 class FreelancerAppTester:
     def __init__(self):
