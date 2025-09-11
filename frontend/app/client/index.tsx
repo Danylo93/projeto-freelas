@@ -37,7 +37,6 @@ export default function ClientHome() {
   const [modalVisible, setModalVisible] = useState(false);
   const [serviceDescription, setServiceDescription] = useState('');
   const { user, logout } = useAuth();
-  const router = useRouter();
 
   const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
 
