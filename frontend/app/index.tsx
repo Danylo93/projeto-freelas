@@ -13,10 +13,10 @@ export default function Index() {
         // Redirect based on user type
         if (user.user_type === 1) {
           // Prestador
-          router.replace('/provider/');
+          router.replace('/(provider)');
         } else if (user.user_type === 2) {
           // Cliente
-          router.replace('/client/');
+          router.replace('/(client)');
         }
       } else {
         // Not authenticated, go to auth screen
