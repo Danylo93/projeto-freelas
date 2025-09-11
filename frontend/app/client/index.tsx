@@ -54,267 +54,8 @@ export default function ClientHome() {
 
   const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
 
-  useEffect(() => {
-    fetchProviders();
-    
-    // Animação de entrada
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 50,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 600,
-        easing: Easing.out(Easing.back(1.5)),
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Listeners do teclado
-    const keyboardWillShow = Keyboard.addListener('keyboardWillShow', (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const keyboardWillHide = Keyboard.addListener('keyboardWillHide', () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      keyboardWillShow.remove();
-      keyboardWillHide.remove();
-    };
-  }, []);
-
-  const LoadingAnimation = () => {
-    const rotateAnim = new Animated.Value(0);
-    const bounceAnim = new Animated.Value(0);
-
-    React.useEffect(() => {
-      const rotate = () => {
-        rotateAnim.setValue(0);
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }).start(() => rotate());
-      };
-
-      const bounce = () => {
-        Animated.sequence([
-          Animated.timing(bounceAnim, {
-            toValue: 1,
-            duration: 1000,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(bounceAnim, {
-            toValue: 0,
-            duration: 1000,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-        ]).start(() => bounce());
-      };
-
-      rotate();
-      bounce();
-    }, []);
-
-    const spin = rotateAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
-    });
-
-    const bounceY = bounceAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -20],
-    });
-
-    return (
-      <View style={styles.loadingContainer}>
-        <Animated.View 
-          style={[
-            styles.loadingIcon,
-            {
-              transform: [
-                { rotate: spin },
-                { translateY: bounceY },
-              ],
-            }
-          ]}
-        >
-          <Ionicons name="construct" size={48} color="#007AFF" />
-        </Animated.View>
-        <Text style={styles.loadingText}>Carregando prestadores...</Text>
-        <Text style={styles.loadingSubtext}>🔧 Conectando você aos melhores profissionais</Text>
-      </View>
-    );
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Confirmar Logout',
-      'Tem certeza que deseja sair?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Sair',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-          },
-        },
-      ]
-    );
-  };
-
-  if (showProfile) {
-    return <ProfileScreen onBack={() => setShowProfile(false)} />;
-  }
-
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <LoadingAnimation />
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <Animated.View 
-        style={[
-          styles.header,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }
-        ]}
-      >
-        <View>
-          <Text style={styles.greeting}>Olá, {user?.name}! 👋</Text>
-          <Text style={styles.subtitle}>Encontre o serviço que você precisa</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity 
-            onPress={() => setShowProfile(true)} 
-            style={styles.profileButton}
-          >
-            <Ionicons name="person-circle" size={32} color="#007AFF" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Ionicons name="log-out-outline" size={24} color="#F44336" />
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-
-      {/* Modal de Confirmação com KeyboardAvoidingView */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalOverlay}
-          >
-            <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-              <View style={styles.modalOverlay}>
-                <TouchableWithoutFeedback onPress={() => {}}>
-                  <Animated.View 
-                    style={[
-                      styles.modalContent,
-                      {
-                        transform: [{ scale: scaleAnim }],
-                        marginBottom: keyboardHeight > 0 ? keyboardHeight : 0,
-                      }
-                    ]}
-                  >
-                    <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>🛠️ Confirmar Solicitação</Text>
-                      <TouchableOpacity
-                        onPress={() => setModalVisible(false)}
-                        style={styles.closeButton}
-                      >
-                        <Ionicons name="close" size={24} color="#666" />
-                      </TouchableOpacity>
-                    </View>
-
-                    {selectedProvider && (
-                      <View style={styles.modalProviderInfo}>
-                        <View style={styles.providerAvatar}>
-                          <Ionicons name="construct" size={32} color="#007AFF" />
-                        </View>
-                        <Text style={styles.modalProviderName}>{selectedProvider.name}</Text>
-                        <Text style={styles.modalProviderCategory}>🔧 {selectedProvider.category}</Text>
-                        <Text style={styles.modalProviderPrice}>
-                          💰 R$ {selectedProvider.price.toFixed(2)}
-                        </Text>
-                        <View style={styles.providerStats}>
-                          <View style={styles.statItem}>
-                            <Ionicons name="star" size={16} color="#FFD700" />
-                            <Text style={styles.statText}>{selectedProvider.rating.toFixed(1)}</Text>
-                          </View>
-                          <View style={styles.statItem}>
-                            <Ionicons name="location" size={16} color="#666" />
-                            <Text style={styles.statText}>4km</Text>
-                          </View>
-                        </View>
-                      </View>
-                    )}
-
-                    <Text style={styles.inputLabel}>✍️ Descreva o serviço:</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      multiline
-                      numberOfLines={4}
-                      placeholder="Ex: Minha pia quebrou, precisa refazer o encanamento..."
-                      value={serviceDescription}
-                      onChangeText={setServiceDescription}
-                      textAlignVertical="top"
-                    />
-
-                    <View style={styles.modalButtons}>
-                      <TouchableOpacity
-                        style={[styles.modalButton, styles.cancelButton]}
-                        onPress={() => setModalVisible(false)}
-                      >
-                        <Text style={styles.cancelButtonText}>Cancelar</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity
-                        style={[styles.modalButton, styles.confirmButton]}
-                        onPress={handleConfirmService}
-                      >
-                        <Ionicons name="checkmark" size={20} color="#fff" />
-                        <Text style={styles.confirmButtonText}>Confirmar</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </Animated.View>
-                </TouchableWithoutFeedback>
-              </View>
-            </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
-        </TouchableWithoutFeedback>
-      </Modal>
-    </SafeAreaView>
-  );
-}
-
-const fetchProviders = async () => {
+  // Todas as funções dentro do componente
+  const fetchProviders = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/providers`);
       setProviders(response.data);
@@ -337,24 +78,16 @@ const fetchProviders = async () => {
     }
 
     try {
-      console.log('🛠️ Iniciando solicitação de serviço...');
-      console.log('Provider:', selectedProvider);
-      console.log('Description:', serviceDescription);
-      
       const requestData = {
         provider_id: selectedProvider.user_id,
         category: selectedProvider.category,
         description: serviceDescription,
         price: selectedProvider.price,
-        client_latitude: -23.5505, // Mock location - São Paulo
+        client_latitude: -23.5505,
         client_longitude: -46.6333,
       };
 
-      console.log('🚀 Enviando request:', requestData);
-      console.log('🔑 Authorization header:', axios.defaults.headers.common['Authorization']);
-      
       const response = await axios.post(`${API_BASE_URL}/requests`, requestData);
-      console.log('✅ Resposta da API:', response.data);
       
       Alert.alert(
         'Solicitação Enviada!',
@@ -366,50 +99,31 @@ const fetchProviders = async () => {
               setModalVisible(false);
               setServiceDescription('');
               setSelectedProvider(null);
-              // Refresh the providers list
               fetchProviders();
             },
           },
         ]
       );
     } catch (error: any) {
-      console.error('❌ Erro na solicitação:', error);
-      console.error('❌ Response status:', error.response?.status);
-      console.error('❌ Response data:', error.response?.data);
-      console.error('❌ Request config:', error.config);
-      
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          'Erro ao solicitar serviço';
-      
-      Alert.alert('Erro', `Falha na solicitação: ${errorMessage}`);
+      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao solicitar serviço');
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'available':
-        return '#4CAF50';
-      case 'busy':
-        return '#FF9800';
-      case 'offline':
-        return '#F44336';
-      default:
-        return '#999';
+      case 'available': return '#4CAF50';
+      case 'busy': return '#FF9800';
+      case 'offline': return '#F44336';
+      default: return '#999';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'available':
-        return 'Online';
-      case 'busy':
-        return 'Ocupado';
-      case 'offline':
-        return 'Offline';
-      default:
-        return 'Desconhecido';
+      case 'available': return 'Online';
+      case 'busy': return 'Ocupado';
+      case 'offline': return 'Offline';
+      default: return 'Desconhecido';
     }
   };
 
@@ -418,38 +132,45 @@ const fetchProviders = async () => {
       'Confirmar Logout',
       'Tem certeza que deseja sair?',
       [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Sair',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-          },
-        },
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Sair', style: 'destructive', onPress: logout },
       ]
     );
   };
 
-  if (showProfile) {
-    return <ProfileScreen onBack={() => setShowProfile(false)} />;
-  }
+  const LoadingAnimation = () => {
+    const rotateAnim = new Animated.Value(0);
 
-  if (isLoading) {
+    React.useEffect(() => {
+      const rotate = () => {
+        rotateAnim.setValue(0);
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }).start(() => rotate());
+      };
+      rotate();
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
     return (
-      <SafeAreaView style={styles.container}>
-        <LoadingAnimation />
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <Animated.View style={[styles.loadingIcon, { transform: [{ rotate: spin }] }]}>
+          <Ionicons name="construct" size={48} color="#007AFF" />
+        </Animated.View>
+        <Text style={styles.loadingText}>Carregando prestadores...</Text>
+      </View>
     );
-  }
+  };
 
   const renderProvider = ({ item }: { item: Provider }) => (
-    <TouchableOpacity
-      style={styles.providerCard}
-      onPress={() => handleProviderSelect(item)}
-    >
+    <TouchableOpacity style={styles.providerCard} onPress={() => handleProviderSelect(item)}>
       <View style={styles.providerHeader}>
         <View style={styles.providerInfo}>
           <Text style={styles.providerName}>{item.name}</Text>
@@ -465,14 +186,10 @@ const fetchProviders = async () => {
           <Ionicons name="cash" size={16} color="#666" />
           <Text style={styles.detailText}>R$ {item.price.toFixed(2)}</Text>
         </View>
-        
         <View style={styles.detailRow}>
           <Ionicons name="star" size={16} color="#FFD700" />
-          <Text style={styles.detailText}>
-            {item.rating.toFixed(1)} ({item.total_reviews} avaliações)
-          </Text>
+          <Text style={styles.detailText}>{item.rating.toFixed(1)} ({item.total_reviews})</Text>
         </View>
-        
         <View style={styles.detailRow}>
           <Ionicons name="location" size={16} color="#666" />
           <Text style={styles.detailText}>3.2 km</Text>
@@ -485,26 +202,47 @@ const fetchProviders = async () => {
     </TouchableOpacity>
   );
 
+  useEffect(() => {
+    fetchProviders();
+    
+    // Animações
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 600, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true }),
+    ]).start();
+
+    // Keyboard listeners
+    const keyboardWillShow = Keyboard.addListener('keyboardWillShow', (e) => setKeyboardHeight(e.endCoordinates.height));
+    const keyboardWillHide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
+
+  if (showProfile) {
+    return <ProfileScreen onBack={() => setShowProfile(false)} />;
+  }
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LoadingAnimation />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.View 
-        style={[
-          styles.header,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }
-        ]}
-      >
+      <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
         <View>
           <Text style={styles.greeting}>Olá, {user?.name}! 👋</Text>
           <Text style={styles.subtitle}>Encontre o serviço que você precisa</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity 
-            onPress={() => setShowProfile(true)} 
-            style={styles.profileButton}
-          >
+          <TouchableOpacity onPress={() => setShowProfile(true)} style={styles.profileButton}>
             <Ionicons name="person-circle" size={32} color="#007AFF" />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
@@ -513,57 +251,27 @@ const fetchProviders = async () => {
         </View>
       </Animated.View>
 
-      <Animated.View 
-        style={[
-          {
-            flex: 1,
-            opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }],
-          }
-        ]}
-      >
+      <Animated.View style={[{ flex: 1, opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
         <FlatList
           data={providers}
           renderItem={renderProvider}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={fetchProviders} />
-          }
+          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchProviders} />}
           showsVerticalScrollIndicator={false}
         />
       </Animated.View>
 
-      {/* Modal de Confirmação com KeyboardAvoidingView */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
+      <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalOverlay}
-          >
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
               <View style={styles.modalOverlay}>
                 <TouchableWithoutFeedback onPress={() => {}}>
-                  <Animated.View 
-                    style={[
-                      styles.modalContent,
-                      {
-                        transform: [{ scale: scaleAnim }],
-                        marginBottom: keyboardHeight > 0 ? keyboardHeight : 0,
-                      }
-                    ]}
-                  >
+                  <Animated.View style={[styles.modalContent, { transform: [{ scale: scaleAnim }], marginBottom: keyboardHeight }]}>
                     <View style={styles.modalHeader}>
                       <Text style={styles.modalTitle}>🛠️ Confirmar Solicitação</Text>
-                      <TouchableOpacity
-                        onPress={() => setModalVisible(false)}
-                        style={styles.closeButton}
-                      >
+                      <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
                         <Ionicons name="close" size={24} color="#666" />
                       </TouchableOpacity>
                     </View>
@@ -575,19 +283,7 @@ const fetchProviders = async () => {
                         </View>
                         <Text style={styles.modalProviderName}>{selectedProvider.name}</Text>
                         <Text style={styles.modalProviderCategory}>🔧 {selectedProvider.category}</Text>
-                        <Text style={styles.modalProviderPrice}>
-                          💰 R$ {selectedProvider.price.toFixed(2)}
-                        </Text>
-                        <View style={styles.providerStats}>
-                          <View style={styles.statItem}>
-                            <Ionicons name="star" size={16} color="#FFD700" />
-                            <Text style={styles.statText}>{selectedProvider.rating.toFixed(1)}</Text>
-                          </View>
-                          <View style={styles.statItem}>
-                            <Ionicons name="location" size={16} color="#666" />
-                            <Text style={styles.statText}>4km</Text>
-                          </View>
-                        </View>
+                        <Text style={styles.modalProviderPrice}>💰 R$ {selectedProvider.price.toFixed(2)}</Text>
                       </View>
                     )}
 
@@ -603,17 +299,10 @@ const fetchProviders = async () => {
                     />
 
                     <View style={styles.modalButtons}>
-                      <TouchableOpacity
-                        style={[styles.modalButton, styles.cancelButton]}
-                        onPress={() => setModalVisible(false)}
-                      >
+                      <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisible(false)}>
                         <Text style={styles.cancelButtonText}>Cancelar</Text>
                       </TouchableOpacity>
-                      
-                      <TouchableOpacity
-                        style={[styles.modalButton, styles.confirmButton]}
-                        onPress={handleConfirmService}
-                      >
+                      <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleConfirmService}>
                         <Ionicons name="checkmark" size={20} color="#fff" />
                         <Text style={styles.confirmButtonText}>Confirmar</Text>
                       </TouchableOpacity>
@@ -630,30 +319,10 @@ const fetchProviders = async () => {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-  },
-  loadingIcon: {
-    marginBottom: 24,
-  },
-  loadingText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  loadingSubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9fa' },
+  loadingIcon: { marginBottom: 24 },
+  loadingText: { fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 8 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -667,30 +336,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  profileButton: {
-    padding: 4,
-  },
-  greeting: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  logoutButton: {
-    padding: 8,
-  },
-  listContainer: {
-    padding: 16,
-  },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  profileButton: { padding: 4 },
+  greeting: { fontSize: 20, fontWeight: 'bold', color: '#333' },
+  subtitle: { fontSize: 14, color: '#666', marginTop: 4 },
+  logoutButton: { padding: 8 },
+  listContainer: { padding: 16 },
   providerCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -704,21 +355,9 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#007AFF',
   },
-  providerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  providerInfo: {
-    flex: 1,
-  },
-  providerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
+  providerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  providerInfo: { flex: 1 },
+  providerName: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 4 },
   providerCategory: {
     fontSize: 14,
     color: '#666',
@@ -728,49 +367,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignSelf: 'flex-start',
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  providerDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  detailText: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  providerDescription: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
-    fontStyle: 'italic',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  statusText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  providerDetails: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  detailText: { marginLeft: 6, fontSize: 14, color: '#666', fontWeight: '500' },
+  providerDescription: { fontSize: 14, color: '#333', lineHeight: 20, fontStyle: 'italic' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 20,
@@ -778,33 +381,11 @@ const styles = StyleSheet.create({
     margin: 20,
     width: '90%',
     maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modalProviderInfo: {
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
-    marginBottom: 20,
-  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
+  closeButton: { padding: 4 },
+  modalProviderInfo: { alignItems: 'center', padding: 20, backgroundColor: '#f8f9fa', borderRadius: 16, marginBottom: 20 },
   providerAvatar: {
     width: 60,
     height: 60,
@@ -814,43 +395,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  modalProviderName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  modalProviderCategory: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  modalProviderPrice: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#4CAF50',
-    marginBottom: 12,
-  },
-  providerStats: {
-    flexDirection: 'row',
-    gap: 20,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
+  modalProviderName: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 4 },
+  modalProviderCategory: { fontSize: 14, color: '#666', marginBottom: 8 },
+  modalProviderPrice: { fontSize: 18, fontWeight: '600', color: '#4CAF50', marginBottom: 12 },
+  inputLabel: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 12 },
   textInput: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -862,40 +410,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafafa',
     textAlignVertical: 'top',
   },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  cancelButton: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  confirmButton: {
-    backgroundColor: '#007AFF',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  confirmButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  modalButtons: { flexDirection: 'row', gap: 12 },
+  modalButton: { flex: 1, paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  cancelButton: { backgroundColor: '#f8f9fa', borderWidth: 1, borderColor: '#ddd' },
+  cancelButtonText: { color: '#666', fontSize: 16, fontWeight: '600' },
+  confirmButton: { backgroundColor: '#007AFF' },
+  confirmButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
