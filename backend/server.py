@@ -415,7 +415,7 @@ async def accept_request(
     if current_user.user_type != UserType.PRESTADOR:
         raise HTTPException(status_code=403, detail="Only providers can accept requests")
     
-    request = await db.service_requests.find_one({"id": request_id, "provider_id": current_user.id})
+    request = await db.service_requests.find_one({"id": request_id, "provider_id": current_user.id}, {"_id": 0})
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
     
@@ -426,7 +426,7 @@ async def accept_request(
     )
     
     # Get provider profile for location
-    provider_profile = await db.provider_profiles.find_one({"user_id": current_user.id})
+    provider_profile = await db.provider_profiles.find_one({"user_id": current_user.id}, {"_id": 0})
     
     # Emit real-time notification to client
     await sio.emit('request_accepted', {
@@ -447,7 +447,7 @@ async def update_request_status(
     status_data: dict,
     current_user: User = Depends(get_current_user)
 ):
-    request = await db.service_requests.find_one({"id": request_id})
+    request = await db.service_requests.find_one({"id": request_id}, {"_id": 0})
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
     
@@ -481,7 +481,7 @@ async def create_rating(
     if current_user.user_type != UserType.CLIENTE:
         raise HTTPException(status_code=403, detail="Only clients can rate services")
     
-    request = await db.service_requests.find_one({"id": rating_data["request_id"], "client_id": current_user.id})
+    request = await db.service_requests.find_one({"id": rating_data["request_id"], "client_id": current_user.id}, {"_id": 0})
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
     
@@ -497,7 +497,7 @@ async def create_rating(
     
     # Update provider's average rating
     ratings = []
-    async for r in db.ratings.find({"provider_id": request["provider_id"]}):
+    async for r in db.ratings.find({"provider_id": request["provider_id"]}, {"_id": 0}):
         ratings.append(r["rating"])
     
     if ratings:
@@ -527,7 +527,7 @@ async def update_provider_location(
     async for request in db.service_requests.find({
         "provider_id": current_user.id,
         "status": {"$in": [RequestStatus.ACCEPTED, RequestStatus.IN_PROGRESS]}
-    }):
+    }, {"_id": 0}):
         distance = calculate_distance(
             location.latitude, location.longitude,
             request["client_latitude"], request["client_longitude"]
