@@ -122,7 +122,7 @@ class FreelancerAppTester:
         
         # Test 3: Login Provider
         login_data = {
-            "email": "joao.encanador@email.com",
+            "email": f"joao.encanador.{int(time.time())}@email.com",
             "password": "senha123"
         }
         
