@@ -1,42 +1,78 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "ServiçoApp",
+    "slug": "servico-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyD629F1gD7ARdLrCGoWgD5Ythg18iqasHA"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar prestadores próximos.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar prestadores próximos.",
+        "NSCameraUsageDescription": "Este app precisa da câmera para validar serviços concluídos.",
+        "NSPhotoLibraryUsageDescription": "Este app precisa acessar suas fotos para validar serviços concluídos."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD629F1gD7ARdLrCGoWgD5Ythg18iqasHA"
+        }
+      }
     },
     "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
       [
-        "expo-splash-screen",
+        "expo-location",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "locationWhenInUsePermission": "Este app precisa da sua localização para encontrar prestadores próximos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Este app precisa acessar suas fotos para validar serviços concluídos.",
+          "cameraPermission": "Este app precisa da câmera para validar serviços concluídos."
         }
       ]
     ],
-    "experiments": {
-      "typedRoutes": true
+    "scheme": "servico-app",
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "servico-app-project"
+      }
     }
   }
 }
