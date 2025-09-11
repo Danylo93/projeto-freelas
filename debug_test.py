@@ -5,16 +5,19 @@ Debug test to identify specific backend issues
 
 import requests
 import json
+import time
 
 BACKEND_URL = "https://jobber.preview.emergentagent.com/api"
 
 def test_auth_and_providers():
     """Test authentication and provider listing"""
     
+    timestamp = int(time.time())
+    
     # Register a client
     client_data = {
         "name": "Test Client",
-        "email": "testclient@example.com",
+        "email": f"testclient{timestamp}@example.com",
         "phone": "+5511999999999",
         "user_type": 2,
         "password": "password123"
@@ -33,7 +36,7 @@ def test_auth_and_providers():
     # Register a provider
     provider_data = {
         "name": "Test Provider",
-        "email": "testprovider@example.com",
+        "email": f"testprovider{timestamp}@example.com",
         "phone": "+5511888888888",
         "user_type": 1,
         "password": "password123"
