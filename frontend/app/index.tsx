@@ -14,47 +14,36 @@ export default function Index() {
   const scaleAnim = new Animated.Value(0);
   const rotateAnim = new Animated.Value(0);
   const fadeAnim = new Animated.Value(0);
-  const bounceAnim = new Animated.Value(0);
 
   useEffect(() => {
-    // Animação da splash screen
-    const splashAnimation = () => {
-      Animated.sequence([
-        // Logo aparece com escala
+    // Se não está carregando e já temos dados de auth, esconder splash
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        setShowSplash(false);
+      }, 2000); // 2 segundos de splash
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
+
+  useEffect(() => {
+    // Animação da splash screen (simplificada)
+    if (showSplash) {
+      Animated.parallel([
         Animated.timing(scaleAnim, {
           toValue: 1,
           duration: 800,
           easing: Easing.elastic(1.2),
           useNativeDriver: true,
         }),
-        // Rotação suave
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 1000,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        // Fade in do texto
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 600,
           useNativeDriver: true,
         }),
-        // Bounce final
-        Animated.spring(bounceAnim, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        // Aguardar um pouco mais antes de esconder splash
-        setTimeout(() => setShowSplash(false), 1000);
-      });
-    };
-
-    splashAnimation();
-  }, []);
+      ]).start();
+    }
+  }, [showSplash]);
 
   const SplashScreen = () => {
     const spin = rotateAnim.interpolate({
