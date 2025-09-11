@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import AuthScreen from './auth';
-import ClientHome from './client';
-import ProviderHome from './provider';
+import AuthScreen from './auth/index';
+import ClientHome from './client/index';
+import ProviderHome from './provider/index';
 
 export default function Index() {
   const { user, isLoading, isAuthenticated } = useAuth();
