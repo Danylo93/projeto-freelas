@@ -410,13 +410,13 @@ async def complete_request(
 
 @api_router.post("/ratings", response_model=Rating)
 async def create_rating(
-    rating: Rating,
+    rating_data: RatingCreate,
     current_user: UserInDB = Depends(get_current_user)
 ):
     if current_user.user_type != UserType.CLIENTE:
         raise HTTPException(status_code=403, detail="Only clients can rate providers")
     
-    rating.client_id = current_user.id
+    rating = Rating(**rating_data.dict(), client_id=current_user.id)
     await db.ratings.insert_one(rating.dict())
     
     # Update provider's average rating
