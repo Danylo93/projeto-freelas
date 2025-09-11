@@ -110,11 +110,23 @@ export default function ClientHome() {
   }, []);
 
   const renderProvider = ({ item }: { item: Provider }) => (
-    <View style={styles.providerCard}>
+    <TouchableOpacity 
+      style={styles.providerCard}
+      onPress={() => handleProviderSelect(item)}
+    >
       <Text style={styles.providerName}>{item.name}</Text>
       <Text style={styles.providerCategory}>{item.category}</Text>
       <Text style={styles.providerPrice}>R$ {item.price.toFixed(2)}</Text>
-    </View>
+      <Text style={styles.providerDescription} numberOfLines={2}>
+        {item.description}
+      </Text>
+      <View style={styles.providerRating}>
+        <Ionicons name="star" size={16} color="#FFD700" />
+        <Text style={styles.ratingText}>
+          {item.rating.toFixed(1)} ({item.total_reviews} avaliações)
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 
   if (isLoading) {
