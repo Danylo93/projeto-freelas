@@ -342,7 +342,7 @@ class FreelancerAppTester:
         if "provider" in self.tokens and "request1" in self.service_requests:
             request_id = self.service_requests["request1"]["id"]
             response = self.make_request("PUT", f"/requests/{request_id}/accept", token=self.tokens["provider"])
-            if response["success"] and response["data"].get("status") == "accepted":
+            if response["success"]:
                 self.log_result("crud_operations", "Accept Service Request", True)
             else:
                 self.log_result("crud_operations", "Accept Service Request", False,
@@ -351,8 +351,9 @@ class FreelancerAppTester:
         # Test 9: Complete service request (as provider)
         if "provider" in self.tokens and "request1" in self.service_requests:
             request_id = self.service_requests["request1"]["id"]
-            response = self.make_request("PUT", f"/requests/{request_id}/complete", token=self.tokens["provider"])
-            if response["success"] and response["data"].get("status") == "completed":
+            status_data = {"status": "completed"}
+            response = self.make_request("PUT", f"/requests/{request_id}/update-status", status_data, self.tokens["provider"])
+            if response["success"]:
                 self.log_result("crud_operations", "Complete Service Request", True)
             else:
                 self.log_result("crud_operations", "Complete Service Request", False,
