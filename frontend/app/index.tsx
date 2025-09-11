@@ -46,27 +46,13 @@ export default function Index() {
   }, [showSplash]);
 
   const SplashScreen = () => {
-    const spin = rotateAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
-    });
-
-    const bounce = bounceAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -10],
-    });
-
     return (
       <View style={styles.splashContainer}>
         <Animated.View
           style={[
             styles.logoContainer,
             {
-              transform: [
-                { scale: scaleAnim },
-                { rotate: spin },
-                { translateY: bounce },
-              ],
+              transform: [{ scale: scaleAnim }],
             },
           ]}
         >
@@ -76,10 +62,6 @@ export default function Index() {
         <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
           <Text style={styles.appName}>ServiçoApp</Text>
           <Text style={styles.tagline}>🔧 Conectando você aos melhores profissionais</Text>
-        </Animated.View>
-
-        <Animated.View style={[styles.loadingDots, { opacity: fadeAnim }]}>
-          <LoadingDots />
         </Animated.View>
       </View>
     );
