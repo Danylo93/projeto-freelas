@@ -202,7 +202,7 @@ class FreelancerAppTester:
         # Test 2: Create another provider for testing
         provider2_data = {
             "name": "Carlos Eletricista",
-            "email": "carlos.eletricista@email.com",
+            "email": f"carlos.eletricista.{int(time.time())}@email.com",
             "phone": "+5511777665544",
             "user_type": 1,
             "password": "senha789"
