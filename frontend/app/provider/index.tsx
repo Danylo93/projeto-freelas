@@ -259,7 +259,7 @@ export default function ProviderHome() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Detalhes da Solicitação</Text>
+              <Text style={styles.modalTitle}>🛠️ Detalhes da Solicitação</Text>
               <TouchableOpacity
                 onPress={() => setModalVisible(false)}
                 style={styles.closeButton}
@@ -273,23 +273,7 @@ export default function ProviderHome() {
                 <View style={styles.modalClientInfo}>
                   <Text style={styles.modalClientName}>{selectedRequest.client_name}</Text>
                   <Text style={styles.modalClientPhone}>{selectedRequest.client_phone}</Text>
-                  
-                  <View style={styles.modalDetailsRow}>
-                    <View style={styles.modalDetailItem}>
-                      <Ionicons name="construct" size={20} color="#007AFF" />
-                      <Text style={styles.modalDetailText}>{selectedRequest.category}</Text>
-                    </View>
-                    
-                    <View style={styles.modalDetailItem}>
-                      <Ionicons name="cash" size={20} color="#4CAF50" />
-                      <Text style={styles.modalDetailText}>R$ {selectedRequest.price.toFixed(2)}</Text>
-                    </View>
-                    
-                    <View style={styles.modalDetailItem}>
-                      <Ionicons name="location" size={20} color="#666" />
-                      <Text style={styles.modalDetailText}>4km</Text>
-                    </View>
-                  </View>
+                  <Text style={styles.modalServicePrice}>R$ {selectedRequest.price.toFixed(2)}</Text>
                 </View>
 
                 <View style={styles.descriptionContainer}>
