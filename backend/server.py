@@ -259,13 +259,13 @@ async def get_me(current_user: UserInDB = Depends(get_current_user)):
 
 @api_router.post("/provider/profile", response_model=ServiceProviderProfile)
 async def create_provider_profile(
-    profile: ServiceProviderProfile,
+    profile_data: ServiceProviderProfileCreate,
     current_user: UserInDB = Depends(get_current_user)
 ):
     if current_user.user_type != UserType.PRESTADOR:
         raise HTTPException(status_code=403, detail="Only providers can create profiles")
     
-    profile.user_id = current_user.id
+    profile = ServiceProviderProfile(**profile_data.dict(), user_id=current_user.id)
     await db.provider_profiles.insert_one(profile.dict())
     return profile
 
