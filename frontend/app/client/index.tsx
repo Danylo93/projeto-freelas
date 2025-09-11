@@ -219,7 +219,25 @@ export default function ClientHome() {
         </View>
       </Animated.View>
 
-  useEffect(() => {
+      <Animated.View 
+        style={[
+          styles.listContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          }
+        ]}
+      >
+        <FlatList
+          data={providers}
+          renderItem={renderProvider}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={fetchProviders} />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      </Animated.View>
     fetchProviders();
   }, []);
 
