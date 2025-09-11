@@ -59,6 +59,51 @@ export default function ClientHome() {
     }
   };
 
+  const handleProviderSelect = (provider: Provider) => {
+    console.log('🎯 Prestador selecionado:', provider.name);
+    setSelectedProvider(provider);
+    setModalVisible(true);
+  };
+
+  const handleConfirmService = async () => {
+    if (!selectedProvider || !serviceDescription.trim()) {
+      Alert.alert('Erro', 'Por favor, descreva o serviço que você precisa');
+      return;
+    }
+
+    try {
+      console.log('🚀 Enviando solicitação...');
+      const requestData = {
+        provider_id: selectedProvider.user_id,
+        category: selectedProvider.category,
+        description: serviceDescription,
+        price: selectedProvider.price,
+        client_latitude: -23.5505,
+        client_longitude: -46.6333,
+      };
+
+      await axios.post(`${API_BASE_URL}/requests`, requestData);
+      
+      Alert.alert(
+        'Solicitação Enviada!',
+        'Aguarde o prestador aceitar sua solicitação',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setModalVisible(false);
+              setServiceDescription('');
+              setSelectedProvider(null);
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error('❌ Erro na solicitação:', error);
+      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao solicitar serviço');
+    }
+  };
+
   useEffect(() => {
     console.log('🚀 [SIMPLE] Iniciando ClientHome...');
     fetchProviders();
