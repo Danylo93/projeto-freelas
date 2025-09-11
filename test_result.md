@@ -101,3 +101,110 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Criar um app mobile e uma API para serviços freelancers similar ao Uber, com autenticação, tempo real, mapas, sistema de avaliações"
+
+backend:
+  - task: "Sistema de autenticação JWT com tipos de usuário (cliente=2, prestador=1)"
+    implemented: false
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Iniciando desenvolvimento da autenticação"
+
+  - task: "Modelos de dados (User, Service, ServiceRequest, Rating)"
+    implemented: false
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Criando modelos para usuários, serviços e solicitações"
+
+  - task: "Socket.io para comunicação em tempo real"
+    implemented: false
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implementar Socket.io para estados em tempo real"
+
+frontend:
+  - task: "Telas de login/registro com tipos de usuário"
+    implemented: false
+    working: "NA"
+    file: "app/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Criando interface de autenticação"
+
+  - task: "Context de autenticação"
+    implemented: false
+    working: "NA"
+    file: "contexts/AuthContext.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Sistema de estado global para autenticação"
+
+  - task: "Tela principal do cliente (lista prestadores)"
+    implemented: false
+    working: "NA"
+    file: "app/cliente/home.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Interface principal para clientes"
+
+  - task: "Tela principal do prestador (lista solicitações)"
+    implemented: false
+    working: "NA"
+    file: "app/prestador/home.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Interface principal para prestadores"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Sistema de autenticação JWT com tipos de usuário"
+    - "Modelos de dados (User, Service, ServiceRequest, Rating)"
+    - "Telas de login/registro com tipos de usuário"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Iniciando desenvolvimento do app de serviços freelancers. Instalei dependências necessárias e criando estrutura inicial."
