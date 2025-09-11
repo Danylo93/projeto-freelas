@@ -105,7 +105,7 @@ class FreelancerAppTester:
         # Test 2: Register Client (user_type = 2)
         client_data = {
             "name": "Maria Santos",
-            "email": "maria.cliente@email.com", 
+            "email": f"maria.cliente.{int(time.time())}@email.com", 
             "phone": "+5511888776655",
             "user_type": 2,
             "password": "senha456"
