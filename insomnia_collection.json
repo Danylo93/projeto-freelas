@@ -1,0 +1,531 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-09-11T18:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "req_auth_register_cliente",
+      "parentId": "fld_auth",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/auth/register",
+      "name": "Registrar Cliente",
+      "description": "Registra um novo cliente no sistema",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"João Cliente\",\n  \"email\": \"joao.cliente@exemplo.com\",\n  \"phone\": \"11999888777\",\n  \"password\": \"123456\",\n  \"user_type\": 2\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1694448000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_register_prestador",
+      "parentId": "fld_auth",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/auth/register",
+      "name": "Registrar Prestador",
+      "description": "Registra um novo prestador no sistema",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Maria Prestadora\",\n  \"email\": \"maria.prestadora@exemplo.com\",\n  \"phone\": \"11888777666\",\n  \"password\": \"123456\",\n  \"user_type\": 1\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1694447000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_login",
+      "parentId": "fld_auth",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/auth/login",
+      "name": "Login",
+      "description": "Faz login no sistema",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"cliente1@exemplo.com\",\n  \"password\": \"123456\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1694446000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_me",
+      "parentId": "fld_auth",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/auth/me",
+      "name": "Obter Usuário Atual",
+      "description": "Retorna dados do usuário autenticado",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694445000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_providers_create_profile",
+      "parentId": "fld_providers",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/provider/profile",
+      "name": "Criar Perfil Prestador",
+      "description": "Cria perfil de prestador (apenas para usuários tipo 1)",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"category\": \"Encanador\",\n  \"price\": 150.00,\n  \"description\": \"Serviços de encanamento residencial e comercial com 15 anos de experiência\",\n  \"status\": \"available\",\n  \"latitude\": -23.5505,\n  \"longitude\": -46.6333,\n  \"rating\": 4.8,\n  \"total_reviews\": 25\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694444000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_providers_list",
+      "parentId": "fld_providers",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/providers",
+      "name": "Listar Prestadores",
+      "description": "Lista todos os prestadores (apenas para clientes)",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694443000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_providers_list_by_category",
+      "parentId": "fld_providers",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/providers?category=Encanador",
+      "name": "Listar Prestadores por Categoria",
+      "description": "Lista prestadores filtrados por categoria",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_category",
+          "name": "category",
+          "value": "Encanador",
+          "description": "Categoria do serviço (Encanador, Eletricista, Borracheiro, etc.)"
+        }
+      ],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694442000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_requests_create",
+      "parentId": "fld_requests",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/requests",
+      "name": "Criar Solicitação",
+      "description": "Cliente solicita serviço de um prestador",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"provider_id\": \"{{ _.provider_id }}\",\n  \"category\": \"Encanador\",\n  \"description\": \"Minha pia da cozinha está vazando e precisa de reparo urgente. O problema começou ontem à noite.\",\n  \"price\": 120.00,\n  \"client_latitude\": -23.5505,\n  \"client_longitude\": -46.6333\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694441000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_requests_list",
+      "parentId": "fld_requests",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/requests",
+      "name": "Listar Solicitações",
+      "description": "Lista solicitações (prestador vê as dele, cliente vê as que fez)",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694440000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_requests_accept",
+      "parentId": "fld_requests",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/requests/{{ _.request_id }}/accept",
+      "name": "Aceitar Solicitação",
+      "description": "Prestador aceita uma solicitação de serviço",
+      "method": "PUT",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694439000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_requests_complete",
+      "parentId": "fld_requests",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/requests/{{ _.request_id }}/complete",
+      "name": "Concluir Serviço",
+      "description": "Prestador marca serviço como concluído",
+      "method": "PUT",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694438000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_ratings_create",
+      "parentId": "fld_ratings",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/ratings",
+      "name": "Criar Avaliação",
+      "description": "Cliente avalia prestador após serviço concluído",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"request_id\": \"{{ _.request_id }}\",\n  \"provider_id\": \"{{ _.provider_id }}\",\n  \"rating\": 5,\n  \"comment\": \"Excelente serviço! Muito profissional e pontual. Resolveu o problema rapidamente e com qualidade. Recomendo!\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694437000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_provider_location_update",
+      "parentId": "fld_providers",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "url": "{{ _.base_url }}/api/provider/location",
+      "name": "Atualizar Localização",
+      "description": "Prestador atualiza sua localização em tempo real",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"latitude\": -23.5489,\n  \"longitude\": -46.6388\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1694436000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "fld_auth",
+      "parentId": "wrk_main",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "name": "🔐 Autenticação",
+      "description": "Endpoints de autenticação (registro, login, verificação)",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1694448000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_providers",
+      "parentId": "wrk_main",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "name": "👷 Prestadores",
+      "description": "Endpoints relacionados aos prestadores de serviço",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1694447000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_requests",
+      "parentId": "wrk_main",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "name": "📋 Solicitações",
+      "description": "Endpoints de solicitações de serviço",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1694446000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_ratings",
+      "parentId": "wrk_main",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "name": "⭐ Avaliações",
+      "description": "Endpoints de avaliações e feedback",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1694445000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "wrk_main",
+      "parentId": null,
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "name": "ServiçoApp API",
+      "description": "API completa do app de serviços freelancers similar ao Uber",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "env_base",
+      "parentId": "wrk_main",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "name": "Base Environment",
+      "data": {
+        "base_url": "https://fixerapp.preview.emergentagent.com",
+        "auth_token": "",
+        "user_id": "",
+        "provider_id": "",
+        "request_id": "",
+        "client_email": "cliente1@exemplo.com",
+        "client_password": "123456",
+        "provider_email": "joao.encanador@exemplo.com",
+        "provider_password": "123456"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url",
+          "auth_token",
+          "user_id",
+          "provider_id",
+          "request_id",
+          "client_email",
+          "client_password",
+          "provider_email",
+          "provider_password"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1694448000000,
+      "_type": "environment"
+    },
+    {
+      "_id": "env_local",
+      "parentId": "env_base",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "name": "Local Development",
+      "data": {
+        "base_url": "http://localhost:8001"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url"
+        ]
+      },
+      "color": "#7d69cb",
+      "isPrivate": false,
+      "metaSortKey": 1694448000000,
+      "_type": "environment"
+    },
+    {
+      "_id": "env_production",
+      "parentId": "env_base",
+      "modified": 1694448000000,
+      "created": 1694448000000,
+      "name": "Production",
+      "data": {
+        "base_url": "https://fixerapp.preview.emergentagent.com"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url"
+        ]
+      },
+      "color": "#d9534f",
+      "isPrivate": false,
+      "metaSortKey": 1694449000000,
+      "_type": "environment"
+    }
+  ]
+}
