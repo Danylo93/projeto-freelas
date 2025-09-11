@@ -41,10 +41,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             user_type: user.user_type,
             token: token,
           },
-          transports: ['polling', 'websocket'], // Tentar polling primeiro
+          transports: ['polling'], // Apenas polling por enquanto para debug
           forceNew: true,
-          timeout: 10000,
-          path: '/socket.io/',
+          timeout: 20000,
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
         });
 
         newSocket.on('connect', () => {
@@ -59,6 +61,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         newSocket.on('connect_error', (error) => {
           console.error('❌ [SOCKET] Erro de conexão:', error.message);
+          console.error('❌ [SOCKET] Detalhes do erro:', error);
+          setIsConnected(false);
+        });
+
+        newSocket.on('reconnect', (attemptNumber) => {
+          console.log('🔄 [SOCKET] Reconectado após', attemptNumber, 'tentativas');
+          setIsConnected(true);
+        });
+
+        newSocket.on('reconnect_error', (error) => {
+          console.error('❌ [SOCKET] Erro de reconexão:', error.message);
+        });
+
+        newSocket.on('reconnect_failed', () => {
+          console.error('❌ [SOCKET] Falha na reconexão após todas as tentativas');
           setIsConnected(false);
         });
 
