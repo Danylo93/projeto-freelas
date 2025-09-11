@@ -41,6 +41,7 @@ export const useAuth = () => {
 };
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
+console.log('🔗 API_BASE_URL:', API_BASE_URL);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
