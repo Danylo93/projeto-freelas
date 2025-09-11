@@ -147,7 +147,15 @@ export default function ClientHome() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Cliente - {user?.name}</Text>
+        <View>
+          <Text style={styles.title}>Cliente - {user?.name}</Text>
+          <View style={styles.connectionIndicator}>
+            <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }]} />
+            <Text style={styles.connectionText}>
+              {isConnected ? '🟢 Socket Conectado' : '🔴 Socket Desconectado'}
+            </Text>
+          </View>
+        </View>
         <TouchableOpacity onPress={logout}>
           <Text style={styles.logoutText}>Sair</Text>
         </TouchableOpacity>
