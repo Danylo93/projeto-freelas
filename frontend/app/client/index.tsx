@@ -104,7 +104,7 @@ export default function ClientHome() {
       };
 
       console.log('🚀 Enviando request:', requestData);
-      console.log('🔑 Token atual:', await axios.defaults.headers.common['Authorization']);
+      console.log('🔑 Authorization header:', axios.defaults.headers.common['Authorization']);
       
       const response = await axios.post(`${API_BASE_URL}/requests`, requestData);
       console.log('✅ Resposta da API:', response.data);
