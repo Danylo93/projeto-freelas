@@ -37,6 +37,9 @@ interface Provider {
 export default function ClientHome() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [serviceDescription, setServiceDescription] = useState('');
   const { user, logout } = useAuth();
 
   const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
