@@ -84,10 +84,13 @@ class FreelancerAppTester:
         """Test JWT authentication with user types"""
         print("\n🔐 Testing Authentication System...")
         
+        # Generate timestamp for unique emails
+        timestamp = int(time.time())
+        
         # Test 1: Register Provider (user_type = 1)
         provider_data = {
             "name": "João Silva",
-            "email": f"joao.encanador.{int(time.time())}@email.com",
+            "email": f"joao.encanador.{timestamp}@email.com",
             "phone": "+5511999887766",
             "user_type": 1,
             "password": "senha123"
@@ -105,7 +108,7 @@ class FreelancerAppTester:
         # Test 2: Register Client (user_type = 2)
         client_data = {
             "name": "Maria Santos",
-            "email": f"maria.cliente.{int(time.time())}@email.com", 
+            "email": f"maria.cliente.{timestamp}@email.com", 
             "phone": "+5511888776655",
             "user_type": 2,
             "password": "senha456"
@@ -122,7 +125,7 @@ class FreelancerAppTester:
         
         # Test 3: Login Provider
         login_data = {
-            "email": f"joao.encanador.{int(time.time())}@email.com",
+            "email": f"joao.encanador.{timestamp}@email.com",
             "password": "senha123"
         }
         
@@ -135,7 +138,7 @@ class FreelancerAppTester:
         
         # Test 4: Login Client
         login_data = {
-            "email": f"maria.cliente.{int(time.time())}@email.com",
+            "email": f"maria.cliente.{timestamp}@email.com",
             "password": "senha456"
         }
         
