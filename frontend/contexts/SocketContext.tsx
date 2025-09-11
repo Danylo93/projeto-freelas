@@ -31,7 +31,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log('🔌 [SOCKET] User:', user.name, 'Type:', user.user_type);
       
       try {
-        const newSocket = io(process.env.EXPO_PUBLIC_BACKEND_URL!, {
+        // Socket.io conecta no mesmo servidor da API mas não precisa do /api prefix
+        const socketUrl = process.env.EXPO_PUBLIC_BACKEND_URL!;
+        console.log('🔌 [SOCKET] Conectando em:', socketUrl);
+        
+        const newSocket = io(socketUrl, {
           auth: {
             user_id: user.id,
             user_type: user.user_type,
@@ -40,6 +44,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           transports: ['polling', 'websocket'], // Tentar polling primeiro
           forceNew: true,
           timeout: 10000,
+          path: '/socket.io/',
         });
 
         newSocket.on('connect', () => {
