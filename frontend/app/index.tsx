@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import AuthScreen from './auth/index';
 import ClientHome from './client/index';
@@ -7,14 +8,125 @@ import ProviderHome from './provider/index';
 
 export default function Index() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const [showSplash, setShowSplash] = useState(true);
 
-  if (isLoading) {
+  // Animações da splash
+  const scaleAnim = new Animated.Value(0);
+  const rotateAnim = new Animated.Value(0);
+  const fadeAnim = new Animated.Value(0);
+  const bounceAnim = new Animated.Value(0);
+
+  useEffect(() => {
+    // Animação da splash screen
+    const splashAnimation = () => {
+      Animated.sequence([
+        // Logo aparece com escala
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.elastic(1.2),
+          useNativeDriver: true,
+        }),
+        // Rotação suave
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        // Fade in do texto
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        // Bounce final
+        Animated.spring(bounceAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // Aguardar um pouco mais antes de esconder splash
+        setTimeout(() => setShowSplash(false), 1000);
+      });
+    };
+
+    splashAnimation();
+  }, []);
+
+  const SplashScreen = () => {
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    const bounce = bounceAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, -10],
+    });
+
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Carregando...</Text>
+      <View style={styles.splashContainer}>
+        <Animated.View
+          style={[
+            styles.logoContainer,
+            {
+              transform: [
+                { scale: scaleAnim },
+                { rotate: spin },
+                { translateY: bounce },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name="construct" size={80} color="#007AFF" />
+        </Animated.View>
+        
+        <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
+          <Text style={styles.appName}>ServiçoApp</Text>
+          <Text style={styles.tagline}>🔧 Conectando você aos melhores profissionais</Text>
+        </Animated.View>
+
+        <Animated.View style={[styles.loadingDots, { opacity: fadeAnim }]}>
+          <LoadingDots />
+        </Animated.View>
       </View>
     );
+  };
+
+  const LoadingDots = () => {
+    const dot1 = new Animated.Value(0);
+    const dot2 = new Animated.Value(0);
+    const dot3 = new Animated.Value(0);
+
+    React.useEffect(() => {
+      const animate = () => {
+        Animated.sequence([
+          Animated.timing(dot1, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot2, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot3, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot1, { toValue: 0, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot2, { toValue: 0, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot3, { toValue: 0, duration: 300, useNativeDriver: true }),
+        ]).start(() => animate());
+      };
+      animate();
+    }, []);
+
+    return (
+      <View style={styles.dotsContainer}>
+        <Animated.View style={[styles.dot, { opacity: dot1 }]} />
+        <Animated.View style={[styles.dot, { opacity: dot2 }]} />
+        <Animated.View style={[styles.dot, { opacity: dot3 }]} />
+      </View>
+    );
+  };
+
+  // Mostrar splash screen enquanto está carregando ou durante animação
+  if (isLoading || showSplash) {
+    return <SplashScreen />;
   }
 
   if (!isAuthenticated || !user) {
@@ -44,10 +156,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    marginTop: 16,
+  splashContainer: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 120,
+    height: 120,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 60,
+    marginBottom: 40,
+    elevation: 10,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  textContainer: {
+    alignItems: 'center',
+    marginBottom: 50,
+  },
+  appName: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 8,
+  },
+  tagline: {
     fontSize: 16,
     color: '#666',
+    textAlign: 'center',
+    paddingHorizontal: 40,
+    lineHeight: 22,
+  },
+  loadingDots: {
+    position: 'absolute',
+    bottom: 100,
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#007AFF',
   },
   errorText: {
     fontSize: 16,
