@@ -214,4 +214,6 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Completei a implementação básica do sistema: autenticação, modelos de dados, interfaces cliente/prestador, e Socket.io. Pronto para testar backend."
+    message: "Backend testado manualmente com sucesso! Fluxo completo funcionando: registro→login→criação de perfil prestador→solicitação de serviço→aceitação→conclusão. Frontend tem tela de auth funcionando mas pode haver problema na comunicação com API."
+  - agent: "main"
+    message: "Próximo passo: implementar funcionalidades de mapas, socket.io no frontend, e adicionar dados de prestadores padrão."
