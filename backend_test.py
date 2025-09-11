@@ -87,7 +87,7 @@ class FreelancerAppTester:
         # Test 1: Register Provider (user_type = 1)
         provider_data = {
             "name": "João Silva",
-            "email": "joao.encanador@email.com",
+            "email": f"joao.encanador.{int(time.time())}@email.com",
             "phone": "+5511999887766",
             "user_type": 1,
             "password": "senha123"
