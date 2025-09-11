@@ -64,6 +64,7 @@ export default function ClientHome() {
       
       const response = await axios.get(`${API_BASE_URL}/providers`);
       console.log('✅ Prestadores carregados:', response.data.length);
+      console.log('📋 Dados dos prestadores:', response.data);
       setProviders(response.data);
     } catch (error: any) {
       console.error('❌ Erro ao carregar prestadores:', error);
@@ -71,6 +72,7 @@ export default function ClientHome() {
       console.error('❌ Data:', error.response?.data);
       Alert.alert('Erro', 'Não foi possível carregar os prestadores');
     } finally {
+      console.log('🏁 Finalizando carregamento...');
       setIsLoading(false);
     }
   };
