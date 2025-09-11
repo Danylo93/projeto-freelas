@@ -262,6 +262,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
   },
+  connectionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  connectionText: {
+    color: '#fff',
+    fontSize: 12,
+  },
   listContainer: {
     padding: 16,
   },
