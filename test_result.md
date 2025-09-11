@@ -106,40 +106,52 @@ user_problem_statement: "Criar um app mobile e uma API para serviços freelancer
 
 backend:
   - task: "Sistema de autenticação JWT com tipos de usuário (cliente=2, prestador=1)"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Iniciando desenvolvimento da autenticação"
+        comment: "Implementado sistema completo de autenticação JWT com registro/login e tipos de usuário"
 
   - task: "Modelos de dados (User, Service, ServiceRequest, Rating)"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Criando modelos para usuários, serviços e solicitações"
+        comment: "Implementados todos os modelos: User, ServiceProviderProfile, ServiceRequest, Rating"
 
   - task: "Socket.io para comunicação em tempo real"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Implementar Socket.io para estados em tempo real"
+        comment: "Implementado Socket.io com eventos para notificações em tempo real"
+
+  - task: "CRUD de prestadores e solicitações"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implementados endpoints para criar/listar prestadores, aceitar/concluir solicitações"
 
 frontend:
   - task: "Telas de login/registro com tipos de usuário"
