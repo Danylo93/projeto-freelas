@@ -507,3 +507,6 @@ async def shutdown_db_client():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(socket_app, host="0.0.0.0", port=8001)
+
+# For production, export socket_app
+app = socket_app
