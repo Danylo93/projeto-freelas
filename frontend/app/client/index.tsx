@@ -254,15 +254,7 @@ export default function ClientHome() {
       <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
         <View>
           <Text style={styles.greeting}>Olá, {user?.name}! 👋</Text>
-          <View style={styles.subtitleContainer}>
-            <Text style={styles.subtitle}>Encontre o serviço que você precisa</Text>
-            <View style={styles.connectionIndicator}>
-              <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }]} />
-              <Text style={styles.connectionText}>
-                {isConnected ? '🟢 Online' : '🔴 Offline'}
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.subtitle}>Encontre o serviço que você precisa</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={() => setShowProfile(true)} style={styles.profileButton}>
