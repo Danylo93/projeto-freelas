@@ -179,6 +179,46 @@ export default function ClientHome() {
     );
   };
 
+  if (showProfile) {
+    return <ProfileScreen onBack={() => setShowProfile(false)} />;
+  }
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LoadingAnimation />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Animated.View 
+        style={[
+          styles.header,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          }
+        ]}
+      >
+        <View>
+          <Text style={styles.greeting}>Olá, {user?.name}! 👋</Text>
+          <Text style={styles.subtitle}>Encontre o serviço que você precisa</Text>
+        </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            onPress={() => setShowProfile(true)} 
+            style={styles.profileButton}
+          >
+            <Ionicons name="person-circle" size={32} color="#007AFF" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={24} color="#F44336" />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
   useEffect(() => {
     fetchProviders();
   }, []);
