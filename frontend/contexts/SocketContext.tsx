@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { Alert } from 'react-native';
 
 interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
+  sendMessage: (event: string, data: any) => void;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -24,7 +26,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     if (user && token) {
-      console.log('🔌 Conectando ao Socket.io...');
+      console.log('🔌 [SOCKET] Iniciando conexão Socket.io...');
+      console.log('🔌 [SOCKET] URL:', process.env.EXPO_PUBLIC_BACKEND_URL);
+      console.log('🔌 [SOCKET] User:', user.name, 'Type:', user.user_type);
       
       try {
         const newSocket = io(process.env.EXPO_PUBLIC_BACKEND_URL!, {
@@ -33,57 +37,94 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             user_type: user.user_type,
             token: token,
           },
-          transports: ['websocket', 'polling'],
+          transports: ['polling', 'websocket'], // Tentar polling primeiro
+          forceNew: true,
+          timeout: 10000,
         });
 
         newSocket.on('connect', () => {
-          console.log('✅ Socket.io conectado:', newSocket.id);
+          console.log('✅ [SOCKET] Conectado com ID:', newSocket.id);
           setIsConnected(true);
         });
 
-        newSocket.on('disconnect', () => {
-          console.log('❌ Socket.io desconectado');
+        newSocket.on('disconnect', (reason) => {
+          console.log('❌ [SOCKET] Desconectado. Motivo:', reason);
           setIsConnected(false);
         });
 
         newSocket.on('connect_error', (error) => {
-          console.error('❌ Erro de conexão Socket.io:', error);
+          console.error('❌ [SOCKET] Erro de conexão:', error.message);
           setIsConnected(false);
         });
 
+        // Event listeners específicos para o app
         newSocket.on('new_request', (data) => {
-          console.log('🔔 Nova solicitação recebida:', data);
+          console.log('🔔 [SOCKET] Nova solicitação recebida:', data);
+          if (user.user_type === 1) { // Prestador
+            Alert.alert(
+              '🔔 Nova Solicitação!',
+              `Cliente: ${data.client_name}\nServiço: ${data.category}\nValor: R$ ${data.price}`,
+              [{ text: 'OK' }]
+            );
+          }
         });
 
         newSocket.on('request_accepted', (data) => {
-          console.log('✅ Solicitação aceita:', data);
+          console.log('✅ [SOCKET] Solicitação aceita:', data);
+          if (user.user_type === 2) { // Cliente
+            Alert.alert(
+              '✅ Solicitação Aceita!',
+              `O prestador aceitou seu serviço de ${data.category}`,
+              [{ text: 'OK' }]
+            );
+          }
         });
 
         newSocket.on('request_completed', (data) => {
-          console.log('🎉 Serviço concluído:', data);
+          console.log('🎉 [SOCKET] Serviço concluído:', data);
+          if (user.user_type === 2) { // Cliente
+            Alert.alert(
+              '🎉 Serviço Concluído!',
+              'O prestador finalizou o serviço. Avalie a qualidade!',
+              [{ text: 'OK' }]
+            );
+          }
         });
 
         newSocket.on('location_updated', (data) => {
-          console.log('📍 Localização atualizada:', data);
+          console.log('📍 [SOCKET] Localização atualizada:', data);
         });
 
         setSocket(newSocket);
 
         return () => {
-          console.log('🔌 Desconectando Socket.io...');
-          newSocket.close();
+          console.log('🔌 [SOCKET] Limpando conexão...');
+          newSocket.disconnect();
           setSocket(null);
           setIsConnected(false);
         };
       } catch (error) {
-        console.error('❌ Erro ao criar Socket.io:', error);
+        console.error('❌ [SOCKET] Erro ao criar Socket.io:', error);
+        setIsConnected(false);
       }
+    } else {
+      console.log('⏳ [SOCKET] Aguardando autenticação...');
     }
   }, [user, token]);
+
+  const sendMessage = (event: string, data: any) => {
+    if (socket && isConnected) {
+      console.log(`📤 [SOCKET] Enviando ${event}:`, data);
+      socket.emit(event, data);
+    } else {
+      console.warn('⚠️ [SOCKET] Não conectado. Não foi possível enviar:', event);
+    }
+  };
 
   const value: SocketContextType = {
     socket,
     isConnected,
+    sendMessage,
   };
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
