@@ -309,8 +309,8 @@ async def get_providers(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Only clients can view providers")
     
     providers = []
-    async for provider in db.provider_profiles.find():
-        user = await db.users.find_one({"id": provider["user_id"]})
+    async for provider in db.provider_profiles.find({}, {"_id": 0}):
+        user = await db.users.find_one({"id": provider["user_id"]}, {"_id": 0})
         if user:
             # Calculate distance (assuming client is at a default location for now)
             distance = calculate_distance(-23.5489, -46.6388, provider["latitude"], provider["longitude"])
