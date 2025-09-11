@@ -20,9 +20,12 @@ export const useSocket = () => {
 };
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  console.log('🚀 [SOCKET] SocketProvider inicializado');
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { user, token } = useAuth();
+  
+  console.log('🔍 [SOCKET] Estado atual:', { user: user?.name, token: !!token, isConnected });
 
   useEffect(() => {
     if (user && token) {
