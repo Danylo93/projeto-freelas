@@ -125,35 +125,23 @@ export default function ProviderHome() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return '#FF9800';
-      case 'accepted':
-        return '#2196F3';
-      case 'in_progress':
-        return '#4CAF50';
-      case 'completed':
-        return '#8BC34A';
-      case 'cancelled':
-        return '#F44336';
-      default:
-        return '#999';
+      case 'pending': return '#FF9800';
+      case 'accepted': return '#2196F3';
+      case 'in_progress': return '#4CAF50';
+      case 'completed': return '#8BC34A';
+      case 'cancelled': return '#F44336';
+      default: return '#999';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'Pendente';
-      case 'accepted':
-        return 'Aceita';
-      case 'in_progress':
-        return 'Em Progresso';
-      case 'completed':
-        return 'Concluída';
-      case 'cancelled':
-        return 'Cancelada';
-      default:
-        return 'Desconhecido';
+      case 'pending': return 'Pendente';
+      case 'accepted': return 'Aceita';
+      case 'in_progress': return 'Em Progresso';
+      case 'completed': return 'Concluída';
+      case 'cancelled': return 'Cancelada';
+      default: return 'Desconhecido';
     }
   };
 
