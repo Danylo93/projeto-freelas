@@ -104,6 +104,8 @@ export default function ClientHome() {
       };
 
       console.log('🚀 Enviando request:', requestData);
+      console.log('🔑 Token atual:', await axios.defaults.headers.common['Authorization']);
+      
       const response = await axios.post(`${API_BASE_URL}/requests`, requestData);
       console.log('✅ Resposta da API:', response.data);
       
@@ -117,14 +119,24 @@ export default function ClientHome() {
               setModalVisible(false);
               setServiceDescription('');
               setSelectedProvider(null);
+              // Refresh the providers list
+              fetchProviders();
             },
           },
         ]
       );
     } catch (error: any) {
       console.error('❌ Erro na solicitação:', error);
-      console.error('❌ Detalhes do erro:', error.response?.data);
-      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao solicitar serviço');
+      console.error('❌ Response status:', error.response?.status);
+      console.error('❌ Response data:', error.response?.data);
+      console.error('❌ Request config:', error.config);
+      
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Erro ao solicitar serviço';
+      
+      Alert.alert('Erro', `Falha na solicitação: ${errorMessage}`);
     }
   };
 
