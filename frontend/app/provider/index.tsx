@@ -60,9 +60,23 @@ export default function ProviderHome() {
   };
 
   useEffect(() => {
+    console.log('🚀 [PROVIDER] Iniciando ProviderHome...');
     fetchRequests();
-    // TODO: Setup Socket.io for real-time updates
-  }, []);
+
+    // Listen for new requests in real-time
+    if (socket) {
+      socket.on('new_request', (data) => {
+        console.log('🔔 [PROVIDER] Nova solicitação via Socket:', data);
+        fetchRequests(); // Refresh the list
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.off('new_request');
+      }
+    };
+  }, [socket]);
 
   const fetchRequests = async () => {
     try {
