@@ -37,6 +37,11 @@ export default function ClientHome() {
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [serviceDescription, setServiceDescription] = useState('');
+  const { user, logout } = useAuth();
+  const router = useRouter();
+
+  const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
+
   const handleLogout = () => {
     Alert.alert(
       'Confirmar Logout',
@@ -57,8 +62,6 @@ export default function ClientHome() {
       ]
     );
   };
-
-  const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
 
   useEffect(() => {
     fetchProviders();
