@@ -80,6 +80,7 @@ export default function ProviderHome() {
   };
 
   const handleRequestSelect = (request: ServiceRequest) => {
+    console.log('🎯 Solicitação selecionada:', request.client_name);
     setSelectedRequest(request);
     setModalVisible(true);
   };
