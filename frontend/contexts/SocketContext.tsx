@@ -26,50 +26,58 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (user && token) {
       console.log('🔌 Conectando ao Socket.io...');
       
-      const newSocket = io(process.env.EXPO_PUBLIC_BACKEND_URL!, {
-        auth: {
-          user_id: user.id,
-          user_type: user.user_type,
-          token: token,
-        },
-        transports: ['websocket', 'polling'],
-      });
+      try {
+        const newSocket = io(process.env.EXPO_PUBLIC_BACKEND_URL!, {
+          auth: {
+            user_id: user.id,
+            user_type: user.user_type,
+            token: token,
+          },
+          transports: ['websocket', 'polling'],
+        });
 
-      newSocket.on('connect', () => {
-        console.log('✅ Socket.io conectado:', newSocket.id);
-        setIsConnected(true);
-      });
+        newSocket.on('connect', () => {
+          console.log('✅ Socket.io conectado:', newSocket.id);
+          setIsConnected(true);
+        });
 
-      newSocket.on('disconnect', () => {
-        console.log('❌ Socket.io desconectado');
-        setIsConnected(false);
-      });
+        newSocket.on('disconnect', () => {
+          console.log('❌ Socket.io desconectado');
+          setIsConnected(false);
+        });
 
-      newSocket.on('new_request', (data) => {
-        console.log('🔔 Nova solicitação recebida:', data);
-        // Aqui você pode adicionar notificações push ou atualizações em tempo real
-      });
+        newSocket.on('connect_error', (error) => {
+          console.error('❌ Erro de conexão Socket.io:', error);
+          setIsConnected(false);
+        });
 
-      newSocket.on('request_accepted', (data) => {
-        console.log('✅ Solicitação aceita:', data);
-      });
+        newSocket.on('new_request', (data) => {
+          console.log('🔔 Nova solicitação recebida:', data);
+        });
 
-      newSocket.on('request_completed', (data) => {
-        console.log('🎉 Serviço concluído:', data);
-      });
+        newSocket.on('request_accepted', (data) => {
+          console.log('✅ Solicitação aceita:', data);
+        });
 
-      newSocket.on('location_updated', (data) => {
-        console.log('📍 Localização atualizada:', data);
-      });
+        newSocket.on('request_completed', (data) => {
+          console.log('🎉 Serviço concluído:', data);
+        });
 
-      setSocket(newSocket);
+        newSocket.on('location_updated', (data) => {
+          console.log('📍 Localização atualizada:', data);
+        });
 
-      return () => {
-        console.log('🔌 Desconectando Socket.io...');
-        newSocket.close();
-        setSocket(null);
-        setIsConnected(false);
-      };
+        setSocket(newSocket);
+
+        return () => {
+          console.log('🔌 Desconectando Socket.io...');
+          newSocket.close();
+          setSocket(null);
+          setIsConnected(false);
+        };
+      } catch (error) {
+        console.error('❌ Erro ao criar Socket.io:', error);
+      }
     }
   }, [user, token]);
 
