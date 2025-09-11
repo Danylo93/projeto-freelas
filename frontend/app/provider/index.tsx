@@ -66,11 +66,15 @@ export default function ProviderHome() {
 
   const fetchRequests = async () => {
     try {
+      console.log('🔄 [PROVIDER] Buscando solicitações...');
       const response = await axios.get(`${API_BASE_URL}/requests`);
+      console.log('✅ [PROVIDER] Solicitações carregadas:', response.data.length);
       setRequests(response.data);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ [PROVIDER] Erro:', error);
       Alert.alert('Erro', 'Não foi possível carregar as solicitações');
     } finally {
+      console.log('🏁 [PROVIDER] Finalizando carregamento...');
       setIsLoading(false);
     }
   };
