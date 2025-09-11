@@ -155,68 +155,63 @@ backend:
 
 frontend:
   - task: "Telas de login/registro com tipos de usuário"
-    implemented: false
+    implemented: true
     working: "NA"
-    file: "app/index.tsx"
+    file: "app/auth/index.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Criando interface de autenticação"
+        comment: "Implementada tela de autenticação completa com seletor de tipo de usuário"
 
   - task: "Context de autenticação"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "contexts/AuthContext.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Sistema de estado global para autenticação"
+        comment: "Implementado AuthContext com AsyncStorage e integração com API"
 
   - task: "Tela principal do cliente (lista prestadores)"
-    implemented: false
+    implemented: true
     working: "NA"
-    file: "app/cliente/home.tsx"
+    file: "app/client/index.tsx"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Interface principal para clientes"
+        comment: "Implementada interface para clientes visualizarem e solicitarem serviços"
 
   - task: "Tela principal do prestador (lista solicitações)"
-    implemented: false
+    implemented: true
     working: "NA"
-    file: "app/prestador/home.tsx"
+    file: "app/provider/index.tsx"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Interface principal para prestadores"
-
-metadata:
-  created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 0
-  run_ui: false
+        comment: "Implementada interface para prestadores visualizarem e aceitarem solicitações"
 
 test_plan:
   current_focus:
     - "Sistema de autenticação JWT com tipos de usuário"
     - "Modelos de dados (User, Service, ServiceRequest, Rating)"
-    - "Telas de login/registro com tipos de usuário"
+    - "CRUD de prestadores e solicitações"
+    - "Socket.io para comunicação em tempo real"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Iniciando desenvolvimento do app de serviços freelancers. Instalei dependências necessárias e criando estrutura inicial."
+    message: "Completei a implementação básica do sistema: autenticação, modelos de dados, interfaces cliente/prestador, e Socket.io. Pronto para testar backend."
