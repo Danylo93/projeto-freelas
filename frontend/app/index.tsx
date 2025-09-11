@@ -1,29 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
+import AuthScreen from './auth';
+import ClientHome from './client';
+import ProviderHome from './provider';
 
 export default function Index() {
   const { user, isLoading, isAuthenticated } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated && user) {
-        // Redirect based on user type
-        if (user.user_type === 1) {
-          // Prestador
-          router.replace('/provider/');
-        } else if (user.user_type === 2) {
-          // Cliente
-          router.replace('/client/');
-        }
-      } else {
-        // Not authenticated, go to auth screen
-        router.replace('/auth');
-      }
-    }
-  }, [isLoading, isAuthenticated, user, router]);
 
   if (isLoading) {
     return (
@@ -34,10 +17,22 @@ export default function Index() {
     );
   }
 
+  if (!isAuthenticated || !user) {
+    return <AuthScreen />;
+  }
+
+  // Redirect based on user type
+  if (user.user_type === 1) {
+    // Prestador
+    return <ProviderHome />;
+  } else if (user.user_type === 2) {
+    // Cliente
+    return <ClientHome />;
+  }
+
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#007AFF" />
-      <Text style={styles.loadingText}>Redirecionando...</Text>
+      <Text style={styles.errorText}>Erro: Tipo de usuário inválido</Text>
     </View>
   );
 }
@@ -53,5 +48,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#F44336',
   },
 });
