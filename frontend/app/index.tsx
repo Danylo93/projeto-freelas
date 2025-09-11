@@ -69,19 +69,23 @@ export default function Index() {
 
   // Mostrar splash screen enquanto está carregando ou durante animação
   if (isLoading || showSplash) {
+    console.log('🔄 [INDEX] Mostrando splash screen');
     return <SplashScreen />;
   }
 
   if (!isAuthenticated || !user) {
+    console.log('❌ [INDEX] Usuário não autenticado, mostrando AuthScreen');
     return <AuthScreen />;
   }
 
+  console.log('✅ [INDEX] Usuário autenticado:', user.name, 'Tipo:', user.user_type);
+
   // Redirect based on user type
   if (user.user_type === 1) {
-    // Prestador
+    console.log('👷 [INDEX] Redirecionando para ProviderHome');
     return <ProviderHome />;
   } else if (user.user_type === 2) {
-    // Cliente
+    console.log('👤 [INDEX] Redirecionando para ClientHome');
     return <ClientHome />;
   }
 
