@@ -9,10 +9,15 @@ import {
   RefreshControl,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSocket } from '../../contexts/SocketContext';
 import axios from 'axios';
 
 interface Provider {
@@ -37,45 +42,27 @@ export default function ClientHome() {
   const [modalVisible, setModalVisible] = useState(false);
   const [serviceDescription, setServiceDescription] = useState('');
   const { user, logout } = useAuth();
+  const { socket, isConnected, sendMessage } = useSocket();
 
   const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Confirmar Logout',
-      'Tem certeza que deseja sair?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Sair',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-          },
-        },
-      ]
-    );
-  };
-
-  useEffect(() => {
-    fetchProviders();
-  }, []);
-
   const fetchProviders = async () => {
     try {
+      console.log('🔄 [SIMPLE] Buscando prestadores...');
       const response = await axios.get(`${API_BASE_URL}/providers`);
+      console.log('✅ [SIMPLE] Prestadores carregados:', response.data.length);
       setProviders(response.data);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ [SIMPLE] Erro:', error);
       Alert.alert('Erro', 'Não foi possível carregar os prestadores');
     } finally {
+      console.log('🏁 [SIMPLE] Finalizando carregamento...');
       setIsLoading(false);
     }
   };
 
   const handleProviderSelect = (provider: Provider) => {
+    console.log('🎯 Prestador selecionado:', provider.name);
     setSelectedProvider(provider);
     setModalVisible(true);
   };
@@ -87,24 +74,17 @@ export default function ClientHome() {
     }
 
     try {
-      console.log('🛠️ Iniciando solicitação de serviço...');
-      console.log('Provider:', selectedProvider);
-      console.log('Description:', serviceDescription);
-      
+      console.log('🚀 Enviando solicitação...');
       const requestData = {
         provider_id: selectedProvider.user_id,
         category: selectedProvider.category,
         description: serviceDescription,
         price: selectedProvider.price,
-        client_latitude: -23.5505, // Mock location - São Paulo
+        client_latitude: -23.5505,
         client_longitude: -46.6333,
       };
 
-      console.log('🚀 Enviando request:', requestData);
-      console.log('🔑 Authorization header:', axios.defaults.headers.common['Authorization']);
-      
-      const response = await axios.post(`${API_BASE_URL}/requests`, requestData);
-      console.log('✅ Resposta da API:', response.data);
+      await axios.post(`${API_BASE_URL}/requests`, requestData);
       
       Alert.alert(
         'Solicitação Enviada!',
@@ -116,102 +96,68 @@ export default function ClientHome() {
               setModalVisible(false);
               setServiceDescription('');
               setSelectedProvider(null);
-              // Refresh the providers list
-              fetchProviders();
             },
           },
         ]
       );
     } catch (error: any) {
       console.error('❌ Erro na solicitação:', error);
-      console.error('❌ Response status:', error.response?.status);
-      console.error('❌ Response data:', error.response?.data);
-      console.error('❌ Request config:', error.config);
-      
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          'Erro ao solicitar serviço';
-      
-      Alert.alert('Erro', `Falha na solicitação: ${errorMessage}`);
+      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao solicitar serviço');
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'available':
-        return '#4CAF50';
-      case 'busy':
-        return '#FF9800';
-      case 'offline':
-        return '#F44336';
-      default:
-        return '#999';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'available':
-        return 'Online';
-      case 'busy':
-        return 'Ocupado';
-      case 'offline':
-        return 'Offline';
-      default:
-        return 'Desconhecido';
-    }
-  };
+  useEffect(() => {
+    console.log('🚀 [SIMPLE] Iniciando ClientHome...');
+    fetchProviders();
+  }, []);
 
   const renderProvider = ({ item }: { item: Provider }) => (
-    <TouchableOpacity
+    <TouchableOpacity 
       style={styles.providerCard}
       onPress={() => handleProviderSelect(item)}
     >
-      <View style={styles.providerHeader}>
-        <View style={styles.providerInfo}>
-          <Text style={styles.providerName}>{item.name}</Text>
-          <Text style={styles.providerCategory}>{item.category}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.providerDetails}>
-        <View style={styles.detailRow}>
-          <Ionicons name="cash" size={16} color="#666" />
-          <Text style={styles.detailText}>R$ {item.price.toFixed(2)}</Text>
-        </View>
-        
-        <View style={styles.detailRow}>
-          <Ionicons name="star" size={16} color="#FFD700" />
-          <Text style={styles.detailText}>
-            {item.rating.toFixed(1)} ({item.total_reviews} avaliações)
-          </Text>
-        </View>
-        
-        <View style={styles.detailRow}>
-          <Ionicons name="location" size={16} color="#666" />
-          <Text style={styles.detailText}>3.2 km</Text>
-        </View>
-      </View>
-      
+      <Text style={styles.providerName}>{item.name}</Text>
+      <Text style={styles.providerCategory}>{item.category}</Text>
+      <Text style={styles.providerPrice}>R$ {item.price.toFixed(2)}</Text>
       <Text style={styles.providerDescription} numberOfLines={2}>
         {item.description}
       </Text>
+      <View style={styles.providerRating}>
+        <Ionicons name="star" size={16} color="#FFD700" />
+        <Text style={styles.ratingText}>
+          {item.rating.toFixed(1)} ({item.total_reviews} avaliações)
+        </Text>
+      </View>
     </TouchableOpacity>
   );
+
+  if (isLoading) {
+    console.log('🔄 [SIMPLE] Mostrando loading...');
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text>Carregando prestadores...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  console.log('🎯 [SIMPLE] Renderizando lista com', providers.length, 'prestadores');
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Olá, {user?.name}!</Text>
-          <Text style={styles.subtitle}>Encontre o serviço que você precisa</Text>
+          <Text style={styles.title}>Cliente - {user?.name}</Text>
+          <View style={styles.connectionIndicator}>
+            <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }]} />
+            <Text style={styles.connectionText}>
+              {isConnected ? '🟢 Socket Conectado' : '🔴 Socket Desconectado'}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#F44336" />
+        <TouchableOpacity onPress={logout}>
+          <Text style={styles.logoutText}>Sair</Text>
         </TouchableOpacity>
       </View>
 
@@ -220,10 +166,7 @@ export default function ClientHome() {
         renderItem={renderProvider}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={fetchProviders} />
-        }
-        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchProviders} />}
       />
 
       {/* Modal de Confirmação */}
@@ -233,56 +176,61 @@ export default function ClientHome() {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Confirmar Solicitação</Text>
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            {selectedProvider && (
-              <View style={styles.modalProviderInfo}>
-                <Text style={styles.modalProviderName}>{selectedProvider.name}</Text>
-                <Text style={styles.modalProviderCategory}>{selectedProvider.category}</Text>
-                <Text style={styles.modalProviderPrice}>
-                  R$ {selectedProvider.price.toFixed(2)}
-                </Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>🛠️ Confirmar Solicitação</Text>
+                <TouchableOpacity
+                  onPress={() => setModalVisible(false)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
               </View>
-            )}
 
-            <Text style={styles.inputLabel}>Descreva o serviço:</Text>
-            <TextInput
-              style={styles.textInput}
-              multiline
-              numberOfLines={4}
-              placeholder="Ex: Minha pia quebrou, precisa refazer o encanamento..."
-              value={serviceDescription}
-              onChangeText={setServiceDescription}
-              textAlignVertical="top"
-            />
+              {selectedProvider && (
+                <View style={styles.modalProviderInfo}>
+                  <Text style={styles.modalProviderName}>{selectedProvider.name}</Text>
+                  <Text style={styles.modalProviderCategory}>{selectedProvider.category}</Text>
+                  <Text style={styles.modalProviderPrice}>
+                    R$ {selectedProvider.price.toFixed(2)}
+                  </Text>
+                </View>
+              )}
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleConfirmService}
-              >
-                <Text style={styles.confirmButtonText}>Confirmar</Text>
-              </TouchableOpacity>
+              <Text style={styles.inputLabel}>Descreva o serviço:</Text>
+              <TextInput
+                style={styles.textInput}
+                multiline
+                numberOfLines={4}
+                placeholder="Ex: Minha pia quebrou, precisa refazer o encanamento..."
+                value={serviceDescription}
+                onChangeText={setServiceDescription}
+                textAlignVertical="top"
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmButton]}
+                  onPress={handleConfirmService}
+                >
+                  <Text style={styles.confirmButtonText}>Confirmar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );
@@ -293,94 +241,82 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    padding: 20,
+    backgroundColor: '#007AFF',
   },
-  greeting: {
-    fontSize: 20,
+  title: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
+  logoutText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  connectionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 4,
   },
-  logoutButton: {
-    padding: 8,
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  connectionText: {
+    color: '#fff',
+    fontSize: 12,
   },
   listContainer: {
     padding: 16,
   },
   providerCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  providerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  providerInfo: {
-    flex: 1,
+    borderRadius: 8,
+    elevation: 2,
   },
   providerName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    marginBottom: 8,
   },
   providerCategory: {
     fontSize: 14,
     color: '#666',
-    marginTop: 2,
+    marginBottom: 4,
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
+  providerPrice: {
+    fontSize: 16,
+    color: '#007AFF',
     fontWeight: '600',
-  },
-  providerDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  detailText: {
-    marginLeft: 4,
-    fontSize: 14,
-    color: '#666',
   },
   providerDescription: {
     fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
+    color: '#666',
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  providerRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  ratingText: {
+    marginLeft: 4,
+    fontSize: 12,
+    color: '#666',
   },
   modalOverlay: {
     flex: 1,
@@ -447,6 +383,7 @@ const styles = StyleSheet.create({
     minHeight: 100,
     fontSize: 16,
     marginBottom: 24,
+    textAlignVertical: 'top',
   },
   modalButtons: {
     flexDirection: 'row',

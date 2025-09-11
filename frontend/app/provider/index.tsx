@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSocket } from '../../contexts/SocketContext';
 import axios from 'axios';
 
 interface ServiceRequest {
@@ -34,6 +35,7 @@ export default function ProviderHome() {
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const { user, logout } = useAuth();
+  const { socket, isConnected, sendMessage } = useSocket();
 
   const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
 
@@ -58,22 +60,41 @@ export default function ProviderHome() {
   };
 
   useEffect(() => {
+    console.log('🚀 [PROVIDER] Iniciando ProviderHome...');
     fetchRequests();
-    // TODO: Setup Socket.io for real-time updates
-  }, []);
+
+    // Listen for new requests in real-time
+    if (socket) {
+      socket.on('new_request', (data) => {
+        console.log('🔔 [PROVIDER] Nova solicitação via Socket:', data);
+        fetchRequests(); // Refresh the list
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.off('new_request');
+      }
+    };
+  }, [socket]);
 
   const fetchRequests = async () => {
     try {
+      console.log('🔄 [PROVIDER] Buscando solicitações...');
       const response = await axios.get(`${API_BASE_URL}/requests`);
+      console.log('✅ [PROVIDER] Solicitações carregadas:', response.data.length);
       setRequests(response.data);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ [PROVIDER] Erro:', error);
       Alert.alert('Erro', 'Não foi possível carregar as solicitações');
     } finally {
+      console.log('🏁 [PROVIDER] Finalizando carregamento...');
       setIsLoading(false);
     }
   };
 
   const handleRequestSelect = (request: ServiceRequest) => {
+    console.log('🎯 Solicitação selecionada:', request.client_name);
     setSelectedRequest(request);
     setModalVisible(true);
   };
@@ -82,6 +103,7 @@ export default function ProviderHome() {
     if (!selectedRequest) return;
 
     try {
+      console.log('✅ Aceitando solicitação...');
       await axios.put(`${API_BASE_URL}/requests/${selectedRequest.id}/accept`);
       
       Alert.alert(
@@ -98,51 +120,42 @@ export default function ProviderHome() {
         ]
       );
     } catch (error: any) {
+      console.error('❌ Erro ao aceitar:', error);
       Alert.alert('Erro', error.response?.data?.detail || 'Erro ao aceitar solicitação');
     }
   };
 
   const handleCompleteRequest = async (requestId: string) => {
     try {
+      console.log('🎉 Concluindo serviço...');
       await axios.put(`${API_BASE_URL}/requests/${requestId}/complete`);
       Alert.alert('Serviço Concluído!', 'O cliente foi notificado');
       fetchRequests();
     } catch (error: any) {
+      console.error('❌ Erro ao concluir:', error);
       Alert.alert('Erro', error.response?.data?.detail || 'Erro ao concluir serviço');
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return '#FF9800';
-      case 'accepted':
-        return '#2196F3';
-      case 'in_progress':
-        return '#4CAF50';
-      case 'completed':
-        return '#8BC34A';
-      case 'cancelled':
-        return '#F44336';
-      default:
-        return '#999';
+      case 'pending': return '#FF9800';
+      case 'accepted': return '#2196F3';
+      case 'in_progress': return '#4CAF50';
+      case 'completed': return '#8BC34A';
+      case 'cancelled': return '#F44336';
+      default: return '#999';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'Pendente';
-      case 'accepted':
-        return 'Aceita';
-      case 'in_progress':
-        return 'Em Progresso';
-      case 'completed':
-        return 'Concluída';
-      case 'cancelled':
-        return 'Cancelada';
-      default:
-        return 'Desconhecido';
+      case 'pending': return 'Pendente';
+      case 'accepted': return 'Aceita';
+      case 'in_progress': return 'Em Progresso';
+      case 'completed': return 'Concluída';
+      case 'cancelled': return 'Cancelada';
+      default: return 'Desconhecido';
     }
   };
 
@@ -198,15 +211,33 @@ export default function ProviderHome() {
     </TouchableOpacity>
   );
 
+  if (isLoading) {
+    console.log('🔄 [PROVIDER] Mostrando loading...');
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text>Carregando solicitações...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  console.log('🎯 [PROVIDER] Renderizando lista com', requests.length, 'solicitações');
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Olá, {user?.name}!</Text>
-          <Text style={styles.subtitle}>Solicitações disponíveis</Text>
+          <Text style={styles.title}>Prestador - {user?.name}</Text>
+          <View style={styles.connectionIndicator}>
+            <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }]} />
+            <Text style={styles.connectionText}>
+              {isConnected ? '🟢 Socket Conectado' : '🔴 Socket Desconectado'}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#F44336" />
+        <TouchableOpacity onPress={logout}>
+          <Text style={styles.logoutText}>Sair</Text>
         </TouchableOpacity>
       </View>
 
@@ -215,10 +246,7 @@ export default function ProviderHome() {
         renderItem={renderRequest}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={fetchRequests} />
-        }
-        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchRequests} />}
       />
 
       {/* Modal de Detalhes */}
@@ -231,7 +259,7 @@ export default function ProviderHome() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Detalhes da Solicitação</Text>
+              <Text style={styles.modalTitle}>🛠️ Detalhes da Solicitação</Text>
               <TouchableOpacity
                 onPress={() => setModalVisible(false)}
                 style={styles.closeButton}
@@ -245,23 +273,7 @@ export default function ProviderHome() {
                 <View style={styles.modalClientInfo}>
                   <Text style={styles.modalClientName}>{selectedRequest.client_name}</Text>
                   <Text style={styles.modalClientPhone}>{selectedRequest.client_phone}</Text>
-                  
-                  <View style={styles.modalDetailsRow}>
-                    <View style={styles.modalDetailItem}>
-                      <Ionicons name="construct" size={20} color="#007AFF" />
-                      <Text style={styles.modalDetailText}>{selectedRequest.category}</Text>
-                    </View>
-                    
-                    <View style={styles.modalDetailItem}>
-                      <Ionicons name="cash" size={20} color="#4CAF50" />
-                      <Text style={styles.modalDetailText}>R$ {selectedRequest.price.toFixed(2)}</Text>
-                    </View>
-                    
-                    <View style={styles.modalDetailItem}>
-                      <Ionicons name="location" size={20} color="#666" />
-                      <Text style={styles.modalDetailText}>4km</Text>
-                    </View>
-                  </View>
+                  <Text style={styles.modalServicePrice}>R$ {selectedRequest.price.toFixed(2)}</Text>
                 </View>
 
                 <View style={styles.descriptionContainer}>
@@ -300,6 +312,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -312,6 +329,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  connectionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  connectionText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  logoutText: {
+    color: '#F44336',
+    fontSize: 16,
+    fontWeight: '600',
   },
   greeting: {
     fontSize: 20,
@@ -445,6 +487,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  modalServicePrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginTop: 8,
   },
   modalDetailsRow: {
     flexDirection: 'row',
