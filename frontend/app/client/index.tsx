@@ -56,7 +56,7 @@ export default function ClientHome() {
           style: 'destructive',
           onPress: async () => {
             await logout();
-            router.replace('/auth');
+            router.replace('/auth/');
           },
         },
       ]
