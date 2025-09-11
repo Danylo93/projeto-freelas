@@ -461,7 +461,7 @@
       "created": 1694448000000,
       "name": "Base Environment",
       "data": {
-        "base_url": "https://fixerapp.preview.emergentagent.com",
+        "base_url": "https://jobber.preview.emergentagent.com",
         "auth_token": "",
         "user_id": "",
         "provider_id": "",
@@ -515,7 +515,7 @@
       "created": 1694448000000,
       "name": "Production",
       "data": {
-        "base_url": "https://fixerapp.preview.emergentagent.com"
+        "base_url": "https://jobber.preview.emergentagent.com"
       },
       "dataPropertyOrder": {
         "&": [

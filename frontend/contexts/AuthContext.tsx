@@ -74,57 +74,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
+      console.log('🔑 [AUTH] Tentando login para:', email);
       setIsLoading(true);
-      console.log('🔐 Tentando fazer login com:', email);
-      console.log('🌐 URL da API:', `${API_BASE_URL}/auth/login`);
+      const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
       
-      const response = await axios.post(`${API_BASE_URL}/auth/login`, {
-        email,
-        password,
-      });
-
-      console.log('✅ Login bem-sucedido:', response.data);
       const { access_token, user_data } = response.data;
+      console.log('✅ [AUTH] Login bem-sucedido:', user_data.name, 'Token:', !!access_token);
       
-      // Store in AsyncStorage
-      await AsyncStorage.setItem('token', access_token);
-      await AsyncStorage.setItem('user', JSON.stringify(user_data));
-      
-      // Update state
       setToken(access_token);
       setUser(user_data);
       
-      // Configure axios defaults
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      await AsyncStorage.setItem('token', access_token);
+      await AsyncStorage.setItem('user', JSON.stringify(user_data));
+      console.log('💾 [AUTH] Token e usuário salvos no AsyncStorage');
       
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Login failed');
+      console.error('❌ [AUTH] Erro no login:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.detail || 'Erro ao fazer login');
     } finally {
+      console.log('🏁 [AUTH] Finalizando processo de login');
       setIsLoading(false);
     }
   };
 
   const register = async (userData: RegisterData) => {
     try {
+      console.log('📝 [AUTH] Tentando registrar usuário:', userData.email, 'Tipo:', userData.user_type);
       setIsLoading(true);
       const response = await axios.post(`${API_BASE_URL}/auth/register`, userData);
-
+      
       const { access_token, user_data } = response.data;
+      console.log('✅ [AUTH] Registro bem-sucedido:', user_data.name, 'Token:', !!access_token);
       
-      // Store in AsyncStorage
-      await AsyncStorage.setItem('token', access_token);
-      await AsyncStorage.setItem('user', JSON.stringify(user_data));
-      
-      // Update state
       setToken(access_token);
       setUser(user_data);
       
-      // Configure axios defaults
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      await AsyncStorage.setItem('token', access_token);
+      await AsyncStorage.setItem('user', JSON.stringify(user_data));
+      console.log('💾 [AUTH] Token e usuário salvos no AsyncStorage');
       
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Registration failed');
+      console.error('❌ [AUTH] Erro no registro:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.detail || 'Erro ao fazer registro');
     } finally {
+      console.log('🏁 [AUTH] Finalizando processo de registro');
       setIsLoading(false);
     }
   };

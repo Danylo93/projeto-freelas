@@ -20,9 +20,12 @@ export const useSocket = () => {
 };
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  console.log('🚀 [SOCKET] SocketProvider inicializado');
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { user, token } = useAuth();
+  
+  console.log('🔍 [SOCKET] Estado atual:', { user: user?.name, token: !!token, isConnected });
 
   useEffect(() => {
     if (user && token) {
@@ -31,15 +34,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log('🔌 [SOCKET] User:', user.name, 'Type:', user.user_type);
       
       try {
-        const newSocket = io(process.env.EXPO_PUBLIC_BACKEND_URL!, {
+        // Socket.io conecta no mesmo servidor da API mas não precisa do /api prefix
+        const socketUrl = process.env.EXPO_PUBLIC_BACKEND_URL!;
+        console.log('🔌 [SOCKET] Conectando em:', socketUrl);
+        
+        const newSocket = io(socketUrl, {
           auth: {
             user_id: user.id,
             user_type: user.user_type,
             token: token,
           },
-          transports: ['polling', 'websocket'], // Tentar polling primeiro
+          transports: ['polling'], // Apenas polling por enquanto para debug
           forceNew: true,
-          timeout: 10000,
+          timeout: 20000,
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
         });
 
         newSocket.on('connect', () => {
@@ -54,6 +64,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         newSocket.on('connect_error', (error) => {
           console.error('❌ [SOCKET] Erro de conexão:', error.message);
+          console.error('❌ [SOCKET] Detalhes do erro:', error);
+          setIsConnected(false);
+        });
+
+        newSocket.on('reconnect', (attemptNumber) => {
+          console.log('🔄 [SOCKET] Reconectado após', attemptNumber, 'tentativas');
+          setIsConnected(true);
+        });
+
+        newSocket.on('reconnect_error', (error) => {
+          console.error('❌ [SOCKET] Erro de reconexão:', error.message);
+        });
+
+        newSocket.on('reconnect_failed', () => {
+          console.error('❌ [SOCKET] Falha na reconexão após todas as tentativas');
           setIsConnected(false);
         });
 
