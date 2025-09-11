@@ -481,6 +481,15 @@ async def location_update(sid, data):
             'longitude': longitude
         }, room=f"provider_{user_id}")
 
+# Health check endpoint
+@app.get("/")
+async def root():
+    return {"message": "FreelancerApp API is running", "status": "ok"}
+
+@api_router.get("/health")
+async def health_check():
+    return {"message": "API is healthy", "status": "ok"}
+
 # Include the router in the main app
 app.include_router(api_router)
 
