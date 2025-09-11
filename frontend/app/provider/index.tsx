@@ -35,8 +35,30 @@ export default function ProviderHome() {
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const { user, logout } = useAuth();
+  const router = useRouter();
 
   const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Confirmar Logout',
+      'Tem certeza que deseja sair?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/auth');
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     fetchRequests();
