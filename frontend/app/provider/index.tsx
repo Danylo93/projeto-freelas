@@ -113,10 +113,12 @@ export default function ProviderHome() {
 
   const handleCompleteRequest = async (requestId: string) => {
     try {
+      console.log('🎉 Concluindo serviço...');
       await axios.put(`${API_BASE_URL}/requests/${requestId}/complete`);
       Alert.alert('Serviço Concluído!', 'O cliente foi notificado');
       fetchRequests();
     } catch (error: any) {
+      console.error('❌ Erro ao concluir:', error);
       Alert.alert('Erro', error.response?.data?.detail || 'Erro ao concluir serviço');
     }
   };
