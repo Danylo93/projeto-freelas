@@ -152,6 +152,9 @@ class LocationUpdate(BaseModel):
     latitude: float
     longitude: float
 
+class ProviderStatusUpdate(BaseModel):
+    status: ServiceStatus
+
 # Helper functions
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -542,6 +545,32 @@ async def update_provider_location(
         }, room=f"client_{request['client_id']}")
     
     return {"message": "Location updated successfully"}
+
+@api_router.put("/provider/status")
+async def update_provider_status(
+    status_update: ProviderStatusUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.PRESTADOR:
+        raise HTTPException(status_code=403, detail="Only providers can update status")
+
+    result = await db.provider_profiles.update_one(
+        {"user_id": current_user.id},
+        {"$set": {"status": status_update.status}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Provider profile not found")
+
+    await sio.emit(
+        'provider_status_update',
+        {
+            'provider_id': current_user.id,
+            'status': status_update.status
+        }
+    )
+
+    return {"status": status_update.status}
 
 # Socket.IO Events
 @sio.event
