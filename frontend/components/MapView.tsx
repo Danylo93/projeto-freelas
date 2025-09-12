@@ -20,8 +20,8 @@ interface MapViewProps {
   showsMyLocationButton?: boolean;
   children?: React.ReactNode;
   onRegionChange?: (region: any) => void;
-  origin?: { latitude: number; longitude: number };
-  destination?: { latitude: number; longitude: number };
+    origin?: { latitude: number; longitude: number } | string;
+    destination?: { latitude: number; longitude: number } | string;
   ref?: any;
 }
 
@@ -46,11 +46,13 @@ interface PolylineProps {
 }
 
 // Web fallback component
-const WebMapView: React.FC<MapViewProps> = ({ style, initialRegion, children }) => {
-  const region = initialRegion;
-  const mapsUrl = region 
-    ? `https://www.google.com/maps/embed/v1/view?key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}&center=${region.latitude},${region.longitude}&zoom=15`
-    : 'about:blank';
+const WebMapView: React.FC<MapViewProps> = ({ style, initialRegion, origin, destination, children }) => {
+  let mapsUrl = 'about:blank';
+  if (origin && destination && typeof origin !== 'string' && typeof destination !== 'string') {
+    mapsUrl = `https://www.google.com/maps/embed/v1/directions?key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}&origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}`;
+  } else if (initialRegion) {
+    mapsUrl = `https://www.google.com/maps/embed/v1/view?key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}&center=${initialRegion.latitude},${initialRegion.longitude}&zoom=15`;
+  }
 
   return (
     <View style={[styles.webMapContainer, style]}>
@@ -151,15 +153,45 @@ function decodePolyline(encoded: string) {
 const CustomMapView = React.forwardRef<any, MapViewProps>((props, ref) => {
   const { origin, destination, children, ...rest } = props;
   const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [resolvedOrigin, setResolvedOrigin] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [resolvedDestination, setResolvedDestination] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  useEffect(() => {
+    const resolveLocation = async (loc: any) => {
+      if (!loc) return null;
+      if (typeof loc === 'string') {
+        try {
+          const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(loc)}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`);
+          const json = await res.json();
+          const geo = json.results?.[0]?.geometry?.location;
+          if (geo) {
+            return { latitude: geo.lat, longitude: geo.lng };
+          }
+        } catch (err) {
+          console.warn('geocoding error', err);
+        }
+        return null;
+      }
+      return loc;
+    };
+
+    const resolve = async () => {
+      const o = await resolveLocation(origin);
+      const d = await resolveLocation(destination);
+      setResolvedOrigin(o);
+      setResolvedDestination(d);
+    };
+    resolve();
+  }, [origin, destination]);
 
   useEffect(() => {
     const fetchRoute = async () => {
-      if (!origin || !destination) {
+      if (!resolvedOrigin || !resolvedDestination) {
         setRouteCoords([]);
         return;
       }
       try {
-        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`;
+        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${resolvedOrigin.latitude},${resolvedOrigin.longitude}&destination=${resolvedDestination.latitude},${resolvedDestination.longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`;
         const response = await fetch(url);
         const data = await response.json();
         const points = data.routes?.[0]?.overview_polyline?.points;
@@ -171,39 +203,29 @@ const CustomMapView = React.forwardRef<any, MapViewProps>((props, ref) => {
       }
     };
     fetchRoute();
-  }, [origin, destination]);
+  }, [resolvedOrigin, resolvedDestination]);
 
-  if (Platform.OS === 'web') {
+  if (Platform.OS === 'web' || !NativeMapView) {
     return (
-      <WebMapView {...rest}>
-        {origin && <CustomMarker coordinate={origin} />}
-        {destination && <CustomMarker coordinate={destination} />}
-        {routeCoords.length > 0 && (
-          <CustomPolyline coordinates={routeCoords} strokeColor="blue" strokeWidth={4} />
-        )}
+      <WebMapView
+        {...rest}
+        origin={resolvedOrigin || undefined}
+        destination={resolvedDestination || undefined}
+      >
         {children}
       </WebMapView>
     );
   }
 
-  if (NativeMapView) {
-    return (
-      <NativeMapView {...rest} ref={ref}>
-        {origin && <CustomMarker coordinate={origin} />}
-        {destination && <CustomMarker coordinate={destination} />}
-        {routeCoords.length > 0 && (
-          <CustomPolyline coordinates={routeCoords} strokeColor="blue" strokeWidth={4} />
-        )}
-        {children}
-      </NativeMapView>
-    );
-  }
-
-  // Fallback if native maps not available
   return (
-    <View style={[styles.fallbackContainer, rest.style]}>
-      <Text style={styles.fallbackText}>Mapa não disponível</Text>
-    </View>
+    <NativeMapView {...rest} ref={ref}>
+      {resolvedOrigin && <CustomMarker coordinate={resolvedOrigin} />}
+      {resolvedDestination && <CustomMarker coordinate={resolvedDestination} />}
+      {routeCoords.length > 0 && (
+        <CustomPolyline coordinates={routeCoords} strokeColor="blue" strokeWidth={4} />
+      )}
+      {children}
+    </NativeMapView>
   );
 });
 CustomMapView.displayName = 'CustomMapView';
@@ -242,16 +264,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginTop: 4,
   },
-  fallbackContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-  },
-  fallbackText: {
-    fontSize: 16,
-    color: '#666',
-  },
-});
+  });
 
 export default CustomMapView;
 export { CustomMarker as Marker, CustomPolyline as Polyline, PROVIDER_GOOGLE };

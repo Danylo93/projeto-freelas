@@ -13,7 +13,7 @@ import {
   StatusBar,
   TextInput,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../../components/MapView';
+import MapView, { PROVIDER_GOOGLE } from '../../components/MapView';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useAuth } from '../../contexts/AuthContext';
@@ -40,6 +40,7 @@ interface Provider {
 
 interface ServiceRequest {
   id: string;
+  provider_id: string;
   status: string;
   provider_name: string;
   provider_phone: string;
@@ -120,14 +121,22 @@ export default function ClientScreen() {
         setShowMap(true);
         
         // Animate to show map
-        if (mapRef.current && data.provider_latitude && data.provider_longitude) {
-          mapRef.current.fitToCoordinates([
-            { latitude: userLocation.latitude, longitude: userLocation.longitude },
-            { latitude: data.provider_latitude, longitude: data.provider_longitude }
-          ], {
-            edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-            animated: true,
-          });
+        if (
+          mapRef.current &&
+          'fitToCoordinates' in mapRef.current &&
+          data.provider_latitude &&
+          data.provider_longitude
+        ) {
+          (mapRef.current as any).fitToCoordinates(
+            [
+              { latitude: userLocation.latitude, longitude: userLocation.longitude },
+              { latitude: data.provider_latitude, longitude: data.provider_longitude },
+            ],
+            {
+              edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+              animated: true,
+            },
+          );
         }
       });
 
@@ -208,6 +217,7 @@ export default function ClientScreen() {
 
       setCurrentRequest({
         id: response.data.id,
+        provider_id: selectedProvider.user_id,
         status: 'pending',
         provider_name: selectedProvider.name,
         provider_phone: selectedProvider.phone || '',
@@ -255,14 +265,20 @@ export default function ClientScreen() {
     }
   };
 
-  const renderProvider = ({ item }: { item: Provider }) => (
-    <Animated.View style={[styles.providerCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-      <TouchableOpacity onPress={() => handleProviderSelect(item)}>
-        <View style={styles.providerHeader}>
-          <View style={styles.providerInfo}>
-            <Text style={styles.providerName}>{item.name}</Text>
-            <Text style={styles.providerCategory}>{item.category}</Text>
-          </View>
+  const renderProvider = ({ item }: { item: Provider }) => {
+    const disabled = currentRequest?.provider_id === item.user_id && currentRequest.status !== 'completed';
+    return (
+      <Animated.View style={[styles.providerCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+        <TouchableOpacity
+          onPress={() => handleProviderSelect(item)}
+          disabled={disabled}
+          style={disabled ? styles.disabledProvider : undefined}
+        >
+          <View style={styles.providerHeader}>
+            <View style={styles.providerInfo}>
+              <Text style={styles.providerName}>{item.name}</Text>
+              <Text style={styles.providerCategory}>{item.category}</Text>
+            </View>
           <View style={styles.providerStatus}>
             <View style={[styles.statusIndicator, { 
               backgroundColor: item.status === 'available' ? '#4CAF50' : '#FF9800' 
@@ -297,7 +313,8 @@ export default function ClientScreen() {
         </Text>
       </TouchableOpacity>
     </Animated.View>
-  );
+    );
+  };
 
   const renderStars = () => {
     return Array.from({ length: 5 }, (_, index) => (
@@ -337,40 +354,13 @@ export default function ClientScreen() {
           initialRegion={userLocation}
           showsUserLocation={true}
           showsMyLocationButton={true}
-        >
-          {userLocation && (
-            <Marker
-              coordinate={{
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude
-              }}
-              title="Sua localização"
-              pinColor="blue"
-            />
-          )}
-          
-          {currentRequest.provider_latitude && currentRequest.provider_longitude && (
-            <>
-              <Marker
-                coordinate={{
-                  latitude: currentRequest.provider_latitude,
-                  longitude: currentRequest.provider_longitude
-                }}
-                title={currentRequest.provider_name}
-                pinColor="red"
-              />
-              
-              <Polyline
-                coordinates={[
-                  { latitude: userLocation.latitude, longitude: userLocation.longitude },
-                  { latitude: currentRequest.provider_latitude, longitude: currentRequest.provider_longitude }
-                ]}
-                strokeColor="#007AFF"
-                strokeWidth={3}
-              />
-            </>
-          )}
-        </MapView>
+          origin={userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : undefined}
+          destination={
+            currentRequest.provider_latitude && currentRequest.provider_longitude
+              ? { latitude: currentRequest.provider_latitude, longitude: currentRequest.provider_longitude }
+              : undefined
+          }
+        />
 
         <View style={styles.statusContainer}>
           <Text style={styles.statusMessage}>{statusMessage}</Text>
@@ -454,13 +444,16 @@ export default function ClientScreen() {
       </View>
 
       {currentRequest && (
-        <View style={styles.activeRequestBanner}>
-          <Ionicons name="time-outline" size={20} color="#007AFF" />
-          <Text style={styles.activeRequestText}>{statusMessage}</Text>
-          <TouchableOpacity onPress={() => setShowMap(true)}>
-            <Ionicons name="map-outline" size={20} color="#007AFF" />
+        <>
+          <View style={styles.activeRequestBanner}>
+            <Ionicons name="time-outline" size={20} color="#007AFF" />
+            <Text style={styles.activeRequestText}>{statusMessage}</Text>
+          </View>
+          <TouchableOpacity style={styles.trackButton} onPress={() => setShowMap(true)}>
+            <Ionicons name="map-outline" size={20} color="#fff" />
+            <Text style={styles.trackButtonText}>Acompanhar pedido</Text>
           </TouchableOpacity>
-        </View>
+        </>
       )}
 
       {loading ? (
@@ -526,9 +519,15 @@ export default function ClientScreen() {
                   </TouchableOpacity>
                   
                   <TouchableOpacity
-                    style={[styles.confirmButton, requestLoading && styles.confirmButtonDisabled]}
+                    style={[
+                      styles.confirmButton,
+                      (requestLoading || (currentRequest && currentRequest.provider_id === selectedProvider.user_id && currentRequest.status !== 'completed')) && styles.confirmButtonDisabled
+                    ]}
                     onPress={handleRequestService}
-                    disabled={requestLoading}
+                    disabled={
+                      requestLoading ||
+                      (currentRequest && currentRequest.provider_id === selectedProvider.user_id && currentRequest.status !== 'completed')
+                    }
                   >
                     {requestLoading ? (
                       <ActivityIndicator color="#fff" />
@@ -606,6 +605,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '500',
+  },
+  trackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007AFF',
+    marginHorizontal: 20,
+    marginVertical: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  trackButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -704,6 +719,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  disabledProvider: {
+    opacity: 0.5,
   },
   modalOverlay: {
     flex: 1,
