@@ -578,6 +578,7 @@ async def update_provider_status(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Provider profile not found")
 
+
     message = {
         'provider_id': current_user.id,
         'status': status_update.status
@@ -585,6 +586,7 @@ async def update_provider_status(
 
     await sio.emit('provider_status_update', message)
     await publish_event('provider_status_update', message)
+
 
     return {"status": status_update.status}
 
