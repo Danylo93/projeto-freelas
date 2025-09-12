@@ -1,4 +1,4 @@
-name: CI/CD
+name: Backend
 
 on:
   push:
@@ -34,25 +34,3 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           docker push ${{ env.IMAGE_TAG }}
-
-  build-apk:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    needs: backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-      - name: Install frontend deps
-        run: yarn --cwd frontend install --frozen-lockfile
-      - name: Build APK
-        run: expo build:android -o app.apk --non-interactive
-      - name: Upload to Azure Blob
-        uses: azure/cli@v1
-        with:
-          inlineScript: |
-            az storage blob upload --container-name ${{ secrets.AZURE_CONTAINER }} --file app.apk --name app-${{ github.sha }}.apk --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} --sas-token ${{ secrets.AZURE_SAS_TOKEN }}
