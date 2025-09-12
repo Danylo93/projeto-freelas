@@ -44,7 +44,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             user_type: user.user_type,
             token: token,
           },
-          transports: ['polling'], // Apenas polling por enquanto para debug
+          transports: ['polling'], // Apenas polling por enquanto para debug - alterar para ['websocket']
+          path: socketUrl.endsWith('/') ? '/socket.io' : '/socket.io',
           forceNew: true,
           timeout: 20000,
           reconnection: true,

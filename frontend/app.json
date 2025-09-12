@@ -15,10 +15,11 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    
     "ios": {
       "supportsTablet": true,
       "config": {
-        "googleMapsApiKey": "AIzaSyD629F1gD7ARdLrCGoWgD5Ythg18iqasHA"
+        "googleMapsApiKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY"
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar prestadores próximos.",
@@ -41,7 +42,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyD629F1gD7ARdLrCGoWgD5Ythg18iqasHA"
+          "apiKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY"
         }
       }
     },
@@ -67,6 +68,8 @@
     ],
     "scheme": "servico-app",
     "extra": {
+      "googleSdkKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",      
+      "googleWebKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",    
       "router": {
         "origin": false
       },

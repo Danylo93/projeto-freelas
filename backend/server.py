@@ -379,7 +379,17 @@ async def create_service_request(
     )
     
     await db.service_requests.insert_one(service_request.dict())
-    
+
+    # calcula distância real entre cliente e prestador (se existir perfil)
+    provider_prof = await db.provider_profiles.find_one({"user_id": request_data["provider_id"]}, {"_id": 0})
+    dist_for_notify = 0.0
+    if provider_prof:
+        dist_for_notify = calculate_distance(
+            request_data["client_latitude"],
+            request_data["client_longitude"],
+            provider_prof.get("latitude", 0.0),
+            provider_prof.get("longitude", 0.0)
+        )
     # Emit real-time notification to provider
     await sio.emit('new_request', {
         'request_id': service_request.id,
@@ -388,11 +398,7 @@ async def create_service_request(
         'category': service_request.category,
         'description': service_request.description,
         'price': service_request.price,
-        'distance': calculate_distance(
-            request_data["client_latitude"],
-            request_data["client_longitude"],
-            0, 0  # Provider coordinates will be updated
-        ),
+        'distance': round(dist_for_notify, 1),
         'client_address': client_address
     }, room=f"provider_{request_data['provider_id']}")
     
@@ -561,6 +567,8 @@ async def update_provider_location(
         }
 
         await sio.emit('provider_location_update', message, room=f"client_{request['client_id']}")
+        await sio.emit('provider_location_update', message, room=f"request_{request['id']}")
+
         await publish_event('provider_location_update', message)
     
     return {"message": "Location updated successfully"}
