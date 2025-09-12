@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Platform, View, Text, StyleSheet } from 'react-native';
+import { WebView } from 'react-native-webview';
 
 interface MapViewProps {
   style?: any;
@@ -54,15 +55,24 @@ const WebMapView: React.FC<MapViewProps> = ({ style, initialRegion, origin, dest
     mapsUrl = `https://www.google.com/maps/embed/v1/view?key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}&center=${initialRegion.latitude},${initialRegion.longitude}&zoom=15`;
   }
 
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[styles.webMapContainer, style]}>
+        <iframe
+          src={mapsUrl}
+          style={styles.webMap}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+        {children}
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.webMapContainer, style]}>
-      <iframe
-        src={mapsUrl}
-        style={styles.webMap}
-        allowFullScreen
-        loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
-      />
+      <WebView source={{ uri: mapsUrl }} style={styles.webMap} />
       {children}
     </View>
   );
