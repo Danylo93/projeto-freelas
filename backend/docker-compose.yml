@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:6
+    container_name: freelas-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .          # <--- contexto é a pasta backend/
+      dockerfile: ./Dockerfile
+    container_name: freelas-api
+    env_file:
+      - ./.env            # <--- .env que está na pasta backend/
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  seed:
+    build:
+      context: .          # usa a mesma imagem/código da API
+      dockerfile: ./Dockerfile
+    container_name: freelas-seed
+    env_file:
+      - ./.env
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command: ["python", "seed_data.py"]
+    restart: "no"
+
+volumes:
+  mongo_data:

@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+
 from motor.motor_asyncio import AsyncIOMotorClient
 import socketio
 import os
@@ -25,12 +26,13 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.getenv('MONGO_URL', 'mongodb://localhost:27017')  # default p/ dev
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.getenv('DB_NAME', 'freelancerapp')]
 
-# Google Maps client
-gmaps = googlemaps.Client(key=os.environ['GOOGLE_MAPS_API_KEY'])
+# Google Maps client (opcional)
+gmaps_key = os.getenv('GOOGLE_MAPS_API_KEY')
+gmaps = googlemaps.Client(key=gmaps_key) if gmaps_key else None
 
 # Messaging clients
 redis_client: Optional[aioredis.Redis] = None
@@ -219,15 +221,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return User(**user)
 
 async def get_address_from_coordinates(latitude: float, longitude: float) -> str:
-    """Get address from coordinates using Google Maps Geocoding API"""
     try:
-        result = gmaps.reverse_geocode((latitude, longitude))
-        if result:
-            return result[0]['formatted_address']
+        if gmaps:
+            result = gmaps.reverse_geocode((latitude, longitude))
+            if result:
+                return result[0]['formatted_address']
         return f"Lat: {latitude}, Lng: {longitude}"
     except Exception as e:
         print(f"Geocoding error: {e}")
         return f"Lat: {latitude}, Lng: {longitude}"
+
 
 # API Routes
 
