@@ -15,7 +15,8 @@ node_modules/
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+.metro-cache/
+.expo/
 # Testing
 /coverage
 
