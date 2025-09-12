@@ -17,6 +17,9 @@ import bcrypt
 from enum import Enum
 import googlemaps
 import math
+import json
+import redis.asyncio as aioredis
+from aiokafka import AIOKafkaProducer
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -28,6 +31,10 @@ db = client[os.environ['DB_NAME']]
 
 # Google Maps client
 gmaps = googlemaps.Client(key=os.environ['GOOGLE_MAPS_API_KEY'])
+
+# Messaging clients
+redis_client: Optional[aioredis.Redis] = None
+kafka_producer: Optional[AIOKafkaProducer] = None
 
 # JWT Configuration
 SECRET_KEY = "your-secret-key-here-change-in-production"
@@ -152,6 +159,9 @@ class LocationUpdate(BaseModel):
     latitude: float
     longitude: float
 
+class ProviderStatusUpdate(BaseModel):
+    status: ServiceStatus
+
 # Helper functions
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -183,8 +193,15 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     
     a = math.sin(dlat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon/2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    
+
     return R * c
+
+async def publish_event(channel: str, message: Dict[str, Any]):
+    """Publish events to Redis and Kafka"""
+    if redis_client:
+        await redis_client.publish(channel, json.dumps(message))
+    if kafka_producer:
+        await kafka_producer.send_and_wait(channel, json.dumps(message).encode())
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
@@ -532,16 +549,44 @@ async def update_provider_location(
             location.latitude, location.longitude,
             request["client_latitude"], request["client_longitude"]
         )
-        
-        await sio.emit('provider_location_update', {
+        message = {
             'request_id': request["id"],
             'provider_latitude': location.latitude,
             'provider_longitude': location.longitude,
             'distance': round(distance, 1),
             'estimated_time': max(5, int(distance * 2))  # Mock time estimation
-        }, room=f"client_{request['client_id']}")
+        }
+
+        await sio.emit('provider_location_update', message, room=f"client_{request['client_id']}")
+        await publish_event('provider_location_update', message)
     
     return {"message": "Location updated successfully"}
+
+@api_router.put("/provider/status")
+async def update_provider_status(
+    status_update: ProviderStatusUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.PRESTADOR:
+        raise HTTPException(status_code=403, detail="Only providers can update status")
+
+    result = await db.provider_profiles.update_one(
+        {"user_id": current_user.id},
+        {"$set": {"status": status_update.status}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Provider profile not found")
+
+    message = {
+        'provider_id': current_user.id,
+        'status': status_update.status
+    }
+
+    await sio.emit('provider_status_update', message)
+    await publish_event('provider_status_update', message)
+
+    return {"status": status_update.status}
 
 # Socket.IO Events
 @sio.event
@@ -570,12 +615,14 @@ async def location_update(sid, data):
             {"$set": {"latitude": latitude, "longitude": longitude}}
         )
         
-        # Emit to relevant clients
-        await sio.emit('location_updated', {
+        # Emit to relevant clients and brokers
+        message = {
             'user_id': user_id,
             'latitude': latitude,
             'longitude': longitude
-        }, room=f"provider_{user_id}")
+        }
+        await sio.emit('location_updated', message, room=f"provider_{user_id}")
+        await publish_event('location_updated', message)
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -583,7 +630,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],  
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -595,9 +642,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@app.on_event("startup")
+async def startup_services():
+    global redis_client, kafka_producer
+    redis_url = os.getenv("REDIS_URL")
+    kafka_bootstrap = os.getenv("KAFKA_BOOTSTRAP")
+    if redis_url:
+        redis_client = aioredis.from_url(redis_url)
+    if kafka_bootstrap:
+        kafka_producer = AIOKafkaProducer(bootstrap_servers=kafka_bootstrap)
+        await kafka_producer.start()
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+    if kafka_producer:
+        await kafka_producer.stop()
+    if redis_client:
+        await redis_client.close()
 
 # Use socket_app instead of app for the main application
 if __name__ == "__main__":

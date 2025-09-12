@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 
 interface MapViewProps {
@@ -20,6 +20,8 @@ interface MapViewProps {
   showsMyLocationButton?: boolean;
   children?: React.ReactNode;
   onRegionChange?: (region: any) => void;
+  origin?: { latitude: number; longitude: number };
+  destination?: { latitude: number; longitude: number };
   ref?: any;
 }
 
@@ -35,10 +37,10 @@ interface MarkerProps {
 }
 
 interface PolylineProps {
-  coordinates: Array<{
+  coordinates: {
     latitude: number;
     longitude: number;
-  }>;
+  }[];
   strokeColor?: string;
   strokeWidth?: number;
 }
@@ -93,32 +95,13 @@ if (Platform.OS !== 'web') {
   }
 }
 
-const CustomMapView = React.forwardRef<any, MapViewProps>((props, ref) => {
-  if (Platform.OS === 'web') {
-    return <WebMapView {...props} />;
-  }
-
-  if (NativeMapView) {
-    return <NativeMapView {...props} ref={ref} />;
-  }
-
-  // Fallback if native maps not available
-  return (
-    <View style={[styles.fallbackContainer, props.style]}>
-      <Text style={styles.fallbackText}>Mapa não disponível</Text>
-    </View>
-  );
-});
-
 const CustomMarker: React.FC<MarkerProps> = (props) => {
   if (Platform.OS === 'web') {
     return <WebMarker {...props} />;
   }
-
   if (NativeMarker) {
     return <NativeMarker {...props} />;
   }
-
   return null;
 };
 
@@ -126,13 +109,104 @@ const CustomPolyline: React.FC<PolylineProps> = (props) => {
   if (Platform.OS === 'web') {
     return <WebPolyline {...props} />;
   }
-
   if (NativePolyline) {
     return <NativePolyline {...props} />;
   }
-
   return null;
 };
+
+function decodePolyline(encoded: string) {
+  let points: Array<{ latitude: number; longitude: number }> = [];
+  let index = 0,
+    lat = 0,
+    lng = 0;
+
+  while (index < encoded.length) {
+    let b,
+      shift = 0,
+      result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = (result & 1) ? ~(result >> 1) : result >> 1;
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = (result & 1) ? ~(result >> 1) : result >> 1;
+    lng += dlng;
+
+    points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+  }
+  return points;
+}
+
+const CustomMapView = React.forwardRef<any, MapViewProps>((props, ref) => {
+  const { origin, destination, children, ...rest } = props;
+  const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+
+  useEffect(() => {
+    const fetchRoute = async () => {
+      if (!origin || !destination) {
+        setRouteCoords([]);
+        return;
+      }
+      try {
+        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        const points = data.routes?.[0]?.overview_polyline?.points;
+        if (points) {
+          setRouteCoords(decodePolyline(points));
+        }
+      } catch (err) {
+        console.warn('directions error', err);
+      }
+    };
+    fetchRoute();
+  }, [origin, destination]);
+
+  if (Platform.OS === 'web') {
+    return (
+      <WebMapView {...rest}>
+        {origin && <CustomMarker coordinate={origin} />}
+        {destination && <CustomMarker coordinate={destination} />}
+        {routeCoords.length > 0 && (
+          <CustomPolyline coordinates={routeCoords} strokeColor="blue" strokeWidth={4} />
+        )}
+        {children}
+      </WebMapView>
+    );
+  }
+
+  if (NativeMapView) {
+    return (
+      <NativeMapView {...rest} ref={ref}>
+        {origin && <CustomMarker coordinate={origin} />}
+        {destination && <CustomMarker coordinate={destination} />}
+        {routeCoords.length > 0 && (
+          <CustomPolyline coordinates={routeCoords} strokeColor="blue" strokeWidth={4} />
+        )}
+        {children}
+      </NativeMapView>
+    );
+  }
+
+  // Fallback if native maps not available
+  return (
+    <View style={[styles.fallbackContainer, rest.style]}>
+      <Text style={styles.fallbackText}>Mapa não disponível</Text>
+    </View>
+  );
+});
+CustomMapView.displayName = 'CustomMapView';
 
 const styles = StyleSheet.create({
   webMapContainer: {
