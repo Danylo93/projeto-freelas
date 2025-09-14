@@ -1,0 +1,11 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.0
+python-dotenv==1.0.1
+pydantic==1.10.15
+
+# JWT – escolha **uma** abordagem:
+python-jose[cryptography]==3.3.0
+
+# Senhas
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2     # fixa <4 para evitar incompatibilidade
