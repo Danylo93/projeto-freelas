@@ -83,7 +83,7 @@ android-sdk/ -e
 # Environment files
 *.env
 *.env.*
--e 
+-e
 # Environment files
 *.env
 *.env.*
@@ -107,3 +107,6 @@ android-sdk/ -e
 # Environment files
 *.env
 *.env.*
+
+# Re-include env defaults for API v2 services
+!api-v2/services/common/**/.env

@@ -44,14 +44,18 @@ services:
   # ----------------- NOSSOS SERVIÇOS -----------------
 
   provider-service:
-    build: ./services/common/provider-service
+    build:
+      context: ./services/common
+      dockerfile: provider-service/Dockerfile
     container_name: provider-service
-    env_file: ./services/common/provider-service/.env
     ports: ["8011:8011"]
     networks: [core]
     depends_on: [mongo, kafka, redis]
+    env_file:
+      - ./services/common/provider-service/.env
+    working_dir: /app/provider-service
     volumes:
-      - ./services/common/provider-service:/app
+      - ./services/common:/app
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8011/healthz || exit 1"]
       interval: 10s
@@ -60,16 +64,43 @@ services:
 
 
   request-service:
-    build: ./services/common/request-service
+    build:
+      context: ./services/common
+      dockerfile: request-service/Dockerfile
     container_name: request-service
-    env_file: ./services/common/request-service/.env
     ports: ["8012:8012"]
     networks: [core]
     depends_on: [mongo, kafka, redis]
+    env_file:
+      - ./services/common/request-service/.env
+    working_dir: /app/request-service
     volumes:
-      - ./services/common/request-service:/app
+      - ./services/common:/app
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8012/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  matching-service:
+    build:
+      context: ./services/common
+      dockerfile: matching-service/Dockerfile
+    container_name: matching-service
+    ports: ["8013:8013"]
+    networks: [core]
+    depends_on:
+      mongo:
+        condition: service_started
+      kafka:
+        condition: service_started
+    env_file:
+      - ./services/common/matching-service/.env
+    working_dir: /app/matching-service
+    volumes:
+      - ./services/common:/app
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8013/healthz || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 10
@@ -77,10 +108,11 @@ services:
   auth-service:
     build: ./services/common/auth-service
     container_name: auth-service
-    env_file: ./services/common/auth-service/.env
     ports: ["8014:8014"]
     networks: [core]
     depends_on: [mongo]
+    env_file:
+      - ./services/common/auth-service/.env
     volumes:
       - ./services/common/auth-service:/app
     healthcheck:
@@ -92,7 +124,6 @@ services:
   socket-gateway:
     build: ./services/common/socket-gateway
     container_name: socket-gateway
-    env_file: ./services/common/socket-gateway/.env
     ports: ["8015:8015"]
     networks: [core]
     depends_on:
@@ -102,6 +133,8 @@ services:
         condition: service_healthy
       auth-service:
         condition: service_healthy
+    env_file:
+      - ./services/common/socket-gateway/.env
     volumes:
       - ./services/common/socket-gateway:/app
 
