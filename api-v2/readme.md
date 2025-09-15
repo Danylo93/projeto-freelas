@@ -115,5 +115,5 @@ Todos os serviços expõem `/healthz` para checagens.
 ## 6. Coleção Insomnia
 
 - Importe o arquivo [`insomnia-api-v2.json`](./insomnia-api-v2.json) no Insomnia para carregar todas as rotas do gateway e dos microserviços individuais.
-- O ambiente "Base Environment" já aponta para `http://localhost` com as portas padrão do `docker compose` e traz IDs/e-mails de exemplo.
-- Após executar a requisição de login, copie o `access_token` retornado e preencha o campo `auth_token` no ambiente para habilitar as rotas protegidas (`/auth/me`).
+- O ambiente "Base Environment" já aponta para `http://localhost` com as portas padrão do `docker compose` e organiza as configurações em três blocos: `services` (URLs dos serviços), `auth.credentials` (credenciais de teste) e `samples` (IDs e categoria padrão).
+- Depois de executar a requisição de login, copie o `access_token` retornado e preencha o campo `auth.token` no ambiente para habilitar as rotas protegidas (`/auth/me`).

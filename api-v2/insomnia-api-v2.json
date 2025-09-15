@@ -1,7 +1,7 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2024-05-03T00:00:00.000Z",
+  "__export_date": "2025-09-15T20:49:51+00:00",
   "__export_source": "insomnia.desktop.app:v2023.5.8",
   "resources": [
     {
@@ -17,41 +17,124 @@
     {
       "_id": "env_api_v2_base",
       "parentId": "wrk_api_v2",
-      "modified": 1714785601000,
+      "modified": 1757969391433,
       "created": 1714785601000,
       "name": "Base Environment",
       "data": {
-        "gateway_service_url": "http://localhost:8015",
-        "gateway_api_url": "http://localhost:8015/api",
-        "provider_service_url": "http://localhost:8011",
-        "request_service_url": "http://localhost:8012",
-        "matching_service_url": "http://localhost:8013",
-        "auth_service_url": "http://localhost:8014",
-        "sample_provider_id": "prov-001",
-        "sample_request_id": "req-001",
-        "sample_client_id": "cli-001",
-        "sample_category": "plumber",
-        "sample_provider_email": "joao.prestador@example.com",
-        "sample_client_email": "maria.cliente@example.com",
-        "sample_password": "123456",
-        "auth_token": ""
+        "services": {
+          "gateway": {
+            "http": "http://localhost:8015",
+            "api": "{{ _.services.gateway.http }}/api"
+          },
+          "provider": {
+            "http": "http://localhost:8011"
+          },
+          "request": {
+            "http": "http://localhost:8012"
+          },
+          "matching": {
+            "http": "http://localhost:8013"
+          },
+          "auth": {
+            "http": "http://localhost:8014",
+            "api": "{{ _.services.auth.http }}/auth"
+          }
+        },
+        "auth": {
+          "token": "",
+          "credentials": {
+            "provider": {
+              "email": "joao.prestador@example.com",
+              "password": "123456"
+            },
+            "client": {
+              "email": "maria.cliente@example.com",
+              "password": "123456"
+            },
+            "generic": {
+              "password": "123456"
+            }
+          }
+        },
+        "samples": {
+          "provider": {
+            "id": "prov-001",
+            "user_id": "prov-001",
+            "category": "plumber"
+          },
+          "client": {
+            "id": "cli-001"
+          },
+          "request": {
+            "id": "req-001"
+          }
+        }
       },
       "dataPropertyOrder": {
         "&": [
-          "gateway_service_url",
-          "gateway_api_url",
-          "provider_service_url",
-          "request_service_url",
-          "matching_service_url",
-          "auth_service_url",
-          "sample_provider_id",
-          "sample_request_id",
-          "sample_client_id",
-          "sample_category",
-          "sample_provider_email",
-          "sample_client_email",
-          "sample_password",
-          "auth_token"
+          "services",
+          "auth",
+          "samples"
+        ],
+        "services": [
+          "gateway",
+          "provider",
+          "request",
+          "matching",
+          "auth"
+        ],
+        "services.gateway": [
+          "http",
+          "api"
+        ],
+        "services.provider": [
+          "http"
+        ],
+        "services.request": [
+          "http"
+        ],
+        "services.matching": [
+          "http"
+        ],
+        "services.auth": [
+          "http",
+          "api"
+        ],
+        "auth": [
+          "token",
+          "credentials"
+        ],
+        "auth.credentials": [
+          "provider",
+          "client",
+          "generic"
+        ],
+        "auth.credentials.provider": [
+          "email",
+          "password"
+        ],
+        "auth.credentials.client": [
+          "email",
+          "password"
+        ],
+        "auth.credentials.generic": [
+          "password"
+        ],
+        "samples": [
+          "provider",
+          "client",
+          "request"
+        ],
+        "samples.provider": [
+          "id",
+          "user_id",
+          "category"
+        ],
+        "samples.client": [
+          "id"
+        ],
+        "samples.request": [
+          "id"
         ]
       },
       "color": null,
@@ -172,7 +255,7 @@
       "parentId": "fld_gateway",
       "modified": 1714785611000,
       "created": 1714785611000,
-      "url": "{{ _.gateway_service_url }}/healthz",
+      "url": "{{ _.services.gateway.http }}/healthz",
       "name": "Gateway Health",
       "description": "Retorna o status agregado do BFF e URLs configuradas para os serviços internos.",
       "method": "GET",
@@ -195,13 +278,13 @@
       "parentId": "fld_gateway_auth",
       "modified": 1714785612000,
       "created": 1714785612000,
-      "url": "{{ _.gateway_api_url }}/auth/register",
+      "url": "{{ _.services.gateway.api }}/auth/register",
       "name": "Registrar Prestador",
       "description": "Cria um novo usuário do tipo prestador e já retorna o token JWT.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"name\": \"João Prestador\",\n  \"email\": \"{{ _.sample_provider_email }}\",\n  \"phone\": \"11999999999\",\n  \"password\": \"{{ _.sample_password }}\",\n  \"user_type\": 1\n}"
+        "text": "{\n  \"name\": \"João Prestador\",\n  \"email\": \"{{ _.auth.credentials.provider.email }}\",\n  \"phone\": \"11999999999\",\n  \"password\": \"{{ _.auth.credentials.provider.password }}\",\n  \"user_type\": 1\n}"
       },
       "parameters": [],
       "headers": [
@@ -226,13 +309,13 @@
       "parentId": "fld_gateway_auth",
       "modified": 1714785613000,
       "created": 1714785613000,
-      "url": "{{ _.gateway_api_url }}/auth/register",
+      "url": "{{ _.services.gateway.api }}/auth/register",
       "name": "Registrar Cliente",
       "description": "Cria um novo usuário cliente para testar o fluxo completo.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"name\": \"Maria Cliente\",\n  \"email\": \"{{ _.sample_client_email }}\",\n  \"phone\": \"11988887777\",\n  \"password\": \"{{ _.sample_password }}\",\n  \"user_type\": 2\n}"
+        "text": "{\n  \"name\": \"Maria Cliente\",\n  \"email\": \"{{ _.auth.credentials.client.email }}\",\n  \"phone\": \"11988887777\",\n  \"password\": \"{{ _.auth.credentials.client.password }}\",\n  \"user_type\": 2\n}"
       },
       "parameters": [],
       "headers": [
@@ -257,13 +340,13 @@
       "parentId": "fld_gateway_auth",
       "modified": 1714785614000,
       "created": 1714785614000,
-      "url": "{{ _.gateway_api_url }}/auth/login",
+      "url": "{{ _.services.gateway.api }}/auth/login",
       "name": "Login",
-      "description": "Realiza o login e retorna o token para preencher em `auth_token` no ambiente.",
+      "description": "Realiza o login e retorna o token para preencher em `auth.token` no ambiente.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"email\": \"{{ _.sample_provider_email }}\",\n  \"password\": \"{{ _.sample_password }}\"\n}"
+        "text": "{\n  \"email\": \"{{ _.auth.credentials.provider.email }}\",\n  \"password\": \"{{ _.auth.credentials.provider.password }}\"\n}"
       },
       "parameters": [],
       "headers": [
@@ -288,7 +371,7 @@
       "parentId": "fld_gateway_auth",
       "modified": 1714785615000,
       "created": 1714785615000,
-      "url": "{{ _.gateway_api_url }}/auth/me",
+      "url": "{{ _.services.gateway.api }}/auth/me",
       "name": "Perfil Atual",
       "description": "Recupera o usuário autenticado através do token configurado no ambiente.",
       "method": "GET",
@@ -297,7 +380,7 @@
       "headers": [],
       "authentication": {
         "type": "bearer",
-        "token": "{{ _.auth_token }}"
+        "token": "{{ _.auth.token }}"
       },
       "metaSortKey": -1714785615000,
       "isPrivate": false,
@@ -314,7 +397,7 @@
       "parentId": "fld_gateway_providers",
       "modified": 1714785616000,
       "created": 1714785616000,
-      "url": "{{ _.gateway_api_url }}/providers",
+      "url": "{{ _.services.gateway.api }}/providers",
       "name": "Listar Prestadores",
       "description": "Lista todos os prestadores disponíveis no MongoDB via gateway.",
       "method": "GET",
@@ -337,13 +420,13 @@
       "parentId": "fld_gateway_providers",
       "modified": 1714785617000,
       "created": 1714785617000,
-      "url": "{{ _.gateway_api_url }}/providers",
+      "url": "{{ _.services.gateway.api }}/providers",
       "name": "Criar Prestador",
       "description": "Cria ou substitui um prestador para ser usado no matching.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"id\": \"{{ _.sample_provider_id }}\",\n  \"name\": \"João Prestador\",\n  \"category\": \"{{ _.sample_category }}\",\n  \"price\": 150.0,\n  \"description\": \"Especialista em reparos hidráulicos\",\n  \"latitude\": -23.561684,\n  \"longitude\": -46.655981,\n  \"status\": \"available\",\n  \"rating\": 5.0,\n  \"user_id\": \"{{ _.sample_provider_id }}\"\n}"
+        "text": "{\n  \"id\": \"{{ _.samples.provider.id }}\",\n  \"name\": \"João Prestador\",\n  \"category\": \"{{ _.samples.provider.category }}\",\n  \"price\": 150.0,\n  \"description\": \"Especialista em reparos hidráulicos\",\n  \"latitude\": -23.561684,\n  \"longitude\": -46.655981,\n  \"status\": \"available\",\n  \"rating\": 5.0,\n  \"user_id\": \"{{ _.samples.provider.user_id }}\"\n}"
       },
       "parameters": [],
       "headers": [
@@ -368,7 +451,7 @@
       "parentId": "fld_gateway_providers",
       "modified": 1714785618000,
       "created": 1714785618000,
-      "url": "{{ _.gateway_api_url }}/providers/{{ _.sample_provider_id }}/location",
+      "url": "{{ _.services.gateway.api }}/providers/{{ _.samples.provider.id }}/location",
       "name": "Atualizar Localização",
       "description": "Atualiza latitude/longitude e publica evento de localização no Kafka.",
       "method": "PUT",
@@ -399,7 +482,7 @@
       "parentId": "fld_gateway_providers",
       "modified": 1714785619000,
       "created": 1714785619000,
-      "url": "{{ _.gateway_api_url }}/providers/{{ _.sample_provider_id }}/status",
+      "url": "{{ _.services.gateway.api }}/providers/{{ _.samples.provider.id }}/status",
       "name": "Atualizar Status",
       "description": "Altera o status operacional do prestador (available/offline/busy).",
       "method": "PUT",
@@ -430,7 +513,7 @@
       "parentId": "fld_gateway_requests",
       "modified": 1714785620000,
       "created": 1714785620000,
-      "url": "{{ _.gateway_api_url }}/requests",
+      "url": "{{ _.services.gateway.api }}/requests",
       "name": "Listar Solicitações",
       "description": "Lista todas as solicitações registradas no sistema.",
       "method": "GET",
@@ -453,13 +536,13 @@
       "parentId": "fld_gateway_requests",
       "modified": 1714785621000,
       "created": 1714785621000,
-      "url": "{{ _.gateway_api_url }}/requests",
+      "url": "{{ _.services.gateway.api }}/requests",
       "name": "Criar Solicitação",
       "description": "Cria uma solicitação de serviço e dispara eventos de ciclo de vida.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"id\": \"{{ _.sample_request_id }}\",\n  \"client_id\": \"{{ _.sample_client_id }}\",\n  \"category\": \"{{ _.sample_category }}\",\n  \"description\": \"Trocar resistência do chuveiro\",\n  \"client_latitude\": -23.5622,\n  \"client_longitude\": -46.6555,\n  \"price\": 120.0\n}"
+        "text": "{\n  \"id\": \"{{ _.samples.request.id }}\",\n  \"client_id\": \"{{ _.samples.client.id }}\",\n  \"category\": \"{{ _.samples.provider.category }}\",\n  \"description\": \"Trocar resistência do chuveiro\",\n  \"client_latitude\": -23.5622,\n  \"client_longitude\": -46.6555,\n  \"price\": 120.0\n}"
       },
       "parameters": [],
       "headers": [
@@ -484,13 +567,13 @@
       "parentId": "fld_gateway_requests",
       "modified": 1714785622000,
       "created": 1714785622000,
-      "url": "{{ _.gateway_api_url }}/requests/{{ _.sample_request_id }}/accept",
+      "url": "{{ _.services.gateway.api }}/requests/{{ _.samples.request.id }}/accept",
       "name": "Aceitar Solicitação",
       "description": "Marca a solicitação como aceita por um prestador específico.",
       "method": "PUT",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"provider_id\": \"{{ _.sample_provider_id }}\"\n}"
+        "text": "{\n  \"provider_id\": \"{{ _.samples.provider.id }}\"\n}"
       },
       "parameters": [],
       "headers": [
@@ -515,7 +598,7 @@
       "parentId": "fld_gateway_requests",
       "modified": 1714785623000,
       "created": 1714785623000,
-      "url": "{{ _.gateway_api_url }}/requests/{{ _.sample_request_id }}/status",
+      "url": "{{ _.services.gateway.api }}/requests/{{ _.samples.request.id }}/status",
       "name": "Atualizar Status da Solicitação",
       "description": "Atualiza o status da solicitação para acompanhar o fluxo estilo Uber.",
       "method": "PUT",
@@ -546,7 +629,7 @@
       "parentId": "fld_provider_service",
       "modified": 1714785624000,
       "created": 1714785624000,
-      "url": "{{ _.provider_service_url }}/healthz",
+      "url": "{{ _.services.provider.http }}/healthz",
       "name": "Health",
       "description": "Health-check direto do provider-service.",
       "method": "GET",
@@ -569,7 +652,7 @@
       "parentId": "fld_provider_service",
       "modified": 1714785625000,
       "created": 1714785625000,
-      "url": "{{ _.provider_service_url }}/providers",
+      "url": "{{ _.services.provider.http }}/providers",
       "name": "Listar Prestadores",
       "description": "Consulta direta ao provider-service.",
       "method": "GET",
@@ -592,13 +675,13 @@
       "parentId": "fld_provider_service",
       "modified": 1714785626000,
       "created": 1714785626000,
-      "url": "{{ _.provider_service_url }}/providers",
+      "url": "{{ _.services.provider.http }}/providers",
       "name": "Criar Prestador",
       "description": "Cria prestador diretamente no serviço sem passar pelo gateway.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"id\": \"{{ _.sample_provider_id }}\",\n  \"name\": \"João Prestador\",\n  \"category\": \"{{ _.sample_category }}\",\n  \"price\": 150.0,\n  \"description\": \"Especialista em reparos hidráulicos\",\n  \"latitude\": -23.561684,\n  \"longitude\": -46.655981,\n  \"status\": \"available\",\n  \"rating\": 5.0,\n  \"user_id\": \"{{ _.sample_provider_id }}\"\n}"
+        "text": "{\n  \"id\": \"{{ _.samples.provider.id }}\",\n  \"name\": \"João Prestador\",\n  \"category\": \"{{ _.samples.provider.category }}\",\n  \"price\": 150.0,\n  \"description\": \"Especialista em reparos hidráulicos\",\n  \"latitude\": -23.561684,\n  \"longitude\": -46.655981,\n  \"status\": \"available\",\n  \"rating\": 5.0,\n  \"user_id\": \"{{ _.samples.provider.user_id }}\"\n}"
       },
       "parameters": [],
       "headers": [
@@ -623,7 +706,7 @@
       "parentId": "fld_provider_service",
       "modified": 1714785627000,
       "created": 1714785627000,
-      "url": "{{ _.provider_service_url }}/providers/{{ _.sample_provider_id }}/location",
+      "url": "{{ _.services.provider.http }}/providers/{{ _.samples.provider.id }}/location",
       "name": "Atualizar Localização",
       "description": "Atualiza localização diretamente no provider-service.",
       "method": "PUT",
@@ -654,7 +737,7 @@
       "parentId": "fld_provider_service",
       "modified": 1714785628000,
       "created": 1714785628000,
-      "url": "{{ _.provider_service_url }}/providers/{{ _.sample_provider_id }}/status",
+      "url": "{{ _.services.provider.http }}/providers/{{ _.samples.provider.id }}/status",
       "name": "Atualizar Status",
       "description": "Atualiza status diretamente no provider-service.",
       "method": "PUT",
@@ -685,7 +768,7 @@
       "parentId": "fld_request_service",
       "modified": 1714785629000,
       "created": 1714785629000,
-      "url": "{{ _.request_service_url }}/healthz",
+      "url": "{{ _.services.request.http }}/healthz",
       "name": "Health",
       "description": "Health-check direto do request-service.",
       "method": "GET",
@@ -708,7 +791,7 @@
       "parentId": "fld_request_service",
       "modified": 1714785630000,
       "created": 1714785630000,
-      "url": "{{ _.request_service_url }}/requests",
+      "url": "{{ _.services.request.http }}/requests",
       "name": "Listar Solicitações",
       "description": "Lista solicitações diretamente no serviço.",
       "method": "GET",
@@ -731,13 +814,13 @@
       "parentId": "fld_request_service",
       "modified": 1714785631000,
       "created": 1714785631000,
-      "url": "{{ _.request_service_url }}/requests",
+      "url": "{{ _.services.request.http }}/requests",
       "name": "Criar Solicitação",
       "description": "Cria uma solicitação diretamente, útil para testes isolados.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"id\": \"{{ _.sample_request_id }}\",\n  \"client_id\": \"{{ _.sample_client_id }}\",\n  \"category\": \"{{ _.sample_category }}\",\n  \"description\": \"Trocar resistência do chuveiro\",\n  \"client_latitude\": -23.5622,\n  \"client_longitude\": -46.6555,\n  \"price\": 120.0\n}"
+        "text": "{\n  \"id\": \"{{ _.samples.request.id }}\",\n  \"client_id\": \"{{ _.samples.client.id }}\",\n  \"category\": \"{{ _.samples.provider.category }}\",\n  \"description\": \"Trocar resistência do chuveiro\",\n  \"client_latitude\": -23.5622,\n  \"client_longitude\": -46.6555,\n  \"price\": 120.0\n}"
       },
       "parameters": [],
       "headers": [
@@ -762,13 +845,13 @@
       "parentId": "fld_request_service",
       "modified": 1714785632000,
       "created": 1714785632000,
-      "url": "{{ _.request_service_url }}/requests/{{ _.sample_request_id }}/accept",
+      "url": "{{ _.services.request.http }}/requests/{{ _.samples.request.id }}/accept",
       "name": "Aceitar Solicitação",
       "description": "Aceita a solicitação diretamente, útil para simular resposta do app do prestador.",
       "method": "PUT",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"provider_id\": \"{{ _.sample_provider_id }}\"\n}"
+        "text": "{\n  \"provider_id\": \"{{ _.samples.provider.id }}\"\n}"
       },
       "parameters": [],
       "headers": [
@@ -793,7 +876,7 @@
       "parentId": "fld_request_service",
       "modified": 1714785633000,
       "created": 1714785633000,
-      "url": "{{ _.request_service_url }}/requests/{{ _.sample_request_id }}/status",
+      "url": "{{ _.services.request.http }}/requests/{{ _.samples.request.id }}/status",
       "name": "Atualizar Status",
       "description": "Atualiza o status diretamente no request-service.",
       "method": "PUT",
@@ -824,7 +907,7 @@
       "parentId": "fld_auth_service",
       "modified": 1714785634000,
       "created": 1714785634000,
-      "url": "{{ _.auth_service_url }}/healthz",
+      "url": "{{ _.services.auth.http }}/healthz",
       "name": "Health",
       "description": "Health-check direto do auth-service.",
       "method": "GET",
@@ -847,13 +930,13 @@
       "parentId": "fld_auth_service",
       "modified": 1714785635000,
       "created": 1714785635000,
-      "url": "{{ _.auth_service_url }}/auth/register",
+      "url": "{{ _.services.auth.api }}/register",
       "name": "Registrar Usuário",
       "description": "Cria usuário diretamente no auth-service.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"name\": \"Usuário Teste\",\n  \"email\": \"teste@example.com\",\n  \"phone\": \"11970001234\",\n  \"password\": \"{{ _.sample_password }}\",\n  \"user_type\": 2\n}"
+        "text": "{\n  \"name\": \"Usuário Teste\",\n  \"email\": \"teste@example.com\",\n  \"phone\": \"11970001234\",\n  \"password\": \"{{ _.auth.credentials.generic.password }}\",\n  \"user_type\": 2\n}"
       },
       "parameters": [],
       "headers": [
@@ -878,13 +961,13 @@
       "parentId": "fld_auth_service",
       "modified": 1714785636000,
       "created": 1714785636000,
-      "url": "{{ _.auth_service_url }}/auth/login",
+      "url": "{{ _.services.auth.api }}/login",
       "name": "Login",
       "description": "Login direto no auth-service.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"email\": \"{{ _.sample_provider_email }}\",\n  \"password\": \"{{ _.sample_password }}\"\n}"
+        "text": "{\n  \"email\": \"{{ _.auth.credentials.provider.email }}\",\n  \"password\": \"{{ _.auth.credentials.provider.password }}\"\n}"
       },
       "parameters": [],
       "headers": [
@@ -909,7 +992,7 @@
       "parentId": "fld_auth_service",
       "modified": 1714785637000,
       "created": 1714785637000,
-      "url": "{{ _.auth_service_url }}/auth/me",
+      "url": "{{ _.services.auth.api }}/me",
       "name": "Perfil Atual",
       "description": "Retorna o perfil autenticado utilizando o token configurado no ambiente.",
       "method": "GET",
@@ -918,7 +1001,7 @@
       "headers": [],
       "authentication": {
         "type": "bearer",
-        "token": "{{ _.auth_token }}"
+        "token": "{{ _.auth.token }}"
       },
       "metaSortKey": -1714785637000,
       "isPrivate": false,
@@ -935,7 +1018,7 @@
       "parentId": "fld_matching_service",
       "modified": 1714785638000,
       "created": 1714785638000,
-      "url": "{{ _.matching_service_url }}/healthz",
+      "url": "{{ _.services.matching.http }}/healthz",
       "name": "Health",
       "description": "Verifica se o matching-service está em execução.",
       "method": "GET",
