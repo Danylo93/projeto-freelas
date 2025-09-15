@@ -46,10 +46,13 @@ services:
   provider-service:
     build: ./services/common/provider-service
     container_name: provider-service
-    env_file: ./services/common/provider-service/.env
     ports: ["8011:8011"]
     networks: [core]
     depends_on: [mongo, kafka, redis]
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=freelas
+      - KAFKA_BOOTSTRAP=kafka:29092
     volumes:
       - ./services/common/provider-service:/app
     healthcheck:
@@ -62,10 +65,14 @@ services:
   request-service:
     build: ./services/common/request-service
     container_name: request-service
-    env_file: ./services/common/request-service/.env
     ports: ["8012:8012"]
     networks: [core]
     depends_on: [mongo, kafka, redis]
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=freelas
+      - TOPIC_REQUESTS=service.requests
+      - KAFKA_BOOTSTRAP=kafka:29092
     volumes:
       - ./services/common/request-service:/app
     healthcheck:
@@ -74,10 +81,33 @@ services:
       timeout: 3s
       retries: 10
 
+  matching-service:
+    build: ./services/common/matching-service
+    container_name: matching-service
+    ports: ["8013:8013"]
+    networks: [core]
+    depends_on:
+      mongo:
+        condition: service_started
+      kafka:
+        condition: service_started
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=freelas
+      - TOPIC_REQUESTS=service.requests
+      - TOPIC_REQ_LIFECYCLE=requests.lifecycle.v1
+      - KAFKA_BOOTSTRAP=kafka:29092
+    volumes:
+      - ./services/common/matching-service:/app
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8013/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   auth-service:
     build: ./services/common/auth-service
     container_name: auth-service
-    env_file: ./services/common/auth-service/.env
     ports: ["8014:8014"]
     networks: [core]
     depends_on: [mongo]
@@ -92,7 +122,6 @@ services:
   socket-gateway:
     build: ./services/common/socket-gateway
     container_name: socket-gateway
-    env_file: ./services/common/socket-gateway/.env
     ports: ["8015:8015"]
     networks: [core]
     depends_on:

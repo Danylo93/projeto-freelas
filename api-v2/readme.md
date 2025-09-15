@@ -1,135 +1,99 @@
-Como rodar
+# API v2 — Guia rápido
 
-Subir infra
+## 1. Subir a infraestrutura de apoio
 
+Na pasta `api-v2/` rode:
+
+```bash
 docker compose up -d
-# kafka-ui: http://localhost:8085
+```
 
+Isso sobe Kafka (com UI em http://localhost:8085), Redis e MongoDB além dos serviços da API.
 
-Rodar serviços (local ou container):
-– Local rápido (em 4 terminais diferentes):
+## 2. Rodar os microserviços com hot-reload (modo desenvolvimento)
 
-cd services/provider-service && pip install -r requirements.txt && uvicorn main:app --reload --port 8011
-cd services/request-service  && pip install -r requirements.txt && uvicorn main:app --reload --port 8012
-cd services/auth-service && pip install -r requirements.txt && python main.py
-cd services/socket-gateway  && pip install -r requirements.txt && uvicorn main:asgi_app --reload --port 8013
+Cada serviço pode ser iniciado localmente para desenvolvimento rápido.
+Abra terminais separados e execute:
 
-10) Testes rápidos (Insomnia / curl)
-(A) Atualizar localização do prestador (simular online perto da Paulista)
-POST http://localhost:8011/v1/providers/location
-Content-Type: application/json
+```bash
+# Prestadores
+cd services/common/provider-service
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8011
 
-{
-  "provider_id": "prov-001",
-  "lat": -23.561684,
-  "lng": -46.655981,
-  "status": "available"
-}
+# Solicitações
+cd services/common/request-service
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8012
 
-(B) Criar uma solicitação (cliente perto da Paulista)
-POST http://localhost:8012/v1/requests
-Content-Type: application/json
+# Matching (escuta Kafka e atualiza Mongo)
+cd services/common/matching-service
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8013
 
-{
-  "request_id": "req-123",
-  "client_id": "cli-123",
-  "category": "plumber",
-  "price": 120.0,
-  "lat": -23.5622,
-  "lng": -46.6555
-}
+# Autenticação
+cd services/common/auth-service
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8014
 
+# Gateway HTTP/WebSocket
+cd services/common/socket-gateway
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8015
+```
 
-O auth-service vai capturar request.created, procurar providers nos anéis H3, publicar request.offered para o prov-001.
-Se ninguém aceitar em 8s, ele publica request.accepted automaticamente para o primeiro candidato (apenas neste MVP).
+As variáveis de ambiente já possuem valores padrão para o stack docker (`mongo`, `kafka:29092`, etc.). Ajuste conforme necessário.
 
-(C) Aceitar manualmente (se quiser simular aceite do provider no seu app)
-POST http://localhost:8012/v1/requests/req-123/accept
-Content-Type: application/json
+## 3. Fluxo de eventos estilo Uber
 
-{ "provider_id": "prov-001" }
+1. **Atualizar localização do prestador** – publica `provider.location` em Kafka.
+   ```bash
+   curl -X PUT http://localhost:8011/providers/prov-001/location \
+     -H "Content-Type: application/json" \
+     -d '{"latitude":-23.561684,"longitude":-46.655981}'
+   ```
+2. **Criar solicitação** – salva em Mongo e envia para o tópico `service.requests` e `requests.lifecycle.v1`.
+   ```bash
+   curl -X POST http://localhost:8012/requests \
+     -H "Content-Type: application/json" \
+     -d '{
+       "id":"req-123",
+       "client_id":"cli-123",
+       "category":"plumber",
+       "client_latitude":-23.5622,
+       "client_longitude":-46.6555,
+       "price":120.0
+     }'
+   ```
+3. **Matching automático** – o matching-service escuta `service.requests`, busca o prestador disponível mais próximo (via Mongo) e marca o provider como `busy`, atualizando a solicitação para `offered`. Também publica `request.offered` em `requests.lifecycle.v1`.
+4. **Aceitar manualmente** – se o aplicativo do prestador aceitar:
+   ```bash
+   curl -X PUT http://localhost:8012/requests/req-123/accept \
+     -H "Content-Type: application/json" \
+     -d '{"provider_id":"prov-001"}'
+   ```
+5. **Atualizar status da corrida** – gera eventos de tracking:
+   ```bash
+   curl -X PUT http://localhost:8012/requests/req-123/status \
+     -H "Content-Type: application/json" \
+     -d '{"status":"en_route"}'
+   ```
 
-(D) Atualizar status (para emitir eventos no tracking)
-POST http://localhost:8012/v1/requests/req-123/status
-Content-Type: application/json
+## 4. Gateway e WebSocket
 
-{ "status": "en_route" }   // depois: arrived | started | completed
+- Gateway HTTP: http://localhost:8015/healthz
+- Principais rotas: `/api/providers`, `/api/requests`, `/api/auth/login`, `/api/auth/register`, `/api/auth/me`
+- Socket.IO: conecte em `http://localhost:8015` passando `{ auth: { user_id, user_type } }`.
+  - Salas sugeridas: `provider:{provider_id}` para ofertas e `request:{request_id}` para lifecycle.
 
-11) Integração com seu Mobile atual
+## 5. Serviços disponíveis
 
-Socket URL: http://<seu_host>:8013
+| Serviço            | Porta | Descrição                                        |
+| ------------------ | ----- | ------------------------------------------------ |
+| provider-service   | 8011  | CRUD + localização/status de prestadores         |
+| request-service    | 8012  | Gestão do ciclo de vida das solicitações         |
+| matching-service   | 8013  | Consome Kafka e atribui prestadores automaticamente |
+| auth-service       | 8014  | Registro, login e consulta de perfil             |
+| socket-gateway     | 8015  | BFF que unifica rotas HTTP e Socket.IO           |
 
-Ao logar, chame:
-
-const socket = io(SOCKET_URL, { auth: { user_id, user_type } });
-socket.emit('join', { /* opcional se quiser nomes de sala custom */});
-
-
-Prestador: junte-se à sala provider:{provider_id} (recebe offer).
-
-Cliente & Prestador: ao abrir a corrida, junte-se à sala request:{request_id} (recebe accepted, status e — se você publicar — provider_location_update).
-
-Rota estilo Uber: continue usando seu CustomMapView com origin = prestador e destination = cliente.
-
-
- outra versão :
-
- Como rodar
-
-Na raiz api-v2/:
-
-docker compose up --build
-
-
-Aguarde subir. Endpoints para testar no navegador/Insomnia:
-
-Gateway (BFF):
-
-GET http://localhost:8015/healthz
-
-GET http://localhost:8015/api/providers
-
-POST http://localhost:8015/api/requests
-
-POST http://localhost:8015/api/auth/login
-
-Serviços diretos:
-
-GET http://localhost:8011/healthz (provider)
-
-GET http://localhost:8012/healthz (request)
-
-GET http://localhost:8014/healthz (auth)
-
-Seed rápido de prestador:
-
-curl -X POST http://localhost:8011/providers \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id":"prov-1",
-    "name":"Encanador João",
-    "category":"plumber",
-    "price":120.0,
-    "description":"Serviço de encanamento",
-    "latitude":-23.5615,
-    "longitude":-46.6560,
-    "status":"available",
-    "rating":4.8,
-    "user_id":"prov-user-1"
-  }'
-
-
-Criar request via gateway:
-
-curl -X POST http://localhost:8015/api/requests \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id":"req-1",
-    "client_id":"cli-123",
-    "provider_id":"prov-user-1",
-    "category":"plumber",
-    "description":"Minha pia quebrou",
-    "client_latitude":-23.5610,
-    "client_longitude":-46.6550,
-    "price":120.0
-  }'
+Todos os serviços expõem `/healthz` para checagens.
