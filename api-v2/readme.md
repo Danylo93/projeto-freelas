@@ -111,3 +111,9 @@ As variáveis de ambiente já possuem valores padrão para o stack docker (`mong
 | socket-gateway     | 8015  | BFF que unifica rotas HTTP e Socket.IO           |
 
 Todos os serviços expõem `/healthz` para checagens.
+
+## 6. Coleção Insomnia
+
+- Importe o arquivo [`insomnia-api-v2.json`](./insomnia-api-v2.json) no Insomnia para carregar todas as rotas do gateway e dos microserviços individuais.
+- O ambiente "Base Environment" já aponta para `http://localhost` com as portas padrão do `docker compose` e traz IDs/e-mails de exemplo.
+- Após executar a requisição de login, copie o `access_token` retornado e preencha o campo `auth_token` no ambiente para habilitar as rotas protegidas (`/auth/me`).

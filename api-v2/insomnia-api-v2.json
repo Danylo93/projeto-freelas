@@ -1,0 +1,957 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2024-05-03T00:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "wrk_api_v2",
+      "parentId": null,
+      "modified": 1714785600000,
+      "created": 1714785600000,
+      "name": "API v2 Microservices",
+      "description": "Coleção Insomnia baseada na branch feature/resolve-issues-and-add-improvements-ffvcjm para testar o ecossistema escalável.",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "env_api_v2_base",
+      "parentId": "wrk_api_v2",
+      "modified": 1714785601000,
+      "created": 1714785601000,
+      "name": "Base Environment",
+      "data": {
+        "gateway_service_url": "http://localhost:8015",
+        "gateway_api_url": "http://localhost:8015/api",
+        "provider_service_url": "http://localhost:8011",
+        "request_service_url": "http://localhost:8012",
+        "matching_service_url": "http://localhost:8013",
+        "auth_service_url": "http://localhost:8014",
+        "sample_provider_id": "prov-001",
+        "sample_request_id": "req-001",
+        "sample_client_id": "cli-001",
+        "sample_category": "plumber",
+        "sample_provider_email": "joao.prestador@example.com",
+        "sample_client_email": "maria.cliente@example.com",
+        "sample_password": "123456",
+        "auth_token": ""
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "gateway_service_url",
+          "gateway_api_url",
+          "provider_service_url",
+          "request_service_url",
+          "matching_service_url",
+          "auth_service_url",
+          "sample_provider_id",
+          "sample_request_id",
+          "sample_client_id",
+          "sample_category",
+          "sample_provider_email",
+          "sample_client_email",
+          "sample_password",
+          "auth_token"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1714785601000,
+      "_type": "environment"
+    },
+    {
+      "_id": "fld_gateway",
+      "parentId": "wrk_api_v2",
+      "modified": 1714785602000,
+      "created": 1714785602000,
+      "name": "Gateway HTTP",
+      "description": "Rotas expostas pelo socket-gateway (porta 8015).",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1714785602000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_gateway_auth",
+      "parentId": "fld_gateway",
+      "modified": 1714785603000,
+      "created": 1714785603000,
+      "name": "Gateway · Auth",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1714785603000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_gateway_providers",
+      "parentId": "fld_gateway",
+      "modified": 1714785604000,
+      "created": 1714785604000,
+      "name": "Gateway · Providers",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1714785604000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_gateway_requests",
+      "parentId": "fld_gateway",
+      "modified": 1714785605000,
+      "created": 1714785605000,
+      "name": "Gateway · Requests",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1714785605000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_services",
+      "parentId": "wrk_api_v2",
+      "modified": 1714785606000,
+      "created": 1714785606000,
+      "name": "Serviços Internos",
+      "description": "Acesso direto a cada microserviço FastAPI.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1714785606000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_provider_service",
+      "parentId": "fld_services",
+      "modified": 1714785607000,
+      "created": 1714785607000,
+      "name": "Provider Service",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1714785607000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_request_service",
+      "parentId": "fld_services",
+      "modified": 1714785608000,
+      "created": 1714785608000,
+      "name": "Request Service",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1714785608000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_auth_service",
+      "parentId": "fld_services",
+      "modified": 1714785609000,
+      "created": 1714785609000,
+      "name": "Auth Service",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1714785609000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_matching_service",
+      "parentId": "fld_services",
+      "modified": 1714785610000,
+      "created": 1714785610000,
+      "name": "Matching Service",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1714785610000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_gateway_health",
+      "parentId": "fld_gateway",
+      "modified": 1714785611000,
+      "created": 1714785611000,
+      "url": "{{ _.gateway_service_url }}/healthz",
+      "name": "Gateway Health",
+      "description": "Retorna o status agregado do BFF e URLs configuradas para os serviços internos.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1714785611000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_register_provider",
+      "parentId": "fld_gateway_auth",
+      "modified": 1714785612000,
+      "created": 1714785612000,
+      "url": "{{ _.gateway_api_url }}/auth/register",
+      "name": "Registrar Prestador",
+      "description": "Cria um novo usuário do tipo prestador e já retorna o token JWT.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"João Prestador\",\n  \"email\": \"{{ _.sample_provider_email }}\",\n  \"phone\": \"11999999999\",\n  \"password\": \"{{ _.sample_password }}\",\n  \"user_type\": 1\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785612000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_register_client",
+      "parentId": "fld_gateway_auth",
+      "modified": 1714785613000,
+      "created": 1714785613000,
+      "url": "{{ _.gateway_api_url }}/auth/register",
+      "name": "Registrar Cliente",
+      "description": "Cria um novo usuário cliente para testar o fluxo completo.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Maria Cliente\",\n  \"email\": \"{{ _.sample_client_email }}\",\n  \"phone\": \"11988887777\",\n  \"password\": \"{{ _.sample_password }}\",\n  \"user_type\": 2\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785613000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_login",
+      "parentId": "fld_gateway_auth",
+      "modified": 1714785614000,
+      "created": 1714785614000,
+      "url": "{{ _.gateway_api_url }}/auth/login",
+      "name": "Login",
+      "description": "Realiza o login e retorna o token para preencher em `auth_token` no ambiente.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.sample_provider_email }}\",\n  \"password\": \"{{ _.sample_password }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785614000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_profile",
+      "parentId": "fld_gateway_auth",
+      "modified": 1714785615000,
+      "created": 1714785615000,
+      "url": "{{ _.gateway_api_url }}/auth/me",
+      "name": "Perfil Atual",
+      "description": "Recupera o usuário autenticado através do token configurado no ambiente.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1714785615000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_list_providers",
+      "parentId": "fld_gateway_providers",
+      "modified": 1714785616000,
+      "created": 1714785616000,
+      "url": "{{ _.gateway_api_url }}/providers",
+      "name": "Listar Prestadores",
+      "description": "Lista todos os prestadores disponíveis no MongoDB via gateway.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1714785616000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_create_provider",
+      "parentId": "fld_gateway_providers",
+      "modified": 1714785617000,
+      "created": 1714785617000,
+      "url": "{{ _.gateway_api_url }}/providers",
+      "name": "Criar Prestador",
+      "description": "Cria ou substitui um prestador para ser usado no matching.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"id\": \"{{ _.sample_provider_id }}\",\n  \"name\": \"João Prestador\",\n  \"category\": \"{{ _.sample_category }}\",\n  \"price\": 150.0,\n  \"description\": \"Especialista em reparos hidráulicos\",\n  \"latitude\": -23.561684,\n  \"longitude\": -46.655981,\n  \"status\": \"available\",\n  \"rating\": 5.0,\n  \"user_id\": \"{{ _.sample_provider_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785617000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_update_location",
+      "parentId": "fld_gateway_providers",
+      "modified": 1714785618000,
+      "created": 1714785618000,
+      "url": "{{ _.gateway_api_url }}/providers/{{ _.sample_provider_id }}/location",
+      "name": "Atualizar Localização",
+      "description": "Atualiza latitude/longitude e publica evento de localização no Kafka.",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"latitude\": -23.5605,\n  \"longitude\": -46.657\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785618000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_update_status",
+      "parentId": "fld_gateway_providers",
+      "modified": 1714785619000,
+      "created": 1714785619000,
+      "url": "{{ _.gateway_api_url }}/providers/{{ _.sample_provider_id }}/status",
+      "name": "Atualizar Status",
+      "description": "Altera o status operacional do prestador (available/offline/busy).",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"available\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785619000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_list_requests",
+      "parentId": "fld_gateway_requests",
+      "modified": 1714785620000,
+      "created": 1714785620000,
+      "url": "{{ _.gateway_api_url }}/requests",
+      "name": "Listar Solicitações",
+      "description": "Lista todas as solicitações registradas no sistema.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1714785620000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_create_request",
+      "parentId": "fld_gateway_requests",
+      "modified": 1714785621000,
+      "created": 1714785621000,
+      "url": "{{ _.gateway_api_url }}/requests",
+      "name": "Criar Solicitação",
+      "description": "Cria uma solicitação de serviço e dispara eventos de ciclo de vida.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"id\": \"{{ _.sample_request_id }}\",\n  \"client_id\": \"{{ _.sample_client_id }}\",\n  \"category\": \"{{ _.sample_category }}\",\n  \"description\": \"Trocar resistência do chuveiro\",\n  \"client_latitude\": -23.5622,\n  \"client_longitude\": -46.6555,\n  \"price\": 120.0\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785621000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_accept_request",
+      "parentId": "fld_gateway_requests",
+      "modified": 1714785622000,
+      "created": 1714785622000,
+      "url": "{{ _.gateway_api_url }}/requests/{{ _.sample_request_id }}/accept",
+      "name": "Aceitar Solicitação",
+      "description": "Marca a solicitação como aceita por um prestador específico.",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"provider_id\": \"{{ _.sample_provider_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785622000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_gateway_update_request_status",
+      "parentId": "fld_gateway_requests",
+      "modified": 1714785623000,
+      "created": 1714785623000,
+      "url": "{{ _.gateway_api_url }}/requests/{{ _.sample_request_id }}/status",
+      "name": "Atualizar Status da Solicitação",
+      "description": "Atualiza o status da solicitação para acompanhar o fluxo estilo Uber.",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"en_route\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785623000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_provider_health",
+      "parentId": "fld_provider_service",
+      "modified": 1714785624000,
+      "created": 1714785624000,
+      "url": "{{ _.provider_service_url }}/healthz",
+      "name": "Health",
+      "description": "Health-check direto do provider-service.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1714785624000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_provider_list",
+      "parentId": "fld_provider_service",
+      "modified": 1714785625000,
+      "created": 1714785625000,
+      "url": "{{ _.provider_service_url }}/providers",
+      "name": "Listar Prestadores",
+      "description": "Consulta direta ao provider-service.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1714785625000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_provider_create",
+      "parentId": "fld_provider_service",
+      "modified": 1714785626000,
+      "created": 1714785626000,
+      "url": "{{ _.provider_service_url }}/providers",
+      "name": "Criar Prestador",
+      "description": "Cria prestador diretamente no serviço sem passar pelo gateway.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"id\": \"{{ _.sample_provider_id }}\",\n  \"name\": \"João Prestador\",\n  \"category\": \"{{ _.sample_category }}\",\n  \"price\": 150.0,\n  \"description\": \"Especialista em reparos hidráulicos\",\n  \"latitude\": -23.561684,\n  \"longitude\": -46.655981,\n  \"status\": \"available\",\n  \"rating\": 5.0,\n  \"user_id\": \"{{ _.sample_provider_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785626000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_provider_update_location",
+      "parentId": "fld_provider_service",
+      "modified": 1714785627000,
+      "created": 1714785627000,
+      "url": "{{ _.provider_service_url }}/providers/{{ _.sample_provider_id }}/location",
+      "name": "Atualizar Localização",
+      "description": "Atualiza localização diretamente no provider-service.",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"latitude\": -23.5605,\n  \"longitude\": -46.657\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785627000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_provider_update_status",
+      "parentId": "fld_provider_service",
+      "modified": 1714785628000,
+      "created": 1714785628000,
+      "url": "{{ _.provider_service_url }}/providers/{{ _.sample_provider_id }}/status",
+      "name": "Atualizar Status",
+      "description": "Atualiza status diretamente no provider-service.",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"available\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785628000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_request_health",
+      "parentId": "fld_request_service",
+      "modified": 1714785629000,
+      "created": 1714785629000,
+      "url": "{{ _.request_service_url }}/healthz",
+      "name": "Health",
+      "description": "Health-check direto do request-service.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1714785629000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_request_list",
+      "parentId": "fld_request_service",
+      "modified": 1714785630000,
+      "created": 1714785630000,
+      "url": "{{ _.request_service_url }}/requests",
+      "name": "Listar Solicitações",
+      "description": "Lista solicitações diretamente no serviço.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1714785630000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_request_create",
+      "parentId": "fld_request_service",
+      "modified": 1714785631000,
+      "created": 1714785631000,
+      "url": "{{ _.request_service_url }}/requests",
+      "name": "Criar Solicitação",
+      "description": "Cria uma solicitação diretamente, útil para testes isolados.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"id\": \"{{ _.sample_request_id }}\",\n  \"client_id\": \"{{ _.sample_client_id }}\",\n  \"category\": \"{{ _.sample_category }}\",\n  \"description\": \"Trocar resistência do chuveiro\",\n  \"client_latitude\": -23.5622,\n  \"client_longitude\": -46.6555,\n  \"price\": 120.0\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785631000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_request_accept",
+      "parentId": "fld_request_service",
+      "modified": 1714785632000,
+      "created": 1714785632000,
+      "url": "{{ _.request_service_url }}/requests/{{ _.sample_request_id }}/accept",
+      "name": "Aceitar Solicitação",
+      "description": "Aceita a solicitação diretamente, útil para simular resposta do app do prestador.",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"provider_id\": \"{{ _.sample_provider_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785632000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_request_update_status",
+      "parentId": "fld_request_service",
+      "modified": 1714785633000,
+      "created": 1714785633000,
+      "url": "{{ _.request_service_url }}/requests/{{ _.sample_request_id }}/status",
+      "name": "Atualizar Status",
+      "description": "Atualiza o status diretamente no request-service.",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"completed\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785633000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_health",
+      "parentId": "fld_auth_service",
+      "modified": 1714785634000,
+      "created": 1714785634000,
+      "url": "{{ _.auth_service_url }}/healthz",
+      "name": "Health",
+      "description": "Health-check direto do auth-service.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1714785634000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_register",
+      "parentId": "fld_auth_service",
+      "modified": 1714785635000,
+      "created": 1714785635000,
+      "url": "{{ _.auth_service_url }}/auth/register",
+      "name": "Registrar Usuário",
+      "description": "Cria usuário diretamente no auth-service.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Usuário Teste\",\n  \"email\": \"teste@example.com\",\n  \"phone\": \"11970001234\",\n  \"password\": \"{{ _.sample_password }}\",\n  \"user_type\": 2\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785635000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_login",
+      "parentId": "fld_auth_service",
+      "modified": 1714785636000,
+      "created": 1714785636000,
+      "url": "{{ _.auth_service_url }}/auth/login",
+      "name": "Login",
+      "description": "Login direto no auth-service.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.sample_provider_email }}\",\n  \"password\": \"{{ _.sample_password }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1714785636000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_me",
+      "parentId": "fld_auth_service",
+      "modified": 1714785637000,
+      "created": 1714785637000,
+      "url": "{{ _.auth_service_url }}/auth/me",
+      "name": "Perfil Atual",
+      "description": "Retorna o perfil autenticado utilizando o token configurado no ambiente.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}"
+      },
+      "metaSortKey": -1714785637000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_matching_health",
+      "parentId": "fld_matching_service",
+      "modified": 1714785638000,
+      "created": 1714785638000,
+      "url": "{{ _.matching_service_url }}/healthz",
+      "name": "Health",
+      "description": "Verifica se o matching-service está em execução.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1714785638000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    }
+  ]
+}
