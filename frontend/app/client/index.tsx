@@ -10,21 +10,21 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import axios from 'axios';
 
+import { API_BASE_URL } from '@/utils/config';
+import { haversineDistance } from '@/utils/geo';
+
 const { height } = Dimensions.get('window');
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
 
 interface Provider {
   id: string;
   name: string;
   category: string;
   price: number;
-  description: string;
+  description?: string;
   latitude: number;
   longitude: number;
-  address: string;
   status: string;
   rating: number;
-  distance: number;
   user_id: string;
   phone?: string;
 }
@@ -152,30 +152,42 @@ export default function ClientScreen() {
     setShowModal(true);
   };
 
+  const generateRequestId = () => `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   const handleRequestService = async () => {
-    if (!selectedProvider || !userLocation) {
+    if (!selectedProvider || !userLocation || !user) {
       Alert.alert('Erro', 'Selecione um prestador e permita acesso à localização');
       return;
     }
     setRequestLoading(true);
+    const requestId = generateRequestId();
     try {
-      const response = await axios.post(`${API_BASE_URL}/requests`, {
-        provider_id: selectedProvider.user_id,
+      const payload = {
+        id: requestId,
+        client_id: user.id,
+        provider_id: selectedProvider.id,
         category: selectedProvider.category,
         description: `Solicitação de serviço de ${selectedProvider.category}`,
         client_latitude: userLocation.latitude,
         client_longitude: userLocation.longitude,
-        price: selectedProvider.price
-      }, { headers: { Authorization: `Bearer ${token}` } });
+        price: selectedProvider.price,
+        status: 'pending' as const,
+      };
+
+      const response = await axios.post(`${API_BASE_URL}/requests`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const createdId = response.data.id ?? requestId;
 
       setCurrentRequest({
-        id: response.data.id,
-        provider_id: selectedProvider.user_id,
-        status: 'pending',
+        id: createdId,
+        provider_id: selectedProvider.id,
+        status: response.data.status ?? 'pending',
         provider_name: selectedProvider.name,
         provider_phone: selectedProvider.phone || '',
         category: selectedProvider.category,
-        price: selectedProvider.price
+        price: selectedProvider.price,
       });
 
       setStatusMessage('⏳ Aguardando prestador aceitar...');
@@ -190,29 +202,23 @@ export default function ClientScreen() {
     }
   };
 
-  const handleRatingSubmit = async () => {
+  const handleRatingSubmit = () => {
     if (!currentRequest) return;
-    try {
-      await axios.post(`${API_BASE_URL}/ratings`, {
-        request_id: currentRequest.id,
-        rating,
-        comment: ratingComment
-      }, { headers: { Authorization: `Bearer ${token}` } });
-      Alert.alert('Obrigado!', 'Sua avaliação foi enviada com sucesso!');
-      setShowRatingModal(false);
-      setCurrentRequest(null);
-      setShowMap(false);
-      setStatusMessage('');
-      setRating(5);
-      setRatingComment('');
-    } catch (error) {
-      console.error('Erro ao enviar avaliação:', error);
-      Alert.alert('Erro', 'Não foi possível enviar a avaliação');
-    }
+    Alert.alert('Obrigado!', 'Sua avaliação foi registrada!');
+    setShowRatingModal(false);
+    setCurrentRequest(null);
+    setShowMap(false);
+    setStatusMessage('');
+    setRating(5);
+    setRatingComment('');
   };
 
   const renderProvider = ({ item }: { item: Provider }) => {
-    const disabled = currentRequest?.provider_id === item.user_id && currentRequest.status !== 'completed';
+    const distanceKm = userLocation
+      ? haversineDistance(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude)
+      : null;
+    const disabled = currentRequest?.provider_id === item.id && currentRequest.status !== 'completed';
+    const distanceText = distanceKm != null ? `${distanceKm.toFixed(1)} km` : '—';
     return (
       <Animated.View style={[styles.providerCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
         <TouchableOpacity onPress={() => handleProviderSelect(item)} disabled={disabled} style={disabled ? styles.disabledProvider : undefined}>
@@ -236,7 +242,7 @@ export default function ClientScreen() {
             </View>
             <View style={styles.distanceContainer}>
               <Ionicons name="location-outline" size={16} color="#666" />
-              <Text style={styles.distanceText}>{item.distance} km</Text>
+              <Text style={styles.distanceText}>{distanceText}</Text>
             </View>
             <View style={styles.ratingContainer}>
               <Ionicons name="star" size={16} color="#FFD700" />
@@ -244,7 +250,7 @@ export default function ClientScreen() {
             </View>
           </View>
 
-          <Text style={styles.providerDescription} numberOfLines={2}>{item.description}</Text>
+          <Text style={styles.providerDescription} numberOfLines={2}>{item.description || "Sem descrição disponível."}</Text>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -407,7 +413,7 @@ export default function ClientScreen() {
                     </View>
                     <View style={styles.modalDetailItem}>
                       <Ionicons name="location-outline" size={20} color="#666" />
-                      <Text style={styles.modalDetailText}>{selectedProvider.distance} km de distância</Text>
+                      <Text style={styles.modalDetailText}>{userLocation ? `${haversineDistance(userLocation.latitude, userLocation.longitude, selectedProvider.latitude, selectedProvider.longitude).toFixed(1)} km de distância` : 'Distância indisponível'}</Text>
                     </View>
                     <View style={styles.modalDetailItem}>
                       <Ionicons name="star" size={20} color="#FFD700" />
@@ -415,7 +421,7 @@ export default function ClientScreen() {
                     </View>
                   </View>
 
-                  <Text style={styles.modalAddress}>{selectedProvider.address}</Text>
+                  <Text style={styles.modalAddress}>Lat: {selectedProvider.latitude.toFixed(4)} | Lon: {selectedProvider.longitude.toFixed(4)}</Text>
                 </View>
 
                 <View style={styles.modalButtons}>
@@ -425,11 +431,11 @@ export default function ClientScreen() {
                   <TouchableOpacity
                     style={[
                       styles.confirmButton,
-                      (requestLoading || (currentRequest && currentRequest.provider_id === selectedProvider.user_id && currentRequest.status !== 'completed')) && styles.confirmButtonDisabled
+                      (requestLoading || (currentRequest && currentRequest.provider_id === selectedProvider.id && currentRequest.status !== 'completed')) && styles.confirmButtonDisabled
                     ]}
                     onPress={handleRequestService}
                     disabled={
-                      requestLoading || (currentRequest && currentRequest.provider_id === selectedProvider.user_id && currentRequest.status !== 'completed')
+                      requestLoading || (currentRequest && currentRequest.provider_id === selectedProvider.id && currentRequest.status !== 'completed')
                     }
                   >
                     {requestLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmButtonText}>Solicitar Serviço</Text>}

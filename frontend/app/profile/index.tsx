@@ -30,8 +30,6 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
   const slideAnim = new Animated.Value(-50);
   const fadeAnim = new Animated.Value(0);
 
-  const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
-
   useEffect(() => {
     // Animação de entrada
     Animated.parallel([

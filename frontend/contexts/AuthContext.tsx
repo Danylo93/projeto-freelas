@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
+import { API_BASE_URL } from '@/utils/config';
+
 interface User {
   id: string;
   name: string;
@@ -40,9 +42,12 @@ export const useAuth = () => {
   return context;
 };
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
+if (API_BASE_URL) {
+  axios.defaults.baseURL = API_BASE_URL;
+} else {
+  console.warn('⚠️ EXPO_PUBLIC_BACKEND_URL não configurada. As chamadas à API podem falhar.');
+}
 console.log('🔗 API_BASE_URL:', API_BASE_URL);
-console.log('🌍 EXPO_PUBLIC_BACKEND_URL:', process.env.EXPO_PUBLIC_BACKEND_URL);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -61,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
-        
+
         // Configure axios defaults
         axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
       }
@@ -80,10 +85,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const { access_token, user_data } = response.data;
       console.log('✅ [AUTH] Login bem-sucedido:', user_data.name, 'Token:', !!access_token);
-      
+
       setToken(access_token);
       setUser(user_data);
-      
+
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+
       await AsyncStorage.setItem('token', access_token);
       await AsyncStorage.setItem('user', JSON.stringify(user_data));
       console.log('💾 [AUTH] Token e usuário salvos no AsyncStorage');
@@ -105,10 +112,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const { access_token, user_data } = response.data;
       console.log('✅ [AUTH] Registro bem-sucedido:', user_data.name, 'Token:', !!access_token);
-      
+
       setToken(access_token);
       setUser(user_data);
-      
+
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+
       await AsyncStorage.setItem('token', access_token);
       await AsyncStorage.setItem('user', JSON.stringify(user_data));
       console.log('💾 [AUTH] Token e usuário salvos no AsyncStorage');
