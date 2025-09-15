@@ -12,6 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 8014
+EXPOSE 8016
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8014", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8016", "--reload"]

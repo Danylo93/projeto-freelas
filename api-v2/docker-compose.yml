@@ -88,6 +88,21 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+  
+  matching-service:
+    build: ./services/common/matching-service
+    container_name: matching-service
+    env_file: ./services/common/matching-service/.env
+    ports: ["8011:8011"]
+    networks: [core]
+    depends_on: [mongo, kafka, redis]
+    volumes:
+      - ./services/common/matching-service:/app
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8016/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   socket-gateway:
     build: ./services/common/socket-gateway
