@@ -10,8 +10,11 @@ from common.kafka import make_producer
 from common.events import TOPIC_PROV_LOCATION, EV_PROVIDER_LOCATION
 
 load_dotenv()
-MONGO_URL = os.getenv("MONGO_URL","mongodb://mongo:27017")
-DB_NAME   = os.getenv("DB_NAME","freelas")
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://mongo:27017")
+DB_NAME = os.getenv("DB_NAME", "freelas")
+PROVIDER_LOCATION_TOPIC = os.getenv(
+    "TOPIC_PROV_LOCATION", TOPIC_PROV_LOCATION
+)
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -79,7 +82,7 @@ async def update_location(provider_id: str, loc: LocationUpdate):
         raise HTTPException(status_code=404, detail="provider not found")
     if producer:
         await producer.send_and_wait(
-            TOPIC_PROV_LOCATION,
+            PROVIDER_LOCATION_TOPIC,
             {
                 "type": EV_PROVIDER_LOCATION,
                 "provider_id": provider_id,

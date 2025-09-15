@@ -15,9 +15,10 @@ from common.events import (
 )
 
 load_dotenv()
-MONGO_URL = os.getenv("MONGO_URL","mongodb://mongo:27017")
-DB_NAME   = os.getenv("DB_NAME","freelas")
-REQ_TOPIC = os.getenv("TOPIC_REQUESTS","service.requests")
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://mongo:27017")
+DB_NAME = os.getenv("DB_NAME", "freelas")
+REQ_TOPIC = os.getenv("TOPIC_REQUESTS", "service.requests")
+LIFECYCLE_TOPIC = os.getenv("TOPIC_REQ_LIFECYCLE", TOPIC_REQ_LIFECYCLE)
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -71,7 +72,7 @@ async def create_request(req: ServiceRequest):
         await asyncio.gather(
             producer.send_and_wait(REQ_TOPIC, req.dict()),
             producer.send_and_wait(
-                TOPIC_REQ_LIFECYCLE,
+                LIFECYCLE_TOPIC,
                 {
                     "type": EV_REQUEST_CREATED,
                     "request_id": req.id,
@@ -92,7 +93,7 @@ async def accept_request(request_id: str, data: AcceptPayload):
         raise HTTPException(status_code=404, detail="request not found")
     if producer:
         await producer.send_and_wait(
-            TOPIC_REQ_LIFECYCLE,
+            LIFECYCLE_TOPIC,
             {
                 "type": EV_REQUEST_ACCEPTED,
                 "request_id": request_id,
@@ -112,7 +113,7 @@ async def update_request_status(request_id: str, data: StatusUpdate):
         raise HTTPException(status_code=404, detail="request not found")
     if producer:
         await producer.send_and_wait(
-            TOPIC_REQ_LIFECYCLE,
+            LIFECYCLE_TOPIC,
             {
                 "type": EV_STATUS_CHANGED,
                 "request_id": request_id,

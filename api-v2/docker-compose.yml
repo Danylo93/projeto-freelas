@@ -51,11 +51,8 @@ services:
     ports: ["8011:8011"]
     networks: [core]
     depends_on: [mongo, kafka, redis]
-    environment:
-      - MONGO_URL=mongodb://mongo:27017
-      - DB_NAME=freelas
-      - KAFKA_BOOTSTRAP=kafka:29092
-      - PYTHONPATH=/app
+    env_file:
+      - ./services/common/provider-service/.env
     working_dir: /app/provider-service
     volumes:
       - ./services/common:/app
@@ -74,12 +71,8 @@ services:
     ports: ["8012:8012"]
     networks: [core]
     depends_on: [mongo, kafka, redis]
-    environment:
-      - MONGO_URL=mongodb://mongo:27017
-      - DB_NAME=freelas
-      - TOPIC_REQUESTS=service.requests
-      - KAFKA_BOOTSTRAP=kafka:29092
-      - PYTHONPATH=/app
+    env_file:
+      - ./services/common/request-service/.env
     working_dir: /app/request-service
     volumes:
       - ./services/common:/app
@@ -101,13 +94,8 @@ services:
         condition: service_started
       kafka:
         condition: service_started
-    environment:
-      - MONGO_URL=mongodb://mongo:27017
-      - DB_NAME=freelas
-      - TOPIC_REQUESTS=service.requests
-      - TOPIC_REQ_LIFECYCLE=requests.lifecycle.v1
-      - KAFKA_BOOTSTRAP=kafka:29092
-      - PYTHONPATH=/app
+    env_file:
+      - ./services/common/matching-service/.env
     working_dir: /app/matching-service
     volumes:
       - ./services/common:/app
@@ -123,6 +111,8 @@ services:
     ports: ["8014:8014"]
     networks: [core]
     depends_on: [mongo]
+    env_file:
+      - ./services/common/auth-service/.env
     volumes:
       - ./services/common/auth-service:/app
     healthcheck:
@@ -143,6 +133,8 @@ services:
         condition: service_healthy
       auth-service:
         condition: service_healthy
+    env_file:
+      - ./services/common/socket-gateway/.env
     volumes:
       - ./services/common/socket-gateway:/app
 

@@ -1,5 +1,19 @@
 # API v2 — Guia rápido
 
+## 0. Variáveis de ambiente
+
+Cada microserviço possui um arquivo `.env` dentro da própria pasta com os valores padrão para desenvolvimento local e para o `docker compose`. Ajuste conforme a sua infraestrutura:
+
+| Serviço | Arquivo | Variáveis obrigatórias | Observações |
+| ------- | ------- | ---------------------- | ----------- |
+| provider-service | `services/common/provider-service/.env` | `MONGO_URL`, `DB_NAME`, `KAFKA_BOOTSTRAP` | Usa `TOPIC_PROV_LOCATION` opcionalmente para trocar o tópico de localização. |
+| request-service | `services/common/request-service/.env` | `MONGO_URL`, `DB_NAME`, `KAFKA_BOOTSTRAP`, `TOPIC_REQUESTS`, `TOPIC_REQ_LIFECYCLE` | Define o tópico que o matching consome e o tópico de ciclo de vida. |
+| matching-service | `services/common/matching-service/.env` | `MONGO_URL`, `DB_NAME`, `KAFKA_BOOTSTRAP`, `TOPIC_REQUESTS`, `TOPIC_REQ_LIFECYCLE` | Consome `TOPIC_REQUESTS` e publica em `TOPIC_REQ_LIFECYCLE`. |
+| auth-service | `services/common/auth-service/.env` | `MONGO_URL`, `DB_NAME`, `JWT_SECRET` | Utilize um segredo forte em produção. |
+| socket-gateway | `services/common/socket-gateway/.env` | `PROVIDER_URL`, `REQUEST_URL`, `AUTH_URL` | URLs internas para roteamento HTTP. |
+
+> 💡 Para rodar os serviços manualmente fora do Docker, exporte `PYTHONPATH=..` antes de iniciar os serviços que importam o pacote `common` (`provider`, `request` e `matching`). No Linux/macOS você pode prefixar o comando com `PYTHONPATH=..` como mostrado abaixo.
+
 ## 1. Subir a infraestrutura de apoio
 
 Na pasta `api-v2/` rode:
@@ -19,17 +33,17 @@ Abra terminais separados e execute:
 # Prestadores
 cd services/common/provider-service
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8011
+PYTHONPATH=.. uvicorn main:app --reload --port 8011
 
 # Solicitações
 cd services/common/request-service
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8012
+PYTHONPATH=.. uvicorn main:app --reload --port 8012
 
 # Matching (escuta Kafka e atualiza Mongo)
 cd services/common/matching-service
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8013
+PYTHONPATH=.. uvicorn main:app --reload --port 8013
 
 # Autenticação
 cd services/common/auth-service
