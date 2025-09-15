@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi.responses import JSONResponse
 import os, traceback
 from dotenv import load_dotenv
@@ -18,14 +18,14 @@ async def health():
         "provider": PROVIDER_URL, "request": REQUEST_URL, "auth": AUTH_URL
     }}
 
-@app.get("/api/providers")
-async def list_providers():
-    url = f"{PROVIDER_URL}/providers"
+async def forward(method: str, url: str, payload: dict | None = None, headers: dict | None = None):
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(url)
+            r = await client.request(method, url, json=payload, headers=headers)
             r.raise_for_status()
-            return r.json()
+            if r.content:
+                return r.json()
+            return {}
     except Exception as e:
         return JSONResponse(
             status_code=502,
@@ -36,3 +36,67 @@ async def list_providers():
                 "trace": traceback.format_exc().splitlines()[-5:],
             },
         )
+
+
+@app.get("/api/providers")
+async def list_providers():
+    return await forward("GET", f"{PROVIDER_URL}/providers")
+
+
+@app.post("/api/providers")
+async def create_provider(data: dict):
+    return await forward("POST", f"{PROVIDER_URL}/providers", data)
+
+
+@app.put("/api/providers/{provider_id}/location")
+async def update_provider_location(provider_id: str, data: dict):
+    return await forward(
+        "PUT", f"{PROVIDER_URL}/providers/{provider_id}/location", data
+    )
+
+
+@app.put("/api/providers/{provider_id}/status")
+async def update_provider_status(provider_id: str, data: dict):
+    return await forward(
+        "PUT", f"{PROVIDER_URL}/providers/{provider_id}/status", data
+    )
+
+
+@app.get("/api/requests")
+async def list_requests():
+    return await forward("GET", f"{REQUEST_URL}/requests")
+
+
+@app.post("/api/requests")
+async def create_request(data: dict):
+    return await forward("POST", f"{REQUEST_URL}/requests", data)
+
+
+@app.put("/api/requests/{request_id}/accept")
+async def accept_request(request_id: str, data: dict):
+    return await forward(
+        "PUT", f"{REQUEST_URL}/requests/{request_id}/accept", data
+    )
+
+
+@app.put("/api/requests/{request_id}/status")
+async def update_request_status(request_id: str, data: dict):
+    return await forward(
+        "PUT", f"{REQUEST_URL}/requests/{request_id}/status", data
+    )
+
+
+@app.post("/api/auth/register")
+async def register(data: dict):
+    return await forward("POST", f"{AUTH_URL}/auth/register", data)
+
+
+@app.post("/api/auth/login")
+async def login(data: dict):
+    return await forward("POST", f"{AUTH_URL}/auth/login", data)
+
+
+@app.get("/api/auth/me")
+async def me(authorization: str | None = Header(None)):
+    headers = {"Authorization": authorization} if authorization else None
+    return await forward("GET", f"{AUTH_URL}/auth/me", headers=headers)

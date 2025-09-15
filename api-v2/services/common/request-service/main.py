@@ -3,14 +3,23 @@ from pydantic import BaseModel
 from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from aiokafka import AIOKafkaProducer
-import os, json, asyncio
+import os, sys, asyncio
 from dotenv import load_dotenv
+
+# allow importing shared modules
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from kafka import make_producer
+from events import (
+    TOPIC_REQ_LIFECYCLE,
+    EV_REQUEST_CREATED,
+    EV_REQUEST_ACCEPTED,
+    EV_STATUS_CHANGED,
+)
 
 load_dotenv()
 MONGO_URL = os.getenv("MONGO_URL","mongodb://mongo:27017")
 DB_NAME   = os.getenv("DB_NAME","freelas")
-KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP","kafka:29092")
-TOPIC_REQUESTS  = os.getenv("TOPIC_REQUESTS","service.requests")
+REQ_TOPIC = os.getenv("TOPIC_REQUESTS","service.requests")
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -21,7 +30,7 @@ producer: Optional[AIOKafkaProducer] = None
 class ServiceRequest(BaseModel):
     id: str
     client_id: str
-    provider_id: str
+    provider_id: Optional[str] = None
     category: str
     description: str = ""
     client_latitude: float
@@ -29,11 +38,18 @@ class ServiceRequest(BaseModel):
     price: float
     status: str = "pending"
 
+
+class StatusUpdate(BaseModel):
+    status: str
+
+
+class AcceptPayload(BaseModel):
+    provider_id: str
+
 @app.on_event("startup")
 async def start():
     global producer
-    producer = AIOKafkaProducer(bootstrap_servers=KAFKA_BOOTSTRAP)
-    await producer.start()
+    producer = await make_producer()
 
 @app.on_event("shutdown")
 async def stop():
@@ -53,7 +69,56 @@ async def list_requests():
 @app.post("/requests", response_model=ServiceRequest)
 async def create_request(req: ServiceRequest):
     await db.requests.insert_one(req.dict())
-    # publica evento para matching/notifications
     if producer:
-        await producer.send_and_wait(TOPIC_REQUESTS, json.dumps(req.dict()).encode())
+        await asyncio.gather(
+            producer.send_and_wait(REQ_TOPIC, req.dict()),
+            producer.send_and_wait(
+                TOPIC_REQ_LIFECYCLE,
+                {
+                    "type": EV_REQUEST_CREATED,
+                    "request_id": req.id,
+                    "client_id": req.client_id,
+                },
+            ),
+        )
     return req
+
+
+@app.put("/requests/{request_id}/accept")
+async def accept_request(request_id: str, data: AcceptPayload):
+    res = await db.requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": "accepted", "provider_id": data.provider_id}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="request not found")
+    if producer:
+        await producer.send_and_wait(
+            TOPIC_REQ_LIFECYCLE,
+            {
+                "type": EV_REQUEST_ACCEPTED,
+                "request_id": request_id,
+                "provider_id": data.provider_id,
+            },
+        )
+    return {"status": "accepted"}
+
+
+@app.put("/requests/{request_id}/status")
+async def update_request_status(request_id: str, data: StatusUpdate):
+    res = await db.requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": data.status}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="request not found")
+    if producer:
+        await producer.send_and_wait(
+            TOPIC_REQ_LIFECYCLE,
+            {
+                "type": EV_STATUS_CHANGED,
+                "request_id": request_id,
+                "status": data.status,
+            },
+        )
+    return {"status": data.status}
