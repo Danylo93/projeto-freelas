@@ -2,14 +2,12 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, sys
+import os
 from dotenv import load_dotenv
 from aiokafka import AIOKafkaProducer
 
-# allow importing shared modules
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from kafka import make_producer
-from events import TOPIC_PROV_LOCATION, EV_PROVIDER_LOCATION
+from common.kafka import make_producer
+from common.events import TOPIC_PROV_LOCATION, EV_PROVIDER_LOCATION
 
 load_dotenv()
 MONGO_URL = os.getenv("MONGO_URL","mongodb://mongo:27017")

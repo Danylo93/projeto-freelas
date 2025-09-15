@@ -1,14 +1,12 @@
-import os, asyncio, math, sys
+import os, asyncio, math
 from typing import Optional
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from dotenv import load_dotenv
 
-# allow imports from sibling common modules
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from kafka import make_consumer, make_producer
-from events import TOPIC_REQ_LIFECYCLE, EV_REQUEST_OFFERED
+from common.kafka import make_consumer, make_producer
+from common.events import TOPIC_REQ_LIFECYCLE, EV_REQUEST_OFFERED
 
 load_dotenv()
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://mongo:27017")

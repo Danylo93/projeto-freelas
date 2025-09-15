@@ -44,7 +44,9 @@ services:
   # ----------------- NOSSOS SERVIÇOS -----------------
 
   provider-service:
-    build: ./services/common/provider-service
+    build:
+      context: ./services/common
+      dockerfile: provider-service/Dockerfile
     container_name: provider-service
     ports: ["8011:8011"]
     networks: [core]
@@ -53,8 +55,10 @@ services:
       - MONGO_URL=mongodb://mongo:27017
       - DB_NAME=freelas
       - KAFKA_BOOTSTRAP=kafka:29092
+      - PYTHONPATH=/app
+    working_dir: /app/provider-service
     volumes:
-      - ./services/common/provider-service:/app
+      - ./services/common:/app
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8011/healthz || exit 1"]
       interval: 10s
@@ -63,7 +67,9 @@ services:
 
 
   request-service:
-    build: ./services/common/request-service
+    build:
+      context: ./services/common
+      dockerfile: request-service/Dockerfile
     container_name: request-service
     ports: ["8012:8012"]
     networks: [core]
@@ -73,8 +79,10 @@ services:
       - DB_NAME=freelas
       - TOPIC_REQUESTS=service.requests
       - KAFKA_BOOTSTRAP=kafka:29092
+      - PYTHONPATH=/app
+    working_dir: /app/request-service
     volumes:
-      - ./services/common/request-service:/app
+      - ./services/common:/app
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8012/healthz || exit 1"]
       interval: 10s
@@ -82,7 +90,9 @@ services:
       retries: 10
 
   matching-service:
-    build: ./services/common/matching-service
+    build:
+      context: ./services/common
+      dockerfile: matching-service/Dockerfile
     container_name: matching-service
     ports: ["8013:8013"]
     networks: [core]
@@ -97,8 +107,10 @@ services:
       - TOPIC_REQUESTS=service.requests
       - TOPIC_REQ_LIFECYCLE=requests.lifecycle.v1
       - KAFKA_BOOTSTRAP=kafka:29092
+      - PYTHONPATH=/app
+    working_dir: /app/matching-service
     volumes:
-      - ./services/common/matching-service:/app
+      - ./services/common:/app
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8013/healthz || exit 1"]
       interval: 10s

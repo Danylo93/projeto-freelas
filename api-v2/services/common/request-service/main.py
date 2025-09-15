@@ -3,13 +3,11 @@ from pydantic import BaseModel
 from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from aiokafka import AIOKafkaProducer
-import os, sys, asyncio
+import os, asyncio
 from dotenv import load_dotenv
 
-# allow importing shared modules
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from kafka import make_producer
-from events import (
+from common.kafka import make_producer
+from common.events import (
     TOPIC_REQ_LIFECYCLE,
     EV_REQUEST_CREATED,
     EV_REQUEST_ACCEPTED,
