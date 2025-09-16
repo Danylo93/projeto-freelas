@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, Alert,
-  ActivityIndicator, Animated, Dimensions, StatusBar, TextInput,
+  ActivityIndicator, Animated, Dimensions, StatusBar, TextInput, Linking,
 } from 'react-native';
 import CustomMapView, { LatLng } from '@/components/CustomMapView';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,7 +32,7 @@ interface Provider {
 interface ServiceRequest {
   id: string;
   provider_id: string;
-  status: string;
+  status: string; // pending | accepted | in_progress | near_client | started | completed | cancelled
   provider_name: string;
   provider_phone: string;
   category: string;
@@ -49,18 +49,22 @@ export default function ClientScreen() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [showModal, setShowModal] = useState(false);
+
   const [showMap, setShowMap] = useState(false);
   const [currentRequest, setCurrentRequest] = useState<ServiceRequest | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
 
-  const [userLocation, setUserLocation] = useState<LatLng | null>(null); // cliente = destino
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
 
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [rating, setRating] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
+
+  // Novo: modal simples para listar serviços em andamento
+  const [showInProgressModal, setShowInProgressModal] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -74,6 +78,7 @@ export default function ClientScreen() {
       Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
     ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getCurrentLocation = async () => {
@@ -93,34 +98,37 @@ export default function ClientScreen() {
   const setupSocketListeners = () => {
     if (!socket) return;
 
-    socket.on('request_accepted', (data) => {
-      // data: { request_id, provider_name, provider_phone, provider_latitude, provider_longitude, ... }
+    const onAccepted = (data: any) => {
       setCurrentRequest(prev => prev ? {
         ...prev,
         status: 'accepted',
         provider_latitude: data.provider_latitude ?? prev.provider_latitude,
         provider_longitude: data.provider_longitude ?? prev.provider_longitude,
         estimated_time: data.estimated_time ?? prev.estimated_time,
-      } : null);
+      } : prev);
       setStatusMessage('🎉 Solicitação aceita! O prestador está a caminho.');
-      setShowMap(true);
-    });
+    };
 
-    socket.on('provider_location_update', (data) => {
-      // data: { request_id, provider_latitude, provider_longitude, distance, estimated_time }
-      if (!currentRequest || data.request_id !== currentRequest.id) return;
-      setCurrentRequest(prev => prev ? {
-        ...prev,
-        provider_latitude: data.provider_latitude,
-        provider_longitude: data.provider_longitude,
-        estimated_time: data.estimated_time
-      } : null);
-      setStatusMessage(`🚗 Prestador chegando em ${data.estimated_time} min (${data.distance} km)`);
-    });
+    const onProviderLoc = (data: any) => {
+      setCurrentRequest(prev => {
+        if (!prev || data.request_id !== prev.id) return prev;
+        return {
+          ...prev,
+          provider_latitude: data.provider_latitude,
+          provider_longitude: data.provider_longitude,
+          estimated_time: data.estimated_time
+        };
+      });
+      if (typeof data.estimated_time === 'number') {
+        setStatusMessage(`🚗 Prestador chegando em ${data.estimated_time} min`);
+      }
+    };
 
-    socket.on('status_updated', (data) => {
-      if (!currentRequest || data.request_id !== currentRequest.id) return;
-      setCurrentRequest(prev => prev ? { ...prev, status: data.status } : null);
+    const onStatus = (data: any) => {
+      setCurrentRequest(prev => {
+        if (!prev || data.request_id !== prev.id) return prev;
+        return { ...prev, status: data.status };
+      });
       switch (data.status) {
         case 'near_client': setStatusMessage('📍 O prestador chegou!'); break;
         case 'started': setStatusMessage('🔧 Serviço iniciado.'); break;
@@ -129,7 +137,17 @@ export default function ClientScreen() {
           setShowRatingModal(true);
           break;
       }
-    });
+    };
+
+    socket.on('request_accepted', onAccepted);
+    socket.on('provider_location_update', onProviderLoc);
+    socket.on('status_updated', onStatus);
+
+    return () => {
+      socket.off('request_accepted', onAccepted);
+      socket.off('provider_location_update', onProviderLoc);
+      socket.off('status_updated', onStatus);
+    };
   };
 
   const loadProviders = async () => {
@@ -257,9 +275,8 @@ export default function ClientScreen() {
       </TouchableOpacity>
     ));
 
-  // ==== TELA DE TRACKING (mapa) ====
+  // ======= TELA DE MAPA (opcional) =======
   if (showMap && currentRequest && userLocation) {
-    // origem = prestador (se já temos posição dele); destino = cliente (você)
     const providerPoint = (currentRequest.provider_latitude && currentRequest.provider_longitude)
       ? { latitude: currentRequest.provider_latitude, longitude: currentRequest.provider_longitude }
       : undefined;
@@ -282,10 +299,9 @@ export default function ClientScreen() {
           origin={providerPoint}
           destination={userLocation}
           initialRegion={{ latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
-          showsUserLocation={true}
-          showsMyLocationButton={true}
+          showsUserLocation
+          showsMyLocationButton
           onRouteReady={({ distanceKm, durationMin }) => {
-            // fallback de ETA quando ainda não há provider_location_update
             if (!currentRequest?.estimated_time && durationMin) {
               setCurrentRequest(prev => prev ? { ...prev, estimated_time: durationMin } : prev);
             }
@@ -306,7 +322,7 @@ export default function ClientScreen() {
         </View>
 
         {/* Avaliação */}
-        <Modal visible={showRatingModal} transparent animationType="slide">
+        <Modal visible={showRatingModal} transparent animationType="slide" onRequestClose={() => setShowRatingModal(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.ratingModal}>
               <Text style={styles.ratingTitle}>Avalie o Serviço</Text>
@@ -334,7 +350,7 @@ export default function ClientScreen() {
     );
   }
 
-  // ==== LISTA DE PRESTADORES ====
+  // ======= LISTA DE PRESTADORES =======
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
@@ -355,17 +371,21 @@ export default function ClientScreen() {
         </View>
       </View>
 
+      {/* Botão simples para ver serviços em andamento */}
+      <TouchableOpacity
+        style={[styles.trackButton, !currentRequest && { opacity: 0.5 }]}
+        onPress={() => setShowInProgressModal(true)}
+        disabled={!currentRequest}
+      >
+        <Ionicons name="clipboard-outline" size={20} color="#fff" />
+        <Text style={styles.trackButtonText}>Serviços em andamento</Text>
+      </TouchableOpacity>
+
       {currentRequest && (
-        <>
-          <View style={styles.activeRequestBanner}>
-            <Ionicons name="time-outline" size={20} color="#007AFF" />
-            <Text style={styles.activeRequestText}>{statusMessage}</Text>
-          </View>
-          <TouchableOpacity style={styles.trackButton} onPress={() => setShowMap(true)}>
-            <Ionicons name="map-outline" size={20} color="#fff" />
-            <Text style={styles.trackButtonText}>Acompanhar pedido</Text>
-          </TouchableOpacity>
-        </>
+        <View style={styles.activeRequestBanner}>
+          <Ionicons name="time-outline" size={20} color="#007AFF" />
+          <Text style={styles.activeRequestText}>{statusMessage || 'Você possui um serviço em andamento'}</Text>
+        </View>
       )}
 
       {loading ? (
@@ -384,7 +404,7 @@ export default function ClientScreen() {
       )}
 
       {/* Modal de confirmação do prestador */}
-      <Modal visible={showModal} transparent animationType="slide">
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             {selectedProvider && (
@@ -440,6 +460,53 @@ export default function ClientScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal simples: Serviços em andamento */}
+      <Modal
+        visible={showInProgressModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowInProgressModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.inProgressModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Serviços em andamento</Text>
+              <TouchableOpacity onPress={() => setShowInProgressModal(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {currentRequest ? (
+              <View style={styles.inProgressCard}>
+                <Text style={styles.inProgressTitle}>{currentRequest.category}</Text>
+                <Text style={styles.inProgressProvider}>{currentRequest.provider_name}</Text>
+                <Text style={styles.inProgressRow}>Status: <Text style={styles.inProgressStrong}>{currentRequest.status}</Text></Text>
+                <Text style={styles.inProgressRow}>Preço: <Text style={styles.inProgressStrong}>R$ {currentRequest.price.toFixed(2)}</Text></Text>
+                {typeof currentRequest.estimated_time === 'number' && (
+                  <Text style={styles.inProgressRow}>ETA: <Text style={styles.inProgressStrong}>{currentRequest.estimated_time} min</Text></Text>
+                )}
+
+                <View style={styles.inProgressActions}>
+                  <TouchableOpacity style={styles.secondaryBtn} onPress={() => { setShowInProgressModal(false); setShowMap(true); }}>
+                    <Ionicons name="map-outline" size={18} color="#007AFF" />
+                    <Text style={styles.secondaryBtnText}>Abrir mapa</Text>
+                  </TouchableOpacity>
+
+                  {!!currentRequest.provider_phone && (
+                    <TouchableOpacity style={styles.callBtn} onPress={() => Linking.openURL(`tel:${currentRequest.provider_phone}`)}>
+                      <Ionicons name="call-outline" size={18} color="#fff" />
+                      <Text style={styles.callBtnText}>Ligar</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            ) : (
+              <Text style={{ color: '#666', textAlign: 'center' }}>Você não possui serviços em andamento.</Text>
+            )}
+          </View>
+        </View>
+      </Modal>
     </Animated.View>
   );
 }
@@ -463,6 +530,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#ddd',
   },
   activeRequestText: { flex: 1, marginLeft: 8, fontSize: 14, color: '#007AFF', fontWeight: '500' },
+
   trackButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#007AFF', marginHorizontal: 20, marginVertical: 12, paddingVertical: 12, borderRadius: 12,
@@ -494,8 +562,8 @@ const styles = StyleSheet.create({
   providerDescription: { fontSize: 14, color: '#666', lineHeight: 20 },
   disabledProvider: { opacity: 0.5 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContainer: { backgroundColor: '#fff', borderRadius: 20, margin: 20, maxHeight: height * 0.8 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center' },
+  modalContainer: { backgroundColor: '#fff', borderRadius: 20, margin: 20, maxHeight: height * 0.8, width: '92%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
   modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#1a1a1a' },
   modalContent: { paddingHorizontal: 20, paddingBottom: 20 },
@@ -533,4 +601,22 @@ const styles = StyleSheet.create({
   ratingButtons: { flexDirection: 'row', width: '100%' },
   submitButton: { flex: 1, backgroundColor: '#007AFF', paddingVertical: 12, alignItems: 'center', marginLeft: 8, borderRadius: 12 },
   submitButtonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
+
+  // Modal simples de "Serviços em andamento"
+  inProgressModal: { backgroundColor: '#fff', borderRadius: 16, paddingBottom: 16, margin: 20, width: '92%' },
+  inProgressCard: { paddingHorizontal: 20, paddingBottom: 16 },
+  inProgressTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a' },
+  inProgressProvider: { fontSize: 14, color: '#007AFF', marginTop: 2, marginBottom: 8 },
+  inProgressRow: { fontSize: 14, color: '#555', marginTop: 4 },
+  inProgressStrong: { fontWeight: '700', color: '#1a1a1a' },
+  inProgressActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
+
+  secondaryBtn: {
+    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#007AFF',
+    paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12,
+  },
+  secondaryBtnText: { color: '#007AFF', fontWeight: '600', marginLeft: 6 },
+
+  callBtn: { backgroundColor: '#34C759', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, flexDirection: 'row', alignItems: 'center' },
+  callBtnText: { color: '#fff', fontWeight: '700', marginLeft: 6 },
 });

@@ -552,7 +552,7 @@ export default function ProviderScreen() {
                       <Text style={styles.detailValue}>R$ {selectedRequest.price.toFixed(2)}</Text>
                     </View>
 
-                    <View className="detailItem">
+                   <View style={styles.detailItem}>
                       <Ionicons name="location-outline" size={20} color="#666" />
                       <Text style={styles.detailLabel}>Distância</Text>
                       <Text style={styles.detailValue}>{selectedRequest.distance || '0'} km</Text>
