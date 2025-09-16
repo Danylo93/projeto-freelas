@@ -19,6 +19,7 @@ import * as Location from 'expo-location';
 import axios, { isAxiosError } from 'axios';
 
 import CustomMapView, { LatLng } from '@/components/CustomMapView';
+import { usePayment } from '@/contexts/PaymentContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { PROVIDERS_API_URL, REQUESTS_API_URL } from '@/utils/config';
@@ -155,6 +156,7 @@ const getStatusCopy = (status: string, providerName?: string | null) => {
 
 export default function ClientScreen() {
   const { user, token, logout } = useAuth();
+  const { startPayment } = usePayment();
   const { socket, isConnected } = useSocket();
 
   const [providers, setProviders] = useState<NormalizedProvider[]>([]);
@@ -688,6 +690,16 @@ export default function ClientScreen() {
       </Animated.View>
     );
   };
+  const canPayNow = !!currentRequest && ['accepted','in_progress','near_client','started'].includes(currentRequest.status);
+  const handlePayNow = async () => {
+    if (!currentRequest) return;
+    const ok = await startPayment(Math.round(currentRequest.price * 100), { request_id: currentRequest.id });
+    if (ok) {
+      Alert.alert('Pagamento concluído', 'Seu pagamento foi processado com sucesso.');
+    } else {
+      Alert.alert('Pagamento não concluído', 'Tente novamente ou use outro método.');
+    }
+  };
 
   const renderStars = () =>
     Array.from({ length: 5 }, (_, i) => (
@@ -855,6 +867,12 @@ export default function ClientScreen() {
               <Ionicons name="map-outline" size={20} color="#fff" />
               <Text style={styles.trackButtonText}>Acompanhar</Text>
             </TouchableOpacity>
+            {canPayNow && (
+              <TouchableOpacity style={styles.payButton} onPress={handlePayNow}>
+                <Ionicons name="card-outline" size={20} color="#fff" />
+                <Text style={styles.trackButtonText}>Pagar agora</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}

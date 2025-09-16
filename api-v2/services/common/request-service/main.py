@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -13,6 +13,17 @@ from common.events import (
     EV_REQUEST_ACCEPTED,
     EV_STATUS_CHANGED,
 )
+from common.common import (
+    PaginationParams,
+    apply_pagination,
+    SortParams,
+    apply_sort,
+    build_filters,
+    IdempotencyKey,
+)
+from common.common.idempotency import ensure_idempotency, store_idempotent_result
+from common.common.ratelimit import RateLimiter
+from common.common.rbac import require_roles
 
 load_dotenv()
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://mongo:27017")
@@ -25,6 +36,7 @@ db = client[DB_NAME]
 
 app = FastAPI(title="request-service")
 producer: Optional[AIOKafkaProducer] = None
+rate_limiter = RateLimiter(max_requests=60, window_seconds=60)
 
 class ServiceRequest(BaseModel):
     id: str
@@ -61,12 +73,40 @@ async def health():
     return {"status":"ok","service":"request"}
 
 @app.get("/requests", response_model=List[ServiceRequest])
-async def list_requests():
-    cur = db.requests.find({}, {"_id":0})
+async def list_requests(
+    client_id: Optional[str] = None,
+    provider_id: Optional[str] = None,
+    status: Optional[str] = None,
+    pagination: PaginationParams = PaginationParams(),
+    sorting: SortParams = SortParams(),
+    user=Depends(require_roles([1,2,3])),
+):
+    params = {
+        "client_id": client_id,
+        "provider_id": provider_id,
+        "status": status,
+    }
+    query = build_filters(params, ["client_id", "provider_id", "status"])
+    cur = db.requests.find(query, {"_id":0})
+    cur = apply_sort(cur, sorting)
+    cur = apply_pagination(cur, pagination)
     return [doc async for doc in cur]
 
 @app.post("/requests", response_model=ServiceRequest)
-async def create_request(req: ServiceRequest):
+async def create_request(
+    req: ServiceRequest,
+    request: Request,
+    idempotency_key: str | None = Header(None, alias=IdempotencyKey.header_name),
+    user=Depends(require_roles([2])),
+):
+    rl_key = request.headers.get("X-Rate-Limit-Key") or request.client.host
+    if not rate_limiter.allow(f"create_request:{rl_key}"):
+        raise HTTPException(status_code=429, detail="rate limit exceeded")
+
+    cached = ensure_idempotency(idempotency_key)
+    if cached is not None:
+        return cached
+
     await db.requests.insert_one(req.dict())
     if producer:
         await asyncio.gather(
@@ -80,11 +120,20 @@ async def create_request(req: ServiceRequest):
                 },
             ),
         )
+    store_idempotent_result(idempotency_key, req)
     return req
 
 
 @app.put("/requests/{request_id}/accept")
-async def accept_request(request_id: str, data: AcceptPayload):
+async def accept_request(
+    request_id: str,
+    data: AcceptPayload,
+    idempotency_key: str | None = Header(None, alias=IdempotencyKey.header_name),
+    user=Depends(require_roles([1])),
+):
+    cached = ensure_idempotency(idempotency_key)
+    if cached is not None:
+        return cached
     res = await db.requests.update_one(
         {"id": request_id},
         {"$set": {"status": "accepted", "provider_id": data.provider_id}},
@@ -100,11 +149,21 @@ async def accept_request(request_id: str, data: AcceptPayload):
                 "provider_id": data.provider_id,
             },
         )
-    return {"status": "accepted"}
+    result = {"status": "accepted"}
+    store_idempotent_result(idempotency_key, result)
+    return result
 
 
 @app.put("/requests/{request_id}/status")
-async def update_request_status(request_id: str, data: StatusUpdate):
+async def update_request_status(
+    request_id: str,
+    data: StatusUpdate,
+    idempotency_key: str | None = Header(None, alias=IdempotencyKey.header_name),
+    user=Depends(require_roles([1,2])),
+):
+    cached = ensure_idempotency(idempotency_key)
+    if cached is not None:
+        return cached
     res = await db.requests.update_one(
         {"id": request_id},
         {"$set": {"status": data.status}},
@@ -120,4 +179,6 @@ async def update_request_status(request_id: str, data: StatusUpdate):
                 "status": data.status,
             },
         )
-    return {"status": data.status}
+    result = {"status": data.status}
+    store_idempotent_result(idempotency_key, result)
+    return result

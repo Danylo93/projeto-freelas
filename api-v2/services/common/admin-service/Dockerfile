@@ -3,5 +3,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-EXPOSE 8015
-CMD ["uvicorn", "main:socket_app", "--host", "0.0.0.0", "--port", "8015", "--reload"]
+EXPOSE 8017
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8017", "--reload"]
+

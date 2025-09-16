@@ -138,6 +138,32 @@ services:
     volumes:
       - ./services/common/socket-gateway:/app
 
+  payment-service:
+    build:
+      context: ./services/common
+      dockerfile: payment-service/Dockerfile
+    container_name: payment-service
+    ports: ["8016:8016"]
+    networks: [core]
+    env_file:
+      - ./services/common/payment-service/.env
+    working_dir: /app/payment-service
+    volumes:
+      - ./services/common:/app
+
+  admin-service:
+    build:
+      context: ./services/common
+      dockerfile: admin-service/Dockerfile
+    container_name: admin-service
+    ports: ["8017:8017"]
+    networks: [core]
+    env_file:
+      - ./services/common/admin-service/.env
+    working_dir: /app/admin-service
+    volumes:
+      - ./services/common:/app
+
 networks:
   core:
     driver: bridge

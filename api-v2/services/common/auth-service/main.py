@@ -53,6 +53,10 @@ class Login(BaseModel):
     password: str
 
 
+class PushToken(BaseModel):
+    token: str
+
+
 @app.get("/healthz")
 async def health():
     return {"status": "ok", "service": "auth"}
@@ -122,3 +126,12 @@ async def login(data: Login):
 @app.get("/auth/me", response_model=User)
 async def me(current: User = Depends(get_current_user)):
     return current
+
+
+@app.post("/auth/push-token")
+async def register_push_token(data: PushToken, current: User = Depends(get_current_user)):
+    await db.users.update_one(
+        {"id": current.id},
+        {"$addToSet": {"push_tokens": data.token}},
+    )
+    return {"status": "registered"}

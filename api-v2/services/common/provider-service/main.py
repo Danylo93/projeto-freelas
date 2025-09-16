@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -7,6 +7,18 @@ from dotenv import load_dotenv
 from aiokafka import AIOKafkaProducer
 
 from common.kafka import make_producer
+from common.common import (
+    PaginationParams,
+    apply_pagination,
+    SortParams,
+    apply_sort,
+    build_filters,
+    IdempotencyKey,
+)
+from common.common.idempotency import store_idempotent_result
+from common.common.idempotency import ensure_idempotency
+from common.common.ratelimit import RateLimiter
+from common.common.rbac import require_roles
 from common.events import TOPIC_PROV_LOCATION, EV_PROVIDER_LOCATION
 
 load_dotenv()
@@ -22,6 +34,7 @@ db = client[DB_NAME]
 app = FastAPI(title="provider-service")
 
 producer: Optional[AIOKafkaProducer] = None
+rate_limiter = RateLimiter(max_requests=30, window_seconds=60)
 
 class Provider(BaseModel):
     id: str
@@ -62,26 +75,70 @@ async def stop():
     client.close()
 
 @app.get("/providers", response_model=List[Provider])
-async def list_providers(user_id: Optional[str] = None):
-    query = {"user_id": user_id} if user_id else {}
+async def list_providers(
+    request: Request,
+    user_id: Optional[str] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    price_min: Optional[float] = None,
+    price_max: Optional[float] = None,
+    pagination: PaginationParams = PaginationParams(),
+    sorting: SortParams = SortParams(),
+    user=Depends(require_roles([1,2,3])),
+):
+    allowed = ["user_id", "category", "status"]
+    params_dict = {
+        "user_id": user_id,
+        "category": category,
+        "status": status,
+        "price_min": price_min,
+        "price_max": price_max,
+    }
+    query = build_filters(params_dict, allowed)
     cur = db.providers.find(query, {"_id": 0})
+    cur = apply_sort(cur, sorting)
+    cur = apply_pagination(cur, pagination)
     return [doc async for doc in cur]
 
 @app.post("/providers", response_model=Provider)
-async def create_provider(p: Provider):
+async def create_provider(
+    p: Provider,
+    request: Request,
+    idempotency_key: str | None = Header(None, alias=IdempotencyKey.header_name),
+    user=Depends(require_roles([1])),
+):
+    # rate limit per client key or ip
+    rl_key = request.headers.get("X-Rate-Limit-Key") or request.client.host
+    if not rate_limiter.allow(f"create_provider:{rl_key}"):
+        raise HTTPException(status_code=429, detail="rate limit exceeded")
+
+    cached = ensure_idempotency(idempotency_key)
+    if cached is not None:
+        return cached
     await db.providers.insert_one(p.dict())
+    store_idempotent_result(idempotency_key, p)
     return p
 
 
 @app.put("/providers/{provider_id}", response_model=Provider)
-async def upsert_provider(provider_id: str, payload: Provider):
+async def upsert_provider(
+    provider_id: str,
+    payload: Provider,
+    idempotency_key: str | None = Header(None, alias=IdempotencyKey.header_name),
+    user=Depends(require_roles([1])),
+):
+    cached = ensure_idempotency(idempotency_key)
+    if cached is not None:
+        return cached
     data = payload.dict()
     data["id"] = provider_id
     await db.providers.update_one({"id": provider_id}, {"$set": data}, upsert=True)
     stored = await db.providers.find_one({"id": provider_id}, {"_id": 0})
     if not stored:
         raise HTTPException(status_code=500, detail="failed to persist provider")
-    return Provider(**stored)
+    result = Provider(**stored)
+    store_idempotent_result(idempotency_key, result)
+    return result
 
 
 @app.put("/providers/{provider_id}/location")

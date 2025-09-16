@@ -16,6 +16,10 @@ const rawRequestServiceUrl = stripTrailingSlash(
   process.env.EXPO_PUBLIC_REQUEST_SERVICE_URL
 );
 const rawSocketUrl = stripTrailingSlash(process.env.EXPO_PUBLIC_SOCKET_URL);
+const rawPaymentServiceUrl = stripTrailingSlash(process.env.EXPO_PUBLIC_PAYMENT_SERVICE_URL);
+const rawStripePk = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const rawSupabaseAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 const resolvedGatewayUrl = rawGatewayUrl || rawSocketUrl || rawBackendUrl;
 const resolvedSocketUrl = rawSocketUrl || rawGatewayUrl || rawBackendUrl;
@@ -36,7 +40,15 @@ export const REQUESTS_API_URL = rawRequestServiceUrl
   ? ensurePath(rawRequestServiceUrl, '/requests')
   : ensurePath(API_BASE_URL, '/requests');
 
+export const PAYMENTS_API_URL = rawPaymentServiceUrl
+  ? ensurePath(rawPaymentServiceUrl, '/payments')
+  : ensurePath(API_BASE_URL, '/payments');
+
 export const SOCKET_URL = resolvedSocketUrl;
+
+export const STRIPE_PUBLISHABLE_KEY = rawStripePk || '';
+export const SUPABASE_URL = rawSupabaseUrl || '';
+export const SUPABASE_ANON_KEY = rawSupabaseAnon || '';
 
 export const USING_SERVICE_OVERRIDES = Boolean(
   rawAuthServiceUrl || rawProviderServiceUrl || rawRequestServiceUrl || rawSocketUrl
