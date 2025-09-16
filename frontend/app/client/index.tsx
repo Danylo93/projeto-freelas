@@ -10,10 +10,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import axios from 'axios';
 
-import { API_BASE_URL } from '@/utils/config';
+import { PROVIDERS_API_URL, REQUESTS_API_URL } from '@/utils/config';
 import { haversineDistance } from '@/utils/geo';
 
 const { height } = Dimensions.get('window');
+
+const PROVIDER_SERVICE_CONFIG_ERROR =
+  'Serviço de prestadores indisponível. Configure EXPO_PUBLIC_PROVIDER_SERVICE_URL ou o gateway com /api/providers.';
+
+const REQUEST_SERVICE_CONFIG_ERROR =
+  'Serviço de solicitações indisponível. Configure EXPO_PUBLIC_REQUEST_SERVICE_URL ou o gateway com /api/requests.';
 
 interface Provider {
   id: string;
@@ -64,6 +70,8 @@ export default function ClientScreen() {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const providerConfigAlertShown = useRef(false);
+  const requestConfigAlertShown = useRef(false);
 
   useEffect(() => {
     loadProviders();
@@ -133,9 +141,18 @@ export default function ClientScreen() {
   };
 
   const loadProviders = async () => {
+    if (!PROVIDERS_API_URL) {
+      if (!providerConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+        providerConfigAlertShown.current = true;
+      }
+      setLoading(false);
+      setProviders([]);
+      return;
+    }
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/providers`, {
+      const response = await axios.get(PROVIDERS_API_URL, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProviders(response.data);
@@ -159,6 +176,13 @@ export default function ClientScreen() {
       Alert.alert('Erro', 'Selecione um prestador e permita acesso à localização');
       return;
     }
+    if (!REQUESTS_API_URL) {
+      if (!requestConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
+        requestConfigAlertShown.current = true;
+      }
+      return;
+    }
     setRequestLoading(true);
     const requestId = generateRequestId();
     try {
@@ -174,7 +198,7 @@ export default function ClientScreen() {
         status: 'pending' as const,
       };
 
-      const response = await axios.post(`${API_BASE_URL}/requests`, payload, {
+      const response = await axios.post(REQUESTS_API_URL, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

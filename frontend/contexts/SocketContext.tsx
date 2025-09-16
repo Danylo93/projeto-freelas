@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { Alert } from 'react-native';
 
-import { BACKEND_URL } from '@/utils/config';
+import { SOCKET_URL } from '@/utils/config';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -32,17 +32,19 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (user && token) {
       console.log('🔌 [SOCKET] Iniciando conexão Socket.io...');
-      console.log('🔌 [SOCKET] URL:', BACKEND_URL);
+      console.log('🔌 [SOCKET] URL:', SOCKET_URL);
       console.log('🔌 [SOCKET] User:', user.name, 'Type:', user.user_type);
 
-      if (!BACKEND_URL) {
-        console.warn('⚠️ [SOCKET] BACKEND_URL não configurada. Conexão Socket.io não iniciada.');
+      if (!SOCKET_URL) {
+        console.warn(
+          '⚠️ [SOCKET] Nenhuma URL para Socket.io configurada. Defina EXPO_PUBLIC_SOCKET_URL, EXPO_PUBLIC_BACKEND_URL ou EXPO_PUBLIC_API_GATEWAY_URL.'
+        );
         return;
       }
 
       try {
         // Socket.io conecta no mesmo servidor da API mas não precisa do /api prefix
-        const socketUrl = BACKEND_URL;
+        const socketUrl = SOCKET_URL;
         console.log('🔌 [SOCKET] Conectando em:', socketUrl);
 
         const newSocket = io(socketUrl, {

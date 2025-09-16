@@ -21,7 +21,7 @@ import { useSocket } from '../../contexts/SocketContext';
 
 // 🔽 mapa estilo Uber
 import CustomMapView, { LatLng } from '@/components/CustomMapView';
-import { API_BASE_URL } from '@/utils/config';
+import { PROVIDERS_API_URL, REQUESTS_API_URL } from '@/utils/config';
 import { haversineDistance } from '@/utils/geo';
 
 const { height } = Dimensions.get('window');
@@ -65,6 +65,12 @@ const formatId = (id: string) => {
   return id.length > 10 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id;
 };
 
+const PROVIDER_SERVICE_CONFIG_ERROR =
+  'Serviço de prestadores indisponível. Configure EXPO_PUBLIC_PROVIDER_SERVICE_URL ou o gateway com /api/providers.';
+
+const REQUEST_SERVICE_CONFIG_ERROR =
+  'Serviço de solicitações indisponível. Configure EXPO_PUBLIC_REQUEST_SERVICE_URL ou o gateway com /api/requests.';
+
 export default function ProviderScreen() {
   const { user, token, logout } = useAuth();
   const { socket, isConnected } = useSocket();
@@ -88,6 +94,8 @@ export default function ProviderScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const locationWatcher = useRef<Location.LocationSubscription | null>(null);
+  const providerConfigAlertShown = useRef(false);
+  const requestConfigAlertShown = useRef(false);
 
 
   useEffect(() => {
@@ -126,8 +134,17 @@ export default function ProviderScreen() {
   const fetchProviderProfile = async () => {
     if (!user) return;
     setProfileLoading(true);
+    if (!PROVIDERS_API_URL) {
+      if (!providerConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+        providerConfigAlertShown.current = true;
+      }
+      setProfileError(PROVIDER_SERVICE_CONFIG_ERROR);
+      setProfileLoading(false);
+      return;
+    }
     try {
-      const response = await axios.get(`${API_BASE_URL}/providers`, {
+      const response = await axios.get(PROVIDERS_API_URL, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const providers: ProviderProfile[] = response.data;
@@ -179,6 +196,13 @@ export default function ProviderScreen() {
 
   // ===== localização do prestador: pega atual, envia pro backend e mantém watcher (move o carro)
   const getCurrentLocation = async (profile: ProviderProfile) => {
+    if (!PROVIDERS_API_URL) {
+      if (!providerConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+        providerConfigAlertShown.current = true;
+      }
+      return;
+    }
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -197,7 +221,7 @@ export default function ProviderScreen() {
       locationWatcher.current?.remove?.();
 
       await axios.put(
-        `${API_BASE_URL}/providers/${profile.id}/location`,
+        `${PROVIDERS_API_URL}/${profile.id}/location`,
         { latitude: start.latitude, longitude: start.longitude },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -238,7 +262,7 @@ export default function ProviderScreen() {
 
           try {
             await axios.put(
-              `${API_BASE_URL}/providers/${profile.id}/location`,
+              `${PROVIDERS_API_URL}/${profile.id}/location`,
               { latitude: next.latitude, longitude: next.longitude },
               { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -291,9 +315,21 @@ export default function ProviderScreen() {
     const currentProfile = profile ?? providerProfile;
     if (!currentProfile) return;
 
+    if (!REQUESTS_API_URL) {
+      if (!requestConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
+        requestConfigAlertShown.current = true;
+      }
+      setLoading(false);
+      setRequests([]);
+      setActiveRequest(null);
+      setStatusMessage('');
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/requests`, {
+      const response = await axios.get(REQUESTS_API_URL, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -372,9 +408,16 @@ export default function ProviderScreen() {
 
   const updateProviderStatus = async (status: string) => {
     if (!providerProfile) return;
+    if (!PROVIDERS_API_URL) {
+      if (!providerConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+        providerConfigAlertShown.current = true;
+      }
+      return;
+    }
     try {
       await axios.put(
-        `${API_BASE_URL}/providers/${providerProfile.id}/status`,
+        `${PROVIDERS_API_URL}/${providerProfile.id}/status`,
         { status },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -391,9 +434,16 @@ export default function ProviderScreen() {
 
   const handleAcceptRequest = async () => {
     if (!selectedRequest || !providerProfile) return;
+    if (!REQUESTS_API_URL) {
+      if (!requestConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
+        requestConfigAlertShown.current = true;
+      }
+      return;
+    }
     try {
       await axios.put(
-        `${API_BASE_URL}/requests/${selectedRequest.id}/accept`,
+        `${REQUESTS_API_URL}/${selectedRequest.id}/accept`,
         { provider_id: providerProfile.id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -414,9 +464,16 @@ export default function ProviderScreen() {
 
   const handleStatusUpdate = async (newStatus: string) => {
     if (!activeRequest) return;
+    if (!REQUESTS_API_URL) {
+      if (!requestConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
+        requestConfigAlertShown.current = true;
+      }
+      return;
+    }
     try {
       await axios.put(
-        `${API_BASE_URL}/requests/${activeRequest.id}/status`,
+        `${REQUESTS_API_URL}/${activeRequest.id}/status`,
         { status: newStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );

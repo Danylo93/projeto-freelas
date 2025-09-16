@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-import { API_BASE_URL } from '@/utils/config';
+import { API_BASE_URL, AUTH_API_URL } from '@/utils/config';
 
 interface User {
   id: string;
@@ -45,9 +45,19 @@ export const useAuth = () => {
 if (API_BASE_URL) {
   axios.defaults.baseURL = API_BASE_URL;
 } else {
-  console.warn('⚠️ EXPO_PUBLIC_BACKEND_URL não configurada. As chamadas à API podem falhar.');
+  console.warn(
+    '⚠️ Nenhuma URL para o gateway HTTP configurada. Defina EXPO_PUBLIC_API_GATEWAY_URL ou EXPO_PUBLIC_BACKEND_URL para usar o proxy /api.'
+  );
 }
+
+if (!AUTH_API_URL) {
+  console.warn(
+    '⚠️ URL do serviço de autenticação não configurada. Defina EXPO_PUBLIC_AUTH_SERVICE_URL ou um gateway com /api/auth.'
+  );
+}
+
 console.log('🔗 API_BASE_URL:', API_BASE_URL);
+console.log('🔐 AUTH_API_URL:', AUTH_API_URL);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -78,10 +88,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string) => {
+    if (!AUTH_API_URL) {
+      throw new Error(
+        'Serviço de autenticação não configurado. Defina EXPO_PUBLIC_AUTH_SERVICE_URL ou um gateway com /api/auth.'
+      );
+    }
+
     try {
-      console.log('🔑 [AUTH] Tentando login para:', email);
+      console.log('🔑 [AUTH] Tentando login para:', email, 'via', AUTH_API_URL);
       setIsLoading(true);
-      const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+      const response = await axios.post(`${AUTH_API_URL}/login`, { email, password });
       
       const { access_token, user_data } = response.data;
       console.log('✅ [AUTH] Login bem-sucedido:', user_data.name, 'Token:', !!access_token);
@@ -105,10 +121,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (userData: RegisterData) => {
+    if (!AUTH_API_URL) {
+      throw new Error(
+        'Serviço de autenticação não configurado. Defina EXPO_PUBLIC_AUTH_SERVICE_URL ou um gateway com /api/auth.'
+      );
+    }
+
     try {
-      console.log('📝 [AUTH] Tentando registrar usuário:', userData.email, 'Tipo:', userData.user_type);
+      console.log('📝 [AUTH] Tentando registrar usuário:', userData.email, 'Tipo:', userData.user_type, 'via', AUTH_API_URL);
       setIsLoading(true);
-      const response = await axios.post(`${API_BASE_URL}/auth/register`, userData);
+      const response = await axios.post(`${AUTH_API_URL}/register`, userData);
       
       const { access_token, user_data } = response.data;
       console.log('✅ [AUTH] Registro bem-sucedido:', user_data.name, 'Token:', !!access_token);
