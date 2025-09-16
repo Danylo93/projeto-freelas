@@ -62,14 +62,26 @@ async def stop():
     client.close()
 
 @app.get("/providers", response_model=List[Provider])
-async def list_providers():
-    cur = db.providers.find({}, {"_id":0})
+async def list_providers(user_id: Optional[str] = None):
+    query = {"user_id": user_id} if user_id else {}
+    cur = db.providers.find(query, {"_id": 0})
     return [doc async for doc in cur]
 
 @app.post("/providers", response_model=Provider)
 async def create_provider(p: Provider):
     await db.providers.insert_one(p.dict())
     return p
+
+
+@app.put("/providers/{provider_id}", response_model=Provider)
+async def upsert_provider(provider_id: str, payload: Provider):
+    data = payload.dict()
+    data["id"] = provider_id
+    await db.providers.update_one({"id": provider_id}, {"$set": data}, upsert=True)
+    stored = await db.providers.find_one({"id": provider_id}, {"_id": 0})
+    if not stored:
+        raise HTTPException(status_code=500, detail="failed to persist provider")
+    return Provider(**stored)
 
 
 @app.put("/providers/{provider_id}/location")

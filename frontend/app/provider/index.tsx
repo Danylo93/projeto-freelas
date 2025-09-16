@@ -111,6 +111,7 @@ export default function ProviderScreen() {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const locationWatcher = useRef<Location.LocationSubscription | null>(null);
   const providerProfileRef = useRef<ProviderProfile | null>(null);
+  const hasPromptedSetup = useRef(false);
   const providerConfigAlertShown = useRef(false);
   const requestConfigAlertShown = useRef(false);
 
@@ -184,17 +185,38 @@ export default function ProviderScreen() {
       return;
     }
     try {
-      const response = await axios.get(PROVIDERS_API_URL, {
+      const url = `${PROVIDERS_API_URL}?user_id=${encodeURIComponent(user.id)}`;
+      const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const providers: ProviderProfile[] = response.data;
+      const providers: ProviderProfile[] = Array.isArray(response.data) ? response.data : [];
       const profile = providers.find((prov) => prov.user_id === user.id);
+
       if (profile) {
         setProviderProfile(profile);
         setProfileError(null);
+        hasPromptedSetup.current = false;
+        setSetupForm({
+          name: profile.name || user.name || '',
+          category: profile.category || '',
+          price: profile.price != null ? String(profile.price) : '',
+          description: profile.description || '',
+        });
+        setSetupLocation({ latitude: profile.latitude, longitude: profile.longitude });
       } else {
         setProviderProfile(null);
         setProfileError('Nenhum cadastro de prestador encontrado.');
+        setSetupForm({
+          name: user.name || '',
+          category: '',
+          price: '',
+          description: '',
+        });
+        setSetupLocation(null);
+        if (!hasPromptedSetup.current) {
+          hasPromptedSetup.current = true;
+          setShowSetupModal(true);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar perfil do prestador:', error);
@@ -325,13 +347,18 @@ export default function ProviderScreen() {
   );
 
   const handleOpenSetupModal = useCallback(() => {
+    const profile = providerProfileRef.current;
     setSetupForm({
-      name: user?.name || '',
-      category: '',
-      price: '',
-      description: '',
+      name: profile?.name || user?.name || '',
+      category: profile?.category || '',
+      price: profile?.price != null ? String(profile.price) : '',
+      description: profile?.description || '',
     });
-    setSetupLocation(null);
+    setSetupLocation(
+      profile
+        ? { latitude: profile.latitude, longitude: profile.longitude }
+        : null
+    );
     setShowSetupModal(true);
   }, [user]);
 
@@ -372,8 +399,11 @@ export default function ProviderScreen() {
       return;
     }
 
+    const existingProfile = providerProfileRef.current;
+    const providerId = existingProfile?.id ?? `prov-${user.id}`;
+
     const payload: ProviderProfile = {
-      id: `prov-${user.id}`,
+      id: providerId,
       name,
       category,
       price: priceValue,
@@ -387,21 +417,38 @@ export default function ProviderScreen() {
 
     setSetupLoading(true);
     try {
-      const response = await axios.post(PROVIDERS_API_URL, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers = { Authorization: `Bearer ${token}` };
+      const request = existingProfile
+        ? axios.put(
+            `${PROVIDERS_API_URL}/${encodeURIComponent(providerId)}`,
+            payload,
+            { headers }
+          )
+        : axios.post(PROVIDERS_API_URL, payload, { headers });
+      const response = await request;
       const created: ProviderProfile = response.data ?? payload;
       setProviderProfile(created);
+      providerProfileRef.current = created;
       setProfileError(null);
-      Alert.alert('Sucesso', 'Perfil de prestador criado com sucesso!');
+      hasPromptedSetup.current = false;
+      Alert.alert(
+        'Sucesso',
+        `Perfil de prestador ${existingProfile ? 'atualizado' : 'criado'} com sucesso!`
+      );
       setShowSetupModal(false);
+      loadRequests(created);
     } catch (error) {
-      console.error('Erro ao criar perfil do prestador:', error);
-      Alert.alert('Erro', 'Não foi possível criar o perfil de prestador.');
+      console.error('Erro ao salvar perfil do prestador:', error);
+      Alert.alert(
+        'Erro',
+        existingProfile
+          ? 'Não foi possível atualizar o perfil de prestador.'
+          : 'Não foi possível criar o perfil de prestador.'
+      );
     } finally {
       setSetupLoading(false);
     }
-  }, [fetchSetupLocation, providerConfigAlertShown, setupForm, setupLocation, token, user]);
+  }, [fetchSetupLocation, loadRequests, providerConfigAlertShown, setupForm, setupLocation, token, user]);
 
   // ===== sockets (notificações de novas solicitações/cancelamentos)
   const setupSocketListeners = useCallback(() => {

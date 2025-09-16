@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 
 import CustomMapView, { LatLng } from '@/components/CustomMapView';
 import { useAuth } from '../../contexts/AuthContext';
@@ -254,13 +254,24 @@ export default function ClientScreen() {
           normalized.find((prov) => prov.id === providerId || prov.user_id === providerId) ?? null;
         setAssignedProvider(found);
         return found;
-      } catch (error) {
+    } catch (error) {
+      if (isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          console.log('ℹ️ [CLIENT] Nenhum prestador encontrado para sincronizar no momento.');
+        } else {
+          console.error(
+            'Erro ao buscar prestador associado:',
+            error.response?.data ?? error.message
+          );
+        }
+      } else {
         console.error('Erro ao buscar prestador associado:', error);
-        return null;
       }
-    },
-    [getAuthHeaders, providers]
-  );
+      return null;
+    }
+  },
+  [getAuthHeaders, providers]
+);
 
   const refreshCurrentRequest = useCallback(
     async (requestId: string) => {

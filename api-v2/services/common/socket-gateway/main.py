@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Header
+from urllib.parse import urlencode
 from fastapi.responses import JSONResponse
 import os, traceback
 from dotenv import load_dotenv
@@ -39,13 +40,21 @@ async def forward(method: str, url: str, payload: dict | None = None, headers: d
 
 
 @app.get("/api/providers")
-async def list_providers():
-    return await forward("GET", f"{PROVIDER_URL}/providers")
+async def list_providers(user_id: str | None = None):
+    url = f"{PROVIDER_URL}/providers"
+    if user_id:
+        url = f"{url}?{urlencode({'user_id': user_id})}"
+    return await forward("GET", url)
 
 
 @app.post("/api/providers")
 async def create_provider(data: dict):
     return await forward("POST", f"{PROVIDER_URL}/providers", data)
+
+
+@app.put("/api/providers/{provider_id}")
+async def upsert_provider(provider_id: str, data: dict):
+    return await forward("PUT", f"{PROVIDER_URL}/providers/{provider_id}", data)
 
 
 @app.put("/api/providers/{provider_id}/location")
