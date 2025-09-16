@@ -6,8 +6,7 @@ const ensurePath = (base: string, segment: string) => {
 };
 
 const rawBackendUrl = stripTrailingSlash(process.env.EXPO_PUBLIC_BACKEND_URL);
-const rawGatewayUrl =
-  stripTrailingSlash(process.env.EXPO_PUBLIC_API_GATEWAY_URL) || rawBackendUrl;
+const rawGatewayUrl = stripTrailingSlash(process.env.EXPO_PUBLIC_API_GATEWAY_URL);
 
 const rawAuthServiceUrl = stripTrailingSlash(process.env.EXPO_PUBLIC_AUTH_SERVICE_URL);
 const rawProviderServiceUrl = stripTrailingSlash(
@@ -18,9 +17,12 @@ const rawRequestServiceUrl = stripTrailingSlash(
 );
 const rawSocketUrl = stripTrailingSlash(process.env.EXPO_PUBLIC_SOCKET_URL);
 
+const resolvedGatewayUrl = rawGatewayUrl || rawSocketUrl || rawBackendUrl;
+const resolvedSocketUrl = rawSocketUrl || rawGatewayUrl || rawBackendUrl;
+
 export const BACKEND_URL = rawBackendUrl;
-export const API_GATEWAY_URL = rawGatewayUrl;
-export const API_BASE_URL = rawGatewayUrl ? `${rawGatewayUrl}/api` : '';
+export const API_GATEWAY_URL = resolvedGatewayUrl;
+export const API_BASE_URL = resolvedGatewayUrl ? ensurePath(resolvedGatewayUrl, '/api') : '';
 
 export const AUTH_API_URL = rawAuthServiceUrl
   ? ensurePath(rawAuthServiceUrl, '/auth')
@@ -34,7 +36,7 @@ export const REQUESTS_API_URL = rawRequestServiceUrl
   ? ensurePath(rawRequestServiceUrl, '/requests')
   : ensurePath(API_BASE_URL, '/requests');
 
-export const SOCKET_URL = rawSocketUrl || rawBackendUrl || rawGatewayUrl;
+export const SOCKET_URL = resolvedSocketUrl;
 
 export const USING_SERVICE_OVERRIDES = Boolean(
   rawAuthServiceUrl || rawProviderServiceUrl || rawRequestServiceUrl || rawSocketUrl

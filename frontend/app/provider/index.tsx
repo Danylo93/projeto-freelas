@@ -11,6 +11,8 @@ import {
   Animated,
   Dimensions,
   StatusBar,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -25,6 +27,8 @@ import { PROVIDERS_API_URL, REQUESTS_API_URL } from '@/utils/config';
 import { haversineDistance } from '@/utils/geo';
 
 const { height } = Dimensions.get('window');
+
+const PROVIDER_CATEGORIES = ['Encanador', 'Eletricista', 'Limpeza', 'Jardinagem', 'Pintura', 'Reformas'];
 
 interface ProviderProfile {
   id: string;
@@ -86,6 +90,16 @@ export default function ProviderScreen() {
   const [showModal, setShowModal] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [setupForm, setSetupForm] = useState({
+    name: user?.name || '',
+    category: '',
+    price: '',
+    description: '',
+  });
+  const [setupLocation, setSetupLocation] = useState<LatLng | null>(null);
 
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);   // região inicial no mapa
   const [providerPos, setProviderPos] = useState<{ latitude: number; longitude: number; heading?: number } | null>(null); // posição animada do carro
@@ -149,6 +163,12 @@ export default function ProviderScreen() {
     activeRequestRef.current = activeRequest;
   }, [activeRequest]);
 
+  useEffect(() => {
+    if (showSetupModal) {
+      fetchSetupLocation();
+    }
+  }, [fetchSetupLocation, showSetupModal]);
+
   const fetchProviderProfile = useCallback(async () => {
     if (!user) {
       return;
@@ -184,6 +204,23 @@ export default function ProviderScreen() {
       setProfileLoading(false);
     }
   }, [token, user]);
+
+  const fetchSetupLocation = useCallback(async (): Promise<LatLng | null> => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão negada', 'Precisamos da sua localização para cadastrar o serviço.');
+        return null;
+      }
+      const current = await Location.getCurrentPositionAsync({});
+      const coords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
+      setSetupLocation(coords);
+      return coords;
+    } catch (error) {
+      console.error('Erro ao obter localização inicial do prestador:', error);
+      return null;
+    }
+  }, []);
 
   // ===== localização do prestador: pega atual, envia pro backend e mantém watcher (move o carro)
   const getCurrentLocation = useCallback(
@@ -286,6 +323,85 @@ export default function ProviderScreen() {
     },
     [token]
   );
+
+  const handleOpenSetupModal = useCallback(() => {
+    setSetupForm({
+      name: user?.name || '',
+      category: '',
+      price: '',
+      description: '',
+    });
+    setSetupLocation(null);
+    setShowSetupModal(true);
+  }, [user]);
+
+  const handleCloseSetupModal = useCallback(() => {
+    setShowSetupModal(false);
+    setSetupLoading(false);
+  }, []);
+
+  const handleCreateProviderProfile = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+    if (!PROVIDERS_API_URL) {
+      if (!providerConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+        providerConfigAlertShown.current = true;
+      }
+      return;
+    }
+
+    const name = setupForm.name.trim();
+    const category = setupForm.category.trim();
+    const priceValue = Number(setupForm.price.replace(',', '.'));
+
+    if (!name || !category) {
+      Alert.alert('Atenção', 'Informe nome e categoria do serviço.');
+      return;
+    }
+
+    if (Number.isNaN(priceValue) || priceValue <= 0) {
+      Alert.alert('Atenção', 'Informe um valor médio válido.');
+      return;
+    }
+
+    const location = setupLocation ?? (await fetchSetupLocation());
+    if (!location) {
+      Alert.alert('Localização necessária', 'Não foi possível obter a localização atual.');
+      return;
+    }
+
+    const payload: ProviderProfile = {
+      id: `prov-${user.id}`,
+      name,
+      category,
+      price: priceValue,
+      description: setupForm.description.trim() || `Serviços de ${category}`,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      status: 'available',
+      rating: 5,
+      user_id: user.id,
+    };
+
+    setSetupLoading(true);
+    try {
+      const response = await axios.post(PROVIDERS_API_URL, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const created: ProviderProfile = response.data ?? payload;
+      setProviderProfile(created);
+      setProfileError(null);
+      Alert.alert('Sucesso', 'Perfil de prestador criado com sucesso!');
+      setShowSetupModal(false);
+    } catch (error) {
+      console.error('Erro ao criar perfil do prestador:', error);
+      Alert.alert('Erro', 'Não foi possível criar o perfil de prestador.');
+    } finally {
+      setSetupLoading(false);
+    }
+  }, [fetchSetupLocation, providerConfigAlertShown, setupForm, setupLocation, token, user]);
 
   // ===== sockets (notificações de novas solicitações/cancelamentos)
   const setupSocketListeners = useCallback(() => {
@@ -453,6 +569,7 @@ export default function ProviderScreen() {
         return;
       }
       try {
+        setStatusUpdating(true);
         await axios.put(
           `${PROVIDERS_API_URL}/${profile.id}/status`,
           { status },
@@ -461,10 +578,25 @@ export default function ProviderScreen() {
         setProviderProfile((prev) => (prev ? { ...prev, status } : prev));
       } catch (error) {
         console.error('Erro ao atualizar status do prestador:', error);
+      } finally {
+        setStatusUpdating(false);
       }
     },
     [token]
   );
+
+  const handleToggleAvailability = useCallback(() => {
+    const profile = providerProfileRef.current;
+    if (!profile) {
+      return;
+    }
+    if (profile.status === 'busy') {
+      Alert.alert('Atenção', 'Finalize o serviço atual antes de alterar a disponibilidade.');
+      return;
+    }
+    const nextStatus = profile.status === 'available' ? 'offline' : 'available';
+    updateProviderStatus(nextStatus);
+  }, [updateProviderStatus]);
 
   const handleRequestSelect = (request: ServiceRequest) => {
     setSelectedRequest(request);
@@ -566,6 +698,10 @@ export default function ProviderScreen() {
           <Text style={styles.emptySubtitle}>
             {profileError || 'Finalize o cadastro de prestador para receber solicitações.'}
           </Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleOpenSetupModal}>
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.primaryButtonText}>Criar perfil de serviço</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.trackButton} onPress={fetchProviderProfile}>
             <Ionicons name="refresh" size={20} color="#fff" />
             <Text style={styles.trackButtonText}>Tentar novamente</Text>
@@ -721,6 +857,39 @@ export default function ProviderScreen() {
             <View style={[styles.socketIndicator, { backgroundColor: isConnected ? '#4CAF50' : '#f44336' }]} />
             <Text style={styles.socketText}>{isConnected ? 'Online' : 'Offline'}</Text>
           </View>
+          {providerProfile && (
+            <TouchableOpacity
+              style={[
+                styles.availabilityButton,
+                (statusUpdating || providerProfile.status === 'busy') && styles.availabilityButtonDisabled,
+              ]}
+              onPress={handleToggleAvailability}
+              disabled={statusUpdating || providerProfile.status === 'busy'}
+            >
+              <View
+                style={[
+                  styles.availabilityIndicator,
+                  {
+                    backgroundColor:
+                      providerProfile.status === 'available'
+                        ? '#4CAF50'
+                        : providerProfile.status === 'busy'
+                        ? '#FF9800'
+                        : '#9E9E9E',
+                  },
+                ]}
+              />
+              <Text style={styles.availabilityText}>
+                {statusUpdating
+                  ? 'Atualizando...'
+                  : providerProfile.status === 'available'
+                  ? 'Disponível'
+                  : providerProfile.status === 'busy'
+                  ? 'Em serviço'
+                  : 'Offline'}
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Ionicons name="log-out-outline" size={24} color="#fff" />
           </TouchableOpacity>
@@ -815,6 +984,107 @@ Lon: {selectedRequest.client_longitude.toFixed(4)}</Text>
           </View>
         </View>
       </Modal>
+
+      <Modal visible={showSetupModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.setupModal}>
+            <View style={styles.setupHeader}>
+              <Text style={styles.setupTitle}>Cadastrar perfil de serviço</Text>
+              <TouchableOpacity onPress={handleCloseSetupModal}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.setupContent}
+              contentContainerStyle={{ paddingBottom: 16 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.setupLabel}>Nome do prestador</Text>
+              <TextInput
+                style={styles.setupInput}
+                placeholder="Seu nome"
+                value={setupForm.name}
+                onChangeText={(text) => setSetupForm((prev) => ({ ...prev, name: text }))}
+              />
+
+              <Text style={styles.setupLabel}>Categoria</Text>
+              <View style={styles.setupChipsContainer}>
+                {PROVIDER_CATEGORIES.map((category) => {
+                  const selected = setupForm.category === category;
+                  return (
+                    <TouchableOpacity
+                      key={category}
+                      style={[styles.setupChip, selected && styles.setupChipSelected]}
+                      onPress={() => setSetupForm((prev) => ({ ...prev, category }))}
+                    >
+                      <Text style={[styles.setupChipText, selected && styles.setupChipTextSelected]}>
+                        {category}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TextInput
+                style={styles.setupInput}
+                placeholder="Ex: Encanador, Eletricista, Limpeza..."
+                value={setupForm.category}
+                onChangeText={(text) => setSetupForm((prev) => ({ ...prev, category: text }))}
+              />
+
+              <Text style={styles.setupLabel}>Valor médio (R$)</Text>
+              <TextInput
+                style={styles.setupInput}
+                placeholder="Informe um valor de referência"
+                keyboardType="numeric"
+                value={setupForm.price}
+                onChangeText={(text) => setSetupForm((prev) => ({ ...prev, price: text }))}
+              />
+
+              <Text style={styles.setupLabel}>Descrição</Text>
+              <TextInput
+                style={styles.setupTextArea}
+                placeholder="Conte um pouco sobre o seu serviço"
+                value={setupForm.description}
+                onChangeText={(text) => setSetupForm((prev) => ({ ...prev, description: text }))}
+                multiline
+                numberOfLines={4}
+              />
+
+              <View style={styles.setupLocationBox}>
+                <Ionicons name="location" size={20} color="#007AFF" />
+                <Text style={styles.setupLocationText}>
+                  {setupLocation
+                    ? `Lat: ${setupLocation.latitude.toFixed(4)} | Lon: ${setupLocation.longitude.toFixed(4)}`
+                    : 'Localização não disponível'}
+                </Text>
+              </View>
+
+              <TouchableOpacity style={styles.setupLocationButton} onPress={fetchSetupLocation}>
+                <Ionicons name="refresh" size={16} color="#007AFF" />
+                <Text style={styles.setupLocationButtonText}>Atualizar localização</Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelButton} onPress={handleCloseSetupModal}>
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmButton, setupLoading && styles.confirmButtonDisabled]}
+                onPress={handleCreateProviderProfile}
+                disabled={setupLoading}
+              >
+                {setupLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Cadastrar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Animated.View>
   );
 }
@@ -848,6 +1118,18 @@ const styles = StyleSheet.create({
   socketStatus: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   socketIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   socketText: { fontSize: 12, color: '#E3F2FD' },
+  availabilityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  availabilityButtonDisabled: { opacity: 0.6 },
+  availabilityIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  availabilityText: { color: '#fff', fontWeight: '600', fontSize: 12 },
   logoutButton: { padding: 8 },
 
   activeRequestBanner: {
@@ -867,6 +1149,28 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#666', marginTop: 16 },
   emptySubtitle: { fontSize: 14, color: '#999', textAlign: 'center', marginTop: 8 },
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 24,
+  },
+  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 8 },
+  trackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  trackButtonText: { color: '#007AFF', fontSize: 16, fontWeight: '600', marginLeft: 8 },
 
   listContainer: { padding: 20 },
   requestCard: {
@@ -897,6 +1201,65 @@ const styles = StyleSheet.create({
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContainer: { backgroundColor: '#fff', borderRadius: 20, margin: 20, maxHeight: height * 0.8 },
+  setupModal: { backgroundColor: '#fff', borderRadius: 20, margin: 20, maxHeight: height * 0.85, width: '100%' },
+  setupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+  setupTitle: { fontSize: 20, fontWeight: 'bold', color: '#1a1a1a' },
+  setupContent: { paddingHorizontal: 20, paddingTop: 10 },
+  setupLabel: { fontSize: 14, fontWeight: '600', color: '#1a1a1a', marginBottom: 8, marginTop: 12 },
+  setupInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#1a1a1a',
+  },
+  setupTextArea: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 15,
+    color: '#1a1a1a',
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  setupChipsContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
+  setupChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  setupChipSelected: { backgroundColor: '#E3F2FD', borderColor: '#007AFF' },
+  setupChipText: { color: '#4A5568', fontWeight: '500' },
+  setupChipTextSelected: { color: '#007AFF' },
+  setupLocationBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  setupLocationText: { marginLeft: 8, color: '#1a1a1a', flex: 1 },
+  setupLocationButton: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  setupLocationButtonText: { marginLeft: 6, color: '#007AFF', fontWeight: '600' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1a1a1a' },
   modalContent: { paddingHorizontal: 20, paddingBottom: 20 },
