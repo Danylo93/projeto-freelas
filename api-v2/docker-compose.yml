@@ -48,11 +48,12 @@ services:
       context: ./services/common
       dockerfile: provider-service/Dockerfile
     container_name: provider-service
-    ports: ["8011:8011"]
     networks: [core]
     depends_on: [mongo, kafka, redis]
     env_file:
       - ./services/common/provider-service/.env
+    environment:
+      - PYTHONPATH=/app
     working_dir: /app/provider-service
     volumes:
       - ./services/common:/app
@@ -68,11 +69,12 @@ services:
       context: ./services/common
       dockerfile: request-service/Dockerfile
     container_name: request-service
-    ports: ["8012:8012"]
     networks: [core]
     depends_on: [mongo, kafka, redis]
     env_file:
       - ./services/common/request-service/.env
+    environment:
+      - PYTHONPATH=/app
     working_dir: /app/request-service
     volumes:
       - ./services/common:/app
@@ -87,7 +89,6 @@ services:
       context: ./services/common
       dockerfile: matching-service/Dockerfile
     container_name: matching-service
-    ports: ["8013:8013"]
     networks: [core]
     depends_on:
       mongo:
@@ -108,7 +109,6 @@ services:
   auth-service:
     build: ./services/common/auth-service
     container_name: auth-service
-    ports: ["8014:8014"]
     networks: [core]
     depends_on: [mongo]
     env_file:
@@ -122,7 +122,9 @@ services:
       retries: 10
 
   socket-gateway:
-    build: ./services/common/socket-gateway
+    build:
+      context: ./services/common/socket-gateway
+      dockerfile: Dockerfile
     container_name: socket-gateway
     ports: ["8015:8015"]
     networks: [core]
@@ -135,15 +137,18 @@ services:
         condition: service_healthy
     env_file:
       - ./services/common/socket-gateway/.env
+    environment:
+      PYTHONPATH: /app
+      KAFKA_BOOTSTRAP: kafka:29092
+    working_dir: /app/socket-gateway
     volumes:
-      - ./services/common/socket-gateway:/app
+      - ./services/common:/app
 
   payment-service:
     build:
       context: ./services/common
       dockerfile: payment-service/Dockerfile
     container_name: payment-service
-    ports: ["8016:8016"]
     networks: [core]
     env_file:
       - ./services/common/payment-service/.env
@@ -156,7 +161,6 @@ services:
       context: ./services/common
       dockerfile: admin-service/Dockerfile
     container_name: admin-service
-    ports: ["8017:8017"]
     networks: [core]
     env_file:
       - ./services/common/admin-service/.env

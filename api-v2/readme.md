@@ -117,3 +117,42 @@ Todos os serviços expõem `/healthz` para checagens.
 - Importe o arquivo [`insomnia-api-v2.json`](./insomnia-api-v2.json) no Insomnia para carregar todas as rotas do gateway e dos microserviços individuais.
 - O ambiente "Base Environment" já aponta para `http://localhost` com as portas padrão do `docker compose` e organiza as configurações em três blocos: `services` (URLs dos serviços), `auth.credentials` (credenciais de teste) e `samples` (IDs e categoria padrão).
 - Depois de executar a requisição de login, copie o `access_token` retornado e preencha o campo `auth.token` no ambiente para habilitar as rotas protegidas (`/auth/me`).
+
+## 7. Expor uma única URL com ngrok (frontend em dispositivos móveis)
+
+Quando o backend roda em uma máquina local ligada por cabo de rede, o iPhone pode não conseguir acessar `http://<IP_LOCAL>:8015` devido a rotas/ACLs/Network. Uma solução simples é expor só o `socket-gateway` via ngrok e apontar o `frontend` para a URL pública gerada.
+
+Passos rápidos:
+
+1. Certifique-se de que o `socket-gateway` está exposto na porta 8015 (no `docker-compose.yml` mantemos `socket-gateway` com `ports: ["8015:8015"]`).
+2. Instale ngrok e inicie um túnel HTTP para a porta 8015:
+
+```bash
+# substitua <authtoken> se necessário e execute:
+ngrok http 8015
+```
+
+3. Copie a URL pública HTTPS que o ngrok exibe (algo como `https://abcd-12-34-56.ngrok.io`).
+
+4. No `frontend/.env` defina as variáveis para usar essa URL única como gateway (exemplo):
+
+```properties
+# exemplo usando a URL do ngrok
+EXPO_PUBLIC_API_GATEWAY_URL=https://abcd-12-34-56.ngrok.io
+EXPO_PUBLIC_BACKEND_URL=https://abcd-12-34-56.ngrok.io/api
+EXPO_PUBLIC_SOCKET_URL=wss://abcd-12-34-56.ngrok.io
+EXPO_PUBLIC_SOCKET_GATEWAY_URL=wss://abcd-12-34-56.ngrok.io
+
+# se quiser que serviços internos usem a mesma base via gateway (opcional):
+EXPO_PUBLIC_AUTH_SERVICE_URL=https://abcd-12-34-56.ngrok.io/api/auth
+EXPO_PUBLIC_PROVIDER_SERVICE_URL=https://abcd-12-34-56.ngrok.io/api/providers
+EXPO_PUBLIC_REQUEST_SERVICE_URL=https://abcd-12-34-56.ngrok.io/api/requests
+EXPO_PUBLIC_PAYMENT_SERVICE_URL=https://abcd-12-34-56.ngrok.io/api/payments
+```
+
+5. Reinicie o `expo`/app no iPhone para que as novas variáveis de ambiente sejam usadas (ou se estiver usando o Expo Go em túnel, atualize a configuração do app).
+
+Observações:
+- O ngrok providencia TLS (HTTPS/WSS). Use `wss://` para WebSocket quando apontar ao ngrok.
+- Esta abordagem protege seus serviços internos — apenas o gateway fica acessível externamente.
+- Em produção prefira um reverse proxy seguro (NGINX/Traefik) e um domínio próprio.

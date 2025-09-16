@@ -18,4 +18,4 @@ WORKDIR /app/provider-service
 
 EXPOSE 8011
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8011", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8011"]

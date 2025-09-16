@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from aiokafka import AIOKafkaProducer
 
 from common.kafka import make_producer
-from common.common import (
+from common import (
     PaginationParams,
     apply_pagination,
     SortParams,
@@ -15,10 +15,9 @@ from common.common import (
     build_filters,
     IdempotencyKey,
 )
-from common.common.idempotency import store_idempotent_result
-from common.common.idempotency import ensure_idempotency
-from common.common.ratelimit import RateLimiter
-from common.common.rbac import require_roles
+from common.idempotency import store_idempotent_result, ensure_idempotency
+from common.ratelimit import RateLimiter
+from common.rbac import require_roles
 from common.events import TOPIC_PROV_LOCATION, EV_PROVIDER_LOCATION
 
 load_dotenv()

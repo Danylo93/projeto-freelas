@@ -37,7 +37,8 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
       ],
       "config": {
         "googleMaps": {
@@ -75,8 +76,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "servico-app-project"
+        "projectId": "ab536686-5f95-4eaf-bdfb-a80e4d7d9dec"
       }
-    }
+    },
+    "owner": "danylo.oliveira"
   }
 }
