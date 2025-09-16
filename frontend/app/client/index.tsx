@@ -1,15 +1,26 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, Alert,
-  ActivityIndicator, Animated, Dimensions, StatusBar, TextInput,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  Modal,
+  Alert,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  StatusBar,
+  TextInput,
+  ScrollView,
 } from 'react-native';
-import CustomMapView, { LatLng } from '@/components/CustomMapView';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { useAuth } from '../../contexts/AuthContext';
-import { useSocket } from '../../contexts/SocketContext';
 import axios from 'axios';
 
+import CustomMapView, { LatLng } from '@/components/CustomMapView';
+import { useAuth } from '../../contexts/AuthContext';
+import { useSocket } from '../../contexts/SocketContext';
 import { PROVIDERS_API_URL, REQUESTS_API_URL } from '@/utils/config';
 import { haversineDistance } from '@/utils/geo';
 
@@ -20,6 +31,8 @@ const PROVIDER_SERVICE_CONFIG_ERROR =
 
 const REQUEST_SERVICE_CONFIG_ERROR =
   'Serviço de solicitações indisponível. Configure EXPO_PUBLIC_REQUEST_SERVICE_URL ou o gateway com /api/requests.';
+
+const SUGGESTED_CATEGORIES = ['Encanador', 'Eletricista', 'Limpeza', 'Jardinagem', 'Pintura', 'Reformas'];
 
 interface Provider {
   id: string;
@@ -37,75 +50,235 @@ interface Provider {
 
 interface ServiceRequest {
   id: string;
-  provider_id: string;
-  status: string;
-  provider_name: string;
-  provider_phone: string;
+  client_id: string;
+  provider_id?: string;
   category: string;
+  description?: string;
   price: number;
-  estimated_time?: number;
-  provider_latitude?: number;
-  provider_longitude?: number;
-}
-
-interface RequestAcceptedPayload {
-  request_id: string;
+  status: string;
+  client_latitude: number;
+  client_longitude: number;
   provider_latitude?: number;
   provider_longitude?: number;
   estimated_time?: number;
 }
 
 interface ProviderLocationUpdatePayload {
-  request_id: string;
-  provider_latitude: number;
-  provider_longitude: number;
-  distance: number;
-  estimated_time: number;
+  request_id?: string;
+  requestId?: string;
+  provider_latitude?: number;
+  provider_longitude?: number;
+  latitude?: number;
+  longitude?: number;
+  location?: { lat?: number; lng?: number };
+  estimated_time?: number;
+  eta?: number;
+  eta_minutes?: number;
+  distance?: number;
+  distance_km?: number;
 }
 
-interface RequestStatusPayload {
-  request_id: string;
-  status: string;
+interface LifecyclePayload {
+  request_id?: string;
+  requestId?: string;
+  id?: string;
+  provider_id?: string;
+  status?: string;
+  type?: string;
+  event?: string;
+  name?: string;
 }
+
+const generateRequestId = () => `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const getStatusCopy = (status: string, providerName?: string | null) => {
+  switch (status) {
+    case 'pending':
+      return 'Buscando prestadores disponíveis...';
+    case 'offered':
+      return providerName
+        ? `Oferta enviada para ${providerName}. Aguardando confirmação.`
+        : 'Oferta enviada para prestadores disponíveis.';
+    case 'accepted':
+      return providerName
+        ? `${providerName} aceitou o serviço e está a caminho!`
+        : 'Prestador aceitou o serviço. Preparando deslocamento...';
+    case 'in_progress':
+      return 'Prestador a caminho do endereço informado.';
+    case 'near_client':
+      return 'O prestador chegou ao local!';
+    case 'started':
+      return 'Serviço em andamento.';
+    case 'completed':
+      return 'Serviço concluído! Avalie sua experiência.';
+    default:
+      return '';
+  }
+};
 
 export default function ClientScreen() {
   const { user, token, logout } = useAuth();
   const { socket, isConnected } = useSocket();
 
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [showMap, setShowMap] = useState(false);
-  const [currentRequest, setCurrentRequest] = useState<ServiceRequest | null>(null);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [assignedProvider, setAssignedProvider] = useState<Provider | null>(null);
 
-  const [loading, setLoading] = useState(false);
+  const [loadingProviders, setLoadingProviders] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
 
-  const [userLocation, setUserLocation] = useState<LatLng | null>(null); // cliente = destino
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+
+  const [currentRequest, setCurrentRequest] = useState<ServiceRequest | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
 
-  const [showRatingModal, setShowRatingModal] = useState(false);
   const [rating, setRating] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+  const [requestForm, setRequestForm] = useState({ category: '', description: '', price: '' });
+
   const providerConfigAlertShown = useRef(false);
   const requestConfigAlertShown = useRef(false);
+  const requestPollRef = useRef<NodeJS.Timeout | null>(null);
+  const currentRequestRef = useRef<ServiceRequest | null>(null);
 
-  const getCurrentLocation = useCallback(async () => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
+    ]).start();
+  }, [fadeAnim, scaleAnim]);
+
+  useEffect(() => {
+    currentRequestRef.current = currentRequest;
+  }, [currentRequest]);
+
+  const getAuthHeaders = useCallback(() => {
+    return token ? { Authorization: `Bearer ${token}` } : undefined;
+  }, [token]);
+
+  const fetchCurrentLocation = useCallback(async (): Promise<LatLng | null> => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permissão negada', 'Precisamos da sua localização para encontrar prestadores próximos.');
-        return;
+        return null;
       }
       const loc = await Location.getCurrentPositionAsync({});
-      setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      setUserLocation(coords);
+      return coords;
     } catch (error) {
       console.error('Erro ao obter localização:', error);
+      return null;
     }
   }, []);
+
+  const stopRequestPolling = useCallback(() => {
+    if (requestPollRef.current) {
+      clearInterval(requestPollRef.current);
+      requestPollRef.current = null;
+    }
+  }, []);
+
+  const syncAssignedProvider = useCallback(
+    async (providerId: string, fallbackList?: Provider[]) => {
+      const list = fallbackList ?? providers;
+      const cached = list.find((prov) => prov.id === providerId);
+      if (cached) {
+        setAssignedProvider(cached);
+        return cached;
+      }
+
+      if (!PROVIDERS_API_URL) {
+        return null;
+      }
+
+      try {
+        const response = await axios.get(PROVIDERS_API_URL, {
+          headers: getAuthHeaders(),
+        });
+        const fetched: Provider[] = response.data;
+        setProviders(fetched);
+        const categories = Array.from(new Set(fetched.map((prov) => prov.category).filter(Boolean))).sort();
+        setAvailableCategories(categories);
+        const found = fetched.find((prov) => prov.id === providerId) ?? null;
+        setAssignedProvider(found);
+        return found;
+      } catch (error) {
+        console.error('Erro ao buscar prestador associado:', error);
+        return null;
+      }
+    },
+    [getAuthHeaders, providers]
+  );
+
+  const refreshCurrentRequest = useCallback(
+    async (requestId: string) => {
+      if (!REQUESTS_API_URL) {
+        return null;
+      }
+
+      try {
+        const response = await axios.get(REQUESTS_API_URL, {
+          headers: getAuthHeaders(),
+        });
+        const allRequests: ServiceRequest[] = response.data;
+        const found = allRequests.find((req) => req.id === requestId) ?? null;
+
+        if (!found) {
+          setCurrentRequest(null);
+          setAssignedProvider(null);
+          setShowMap(false);
+          setShowRatingModal(false);
+          setStatusMessage('');
+          stopRequestPolling();
+          return null;
+        }
+
+        setCurrentRequest((prev) => ({
+          ...prev,
+          ...found,
+          estimated_time: found.estimated_time ?? prev?.estimated_time,
+          provider_latitude: found.provider_latitude ?? prev?.provider_latitude,
+          provider_longitude: found.provider_longitude ?? prev?.provider_longitude,
+        }));
+
+        if (found.provider_id) {
+          await syncAssignedProvider(found.provider_id, providers);
+        }
+
+        if (found.status === 'completed') {
+          stopRequestPolling();
+        }
+
+        return found;
+      } catch (error) {
+        console.error('Erro ao atualizar solicitação:', error);
+        return null;
+      }
+    },
+    [getAuthHeaders, providers, stopRequestPolling, syncAssignedProvider]
+  );
+
+  const startRequestPolling = useCallback(
+    (requestId: string) => {
+      stopRequestPolling();
+      if (!REQUESTS_API_URL) {
+        return;
+      }
+      requestPollRef.current = setInterval(() => {
+        refreshCurrentRequest(requestId);
+      }, 5000);
+    },
+    [refreshCurrentRequest, stopRequestPolling]
+  );
 
   const loadProviders = useCallback(async () => {
     if (!PROVIDERS_API_URL) {
@@ -113,140 +286,207 @@ export default function ClientScreen() {
         Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
         providerConfigAlertShown.current = true;
       }
-      setLoading(false);
       setProviders([]);
+      setAvailableCategories([]);
       return;
     }
+
     try {
-      setLoading(true);
+      setLoadingProviders(true);
       const response = await axios.get(PROVIDERS_API_URL, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeaders(),
       });
-      setProviders(response.data);
+      const list: Provider[] = response.data;
+      setProviders(list);
+      const categories = Array.from(new Set(list.map((prov) => prov.category).filter(Boolean))).sort();
+      setAvailableCategories(categories);
+
+      const activeProviderId = currentRequestRef.current?.provider_id;
+      if (activeProviderId) {
+        const match = list.find((prov) => prov.id === activeProviderId);
+        if (match) {
+          setAssignedProvider(match);
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar prestadores:', error);
       Alert.alert('Erro', 'Não foi possível carregar os prestadores');
     } finally {
-      setLoading(false);
+      setLoadingProviders(false);
     }
-  }, [token]);
+  }, [getAuthHeaders]);
 
-  const setupSocketListeners = useCallback(() => {
-    if (!socket) return undefined;
+  const loadActiveRequest = useCallback(async () => {
+    if (!REQUESTS_API_URL || !user) {
+      return;
+    }
 
-    const handleRequestAccepted = (data: RequestAcceptedPayload) => {
-      setCurrentRequest((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: 'accepted',
-              provider_latitude: data.provider_latitude ?? prev.provider_latitude,
-              provider_longitude: data.provider_longitude ?? prev.provider_longitude,
-              estimated_time: data.estimated_time ?? prev.estimated_time,
-            }
-          : null
+    try {
+      const response = await axios.get(REQUESTS_API_URL, {
+        headers: getAuthHeaders(),
+      });
+      const allRequests: ServiceRequest[] = response.data;
+      const myRequests = allRequests.filter(
+        (req) => req.client_id === user.id && req.status !== 'completed'
       );
-      setStatusMessage('🎉 Solicitação aceita! O prestador está a caminho.');
-      setShowMap(true);
-    };
-
-    const handleProviderLocationUpdate = (data: ProviderLocationUpdatePayload) => {
-      let shouldUpdateStatus = false;
-      let estimatedTime: number | undefined;
-      let distance: number | undefined;
-
-      setCurrentRequest((prev) => {
-        if (!prev || data.request_id !== prev.id) {
-          return prev;
-        }
-
-        shouldUpdateStatus = true;
-        estimatedTime = data.estimated_time;
-        distance = data.distance;
-
-        return {
-          ...prev,
-          provider_latitude: data.provider_latitude,
-          provider_longitude: data.provider_longitude,
-          estimated_time: data.estimated_time,
-        };
-      });
-
-      if (shouldUpdateStatus && estimatedTime != null && distance != null) {
-        setStatusMessage(`🚗 Prestador chegando em ${estimatedTime} min (${distance} km)`);
-      }
-    };
-
-    const handleStatusUpdated = (data: RequestStatusPayload) => {
-      let updatedStatus: string | undefined;
-
-      setCurrentRequest((prev) => {
-        if (!prev || data.request_id !== prev.id) {
-          return prev;
-        }
-
-        updatedStatus = data.status;
-        return { ...prev, status: data.status };
-      });
-
-      if (!updatedStatus) {
+      if (myRequests.length === 0) {
+        setCurrentRequest(null);
+        setAssignedProvider(null);
+        setShowMap(false);
+        stopRequestPolling();
         return;
       }
 
-      switch (updatedStatus) {
-        case 'near_client':
-          setStatusMessage('📍 O prestador chegou!');
-          break;
-        case 'started':
-          setStatusMessage('🔧 Serviço iniciado.');
-          break;
-        case 'completed':
-          setStatusMessage('✅ Serviço concluído!');
-          setShowRatingModal(true);
-          break;
-        default:
-          break;
+      const latest = myRequests[myRequests.length - 1];
+      setCurrentRequest((prev) => ({
+        ...prev,
+        ...latest,
+        estimated_time: prev?.estimated_time,
+        provider_latitude: latest.provider_latitude ?? prev?.provider_latitude,
+        provider_longitude: latest.provider_longitude ?? prev?.provider_longitude,
+      }));
+
+      if (latest.provider_id) {
+        await syncAssignedProvider(latest.provider_id, providers);
+      } else {
+        setAssignedProvider(null);
       }
-    };
 
-    socket.on('request_accepted', handleRequestAccepted);
-    socket.on('provider_location_update', handleProviderLocationUpdate);
-    socket.on('status_updated', handleStatusUpdated);
-
-    return () => {
-      socket.off('request_accepted', handleRequestAccepted);
-      socket.off('provider_location_update', handleProviderLocationUpdate);
-      socket.off('status_updated', handleStatusUpdated);
-    };
-  }, [socket]);
+      startRequestPolling(latest.id);
+    } catch (error) {
+      console.error('Erro ao carregar solicitações ativas:', error);
+    }
+  }, [getAuthHeaders, providers, startRequestPolling, stopRequestPolling, syncAssignedProvider, user]);
 
   useEffect(() => {
     loadProviders();
-    getCurrentLocation();
+    fetchCurrentLocation();
+    loadActiveRequest();
+  }, [fetchCurrentLocation, loadActiveRequest, loadProviders]);
+
+  useEffect(() => {
+    if (currentRequest) {
+      setStatusMessage(getStatusCopy(currentRequest.status, assignedProvider?.name));
+    } else {
+      setStatusMessage('');
+    }
+  }, [assignedProvider?.name, currentRequest]);
+
+  useEffect(() => {
+    if (!currentRequest) {
+      return;
+    }
+
+    if (['accepted', 'in_progress', 'near_client', 'started'].includes(currentRequest.status)) {
+      setShowMap(true);
+    }
+
+    if (currentRequest.status === 'completed') {
+      setShowRatingModal(true);
+      setShowMap(false);
+      loadProviders();
+    }
+  }, [currentRequest, loadProviders]);
+
+  useEffect(() => stopRequestPolling, [stopRequestPolling]);
+
+  const handleLifecycleEvent = useCallback(
+    (payload: LifecyclePayload) => {
+      const requestId = payload.request_id ?? payload.requestId ?? payload.id;
+      if (!requestId) {
+        return;
+      }
+      if (currentRequestRef.current?.id !== requestId) {
+        return;
+      }
+      refreshCurrentRequest(requestId);
+    },
+    [refreshCurrentRequest]
+  );
+
+  const handleProviderLocationUpdate = useCallback(
+    (data: ProviderLocationUpdatePayload) => {
+      const requestId = data.request_id ?? data.requestId;
+      if (!requestId) {
+        return;
+      }
+
+      let nextMessage: string | null = null;
+      setCurrentRequest((prev) => {
+        if (!prev || prev.id !== requestId) {
+          return prev;
+        }
+
+        const latitude =
+          data.provider_latitude ?? data.latitude ?? data.location?.lat ?? prev.provider_latitude;
+        const longitude =
+          data.provider_longitude ?? data.longitude ?? data.location?.lng ?? prev.provider_longitude;
+        const eta =
+          data.estimated_time ?? data.eta ?? data.eta_minutes ?? prev.estimated_time;
+        const distance = data.distance ?? data.distance_km;
+
+        if (typeof distance === 'number' && typeof eta === 'number') {
+          nextMessage = `🚗 Prestador a ${distance.toFixed(1)} km (${eta} min)`;
+        }
+
+        return {
+          ...prev,
+          provider_latitude: latitude,
+          provider_longitude: longitude,
+          estimated_time: typeof eta === 'number' ? eta : prev.estimated_time,
+        };
+      });
+
+      if (nextMessage) {
+        setStatusMessage(nextMessage);
+      }
+    },
+    []
+  );
+
+  const setupSocketListeners = useCallback(() => {
+    if (!socket) {
+      return undefined;
+    }
+
+    const lifecycleEvents = [
+      'request_offered',
+      'request.offered',
+      'request_accepted',
+      'request.accepted',
+      'request_status_changed',
+      'request.status_changed',
+      'status_updated',
+      'request.lifecycle',
+      'request_cancelled',
+      'request.cancelled',
+      'request_completed',
+      'request.completed',
+    ];
+
+    const locationEvents = ['provider_location_update', 'provider.location'];
+
+    lifecycleEvents.forEach((event) => socket.on(event, handleLifecycleEvent));
+    locationEvents.forEach((event) => socket.on(event, handleProviderLocationUpdate));
+
+    return () => {
+      lifecycleEvents.forEach((event) => socket.off(event, handleLifecycleEvent));
+      locationEvents.forEach((event) => socket.off(event, handleProviderLocationUpdate));
+    };
+  }, [handleLifecycleEvent, handleProviderLocationUpdate, socket]);
+
+  useEffect(() => {
     const cleanup = setupSocketListeners();
-
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
-    ]).start();
-
     return () => {
       cleanup?.();
     };
-  }, [fadeAnim, scaleAnim, getCurrentLocation, loadProviders, setupSocketListeners]);
-
-  const handleProviderSelect = (provider: Provider) => {
-    setSelectedProvider(provider);
-    setShowModal(true);
-  };
-
-  const generateRequestId = () => `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }, [setupSocketListeners]);
 
   const handleRequestService = async () => {
-    if (!selectedProvider || !userLocation || !user) {
-      Alert.alert('Erro', 'Selecione um prestador e permita acesso à localização');
+    if (!user) {
       return;
     }
+
     if (!REQUESTS_API_URL) {
       if (!requestConfigAlertShown.current) {
         Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
@@ -254,99 +494,138 @@ export default function ClientScreen() {
       }
       return;
     }
+
+    const category = requestForm.category.trim();
+    if (!category) {
+      Alert.alert('Atenção', 'Escolha ou informe a categoria do serviço.');
+      return;
+    }
+
+    const priceValue = Number(requestForm.price.replace(',', '.'));
+    if (Number.isNaN(priceValue) || priceValue <= 0) {
+      Alert.alert('Atenção', 'Informe um valor estimado válido.');
+      return;
+    }
+
+    const location = userLocation ?? (await fetchCurrentLocation());
+    if (!location) {
+      return;
+    }
+
+    const payload: ServiceRequest = {
+      id: generateRequestId(),
+      client_id: user.id,
+      category,
+      description: requestForm.description.trim() || `Solicitação de ${category}`,
+      client_latitude: location.latitude,
+      client_longitude: location.longitude,
+      price: priceValue,
+      status: 'pending',
+    };
+
     setRequestLoading(true);
-    const requestId = generateRequestId();
     try {
-      const payload = {
-        id: requestId,
-        client_id: user.id,
-        provider_id: selectedProvider.id,
-        category: selectedProvider.category,
-        description: `Solicitação de serviço de ${selectedProvider.category}`,
-        client_latitude: userLocation.latitude,
-        client_longitude: userLocation.longitude,
-        price: selectedProvider.price,
-        status: 'pending' as const,
-      };
-
-      const response = await axios.post(REQUESTS_API_URL, payload, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await axios.post<ServiceRequest>(REQUESTS_API_URL, payload, {
+        headers: getAuthHeaders(),
       });
-
-      const createdId = response.data.id ?? requestId;
+      const created = response.data ?? payload;
 
       setCurrentRequest({
-        id: createdId,
-        provider_id: selectedProvider.id,
-        status: response.data.status ?? 'pending',
-        provider_name: selectedProvider.name,
-        provider_phone: selectedProvider.phone || '',
-        category: selectedProvider.category,
-        price: selectedProvider.price,
+        ...created,
+        provider_latitude: undefined,
+        provider_longitude: undefined,
+        estimated_time: undefined,
       });
-
-      setStatusMessage('⏳ Aguardando prestador aceitar...');
-      setShowModal(false);
-      setSelectedProvider(null);
-      Alert.alert('Sucesso', 'Solicitação enviada! Aguarde a confirmação do prestador.');
+      setAssignedProvider(null);
+      setShowRequestModal(false);
+      setRequestForm({ category: '', description: '', price: '' });
+      setShowMap(false);
+      setRating(5);
+      setRatingComment('');
+      setStatusMessage(getStatusCopy('pending'));
+      startRequestPolling(created.id);
+      Alert.alert('Solicitação enviada', 'Estamos buscando o melhor prestador disponível.');
     } catch (error) {
-      console.error('Erro ao solicitar serviço:', error);
-      Alert.alert('Erro', 'Não foi possível solicitar o serviço');
+      console.error('Erro ao criar solicitação:', error);
+      Alert.alert('Erro', 'Não foi possível criar a solicitação.');
     } finally {
       setRequestLoading(false);
     }
   };
 
   const handleRatingSubmit = () => {
-    if (!currentRequest) return;
     Alert.alert('Obrigado!', 'Sua avaliação foi registrada!');
     setShowRatingModal(false);
     setCurrentRequest(null);
+    setAssignedProvider(null);
     setShowMap(false);
     setStatusMessage('');
     setRating(5);
     setRatingComment('');
+    stopRequestPolling();
+    loadProviders();
   };
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    SUGGESTED_CATEGORIES.forEach((item) => set.add(item));
+    availableCategories.forEach((item) => set.add(item));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [availableCategories]);
 
   const renderProvider = ({ item }: { item: Provider }) => {
     const distanceKm = userLocation
-      ? haversineDistance(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude)
+      ? haversineDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          item.latitude,
+          item.longitude
+        )
       : null;
-    const disabled = currentRequest?.provider_id === item.id && currentRequest.status !== 'completed';
     const distanceText = distanceKm != null ? `${distanceKm.toFixed(1)} km` : '—';
+
     return (
-      <Animated.View style={[styles.providerCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-        <TouchableOpacity onPress={() => handleProviderSelect(item)} disabled={disabled} style={disabled ? styles.disabledProvider : undefined}>
-          <View style={styles.providerHeader}>
-            <View style={styles.providerInfo}>
-              <Text style={styles.providerName}>{item.name}</Text>
-              <Text style={styles.providerCategory}>{item.category}</Text>
-            </View>
-            <View style={styles.providerStatus}>
-              <View style={[styles.statusIndicator, { backgroundColor: item.status === 'available' ? '#4CAF50' : '#FF9800' }]} />
-              <Text style={[styles.statusText, { color: item.status === 'available' ? '#4CAF50' : '#FF9800' }]}>
-                {item.status === 'available' ? 'Online' : 'Offline'}
-              </Text>
-            </View>
+      <Animated.View style={[styles.providerCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>        <View style={styles.providerHeader}>
+          <View style={styles.providerInfo}>
+            <Text style={styles.providerName}>{item.name}</Text>
+            <Text style={styles.providerCategory}>{item.category}</Text>
           </View>
-
-          <View style={styles.providerDetails}>
-            <View style={styles.priceContainer}>
-              <Ionicons name="cash-outline" size={16} color="#007AFF" />
-              <Text style={styles.priceText}>R$ {item.price.toFixed(2)}</Text>
-            </View>
-            <View style={styles.distanceContainer}>
-              <Ionicons name="location-outline" size={16} color="#666" />
-              <Text style={styles.distanceText}>{distanceText}</Text>
-            </View>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
-            </View>
+          <View style={styles.providerStatus}>
+            <View
+              style={[
+                styles.statusIndicator,
+                { backgroundColor: item.status === 'available' ? '#4CAF50' : item.status === 'busy' ? '#FF9800' : '#B0BEC5' },
+              ]}
+            />
+            <Text
+              style={[
+                styles.statusText,
+                { color: item.status === 'available' ? '#4CAF50' : item.status === 'busy' ? '#FF9800' : '#607D8B' },
+              ]}
+            >
+              {item.status === 'available' ? 'Online' : item.status === 'busy' ? 'Em serviço' : 'Offline'}
+            </Text>
           </View>
+        </View>
 
-          <Text style={styles.providerDescription} numberOfLines={2}>{item.description || "Sem descrição disponível."}</Text>
-        </TouchableOpacity>
+        <View style={styles.providerDetails}>
+          <View style={styles.priceContainer}>
+            <Ionicons name="cash-outline" size={16} color="#007AFF" />
+            <Text style={styles.priceText}>R$ {item.price.toFixed(2)}</Text>
+          </View>
+          <View style={styles.distanceContainer}>
+            <Ionicons name="location-outline" size={16} color="#666" />
+            <Text style={styles.distanceText}>{distanceText}</Text>
+          </View>
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={16} color="#FFD700" />
+            <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.providerDescription} numberOfLines={2}>
+          {item.description || 'Sem descrição disponível.'}
+        </Text>
       </Animated.View>
     );
   };
@@ -358,12 +637,12 @@ export default function ClientScreen() {
       </TouchableOpacity>
     ));
 
-  // ==== TELA DE TRACKING (mapa) ====
   if (showMap && currentRequest && userLocation) {
-    // origem = prestador (se já temos posição dele); destino = cliente (você)
-    const providerPoint = (currentRequest.provider_latitude && currentRequest.provider_longitude)
+    const providerPoint = currentRequest.provider_latitude && currentRequest.provider_longitude
       ? { latitude: currentRequest.provider_latitude, longitude: currentRequest.provider_longitude }
-      : undefined;
+      : assignedProvider
+        ? { latitude: assignedProvider.latitude, longitude: assignedProvider.longitude }
+        : undefined;
 
     return (
       <View style={styles.container}>
@@ -382,13 +661,20 @@ export default function ClientScreen() {
           style={styles.map}
           origin={providerPoint}
           destination={userLocation}
-          initialRegion={{ latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
-          showsUserLocation={true}
-          showsMyLocationButton={true}
+          initialRegion={{
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+          showsUserLocation
+          showsMyLocationButton
           onRouteReady={({ distanceKm, durationMin }) => {
-            // fallback de ETA quando ainda não há provider_location_update
             if (!currentRequest?.estimated_time && durationMin) {
-              setCurrentRequest(prev => prev ? { ...prev, estimated_time: durationMin } : prev);
+              setCurrentRequest((prev) => (prev ? { ...prev, estimated_time: durationMin } : prev));
+            }
+            if (!statusMessage && distanceKm && durationMin) {
+              setStatusMessage(`🚗 Prestador a ${distanceKm.toFixed(1)} km (${durationMin} min)`);
             }
           }}
         />
@@ -396,17 +682,21 @@ export default function ClientScreen() {
         <View style={styles.statusContainer}>
           <Text style={styles.statusMessage}>{statusMessage}</Text>
           <View style={styles.requestInfo}>
-            <Text style={styles.providerName}>{currentRequest.provider_name}</Text>
+            <Text style={styles.providerNameText}>
+              {assignedProvider ? assignedProvider.name : 'Prestador em seleção'}
+            </Text>
             <Text style={styles.serviceDetails}>
               {currentRequest.category} - R$ {currentRequest.price.toFixed(2)}
             </Text>
+            {assignedProvider && (
+              <Text style={styles.providerCategoryText}>{assignedProvider.category}</Text>
+            )}
             {currentRequest.estimated_time != null && (
               <Text style={styles.estimatedTime}>Chegada em {currentRequest.estimated_time} minutos</Text>
             )}
           </View>
         </View>
 
-        {/* Avaliação */}
         <Modal visible={showRatingModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={styles.ratingModal}>
@@ -418,7 +708,8 @@ export default function ClientScreen() {
                 placeholder="Deixe um comentário (opcional)"
                 value={ratingComment}
                 onChangeText={setRatingComment}
-                multiline numberOfLines={3}
+                multiline
+                numberOfLines={3}
               />
               <View style={styles.ratingButtons}>
                 <TouchableOpacity style={styles.cancelButton} onPress={() => setShowRatingModal(false)}>
@@ -435,21 +726,30 @@ export default function ClientScreen() {
     );
   }
 
-  // ==== LISTA DE PRESTADORES ====
+  const hasActiveRequest = !!currentRequest && currentRequest.status !== 'completed';
+
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}> 
       <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
 
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Olá, {user?.name}! 👋</Text>
-          <Text style={styles.subtitle}>Encontre o serviço que precisa</Text>
+          <Text style={styles.subtitle}>Solicite o serviço que precisa e acompanhe em tempo real</Text>
         </View>
         <View style={styles.headerActions}>
           <View style={styles.socketStatus}>
             <View style={[styles.socketIndicator, { backgroundColor: isConnected ? '#4CAF50' : '#f44336' }]} />
             <Text style={styles.socketText}>{isConnected ? 'Conectado' : 'Desconectado'}</Text>
           </View>
+          <TouchableOpacity
+            style={[styles.newRequestButton, hasActiveRequest && styles.newRequestButtonDisabled]}
+            onPress={() => setShowRequestModal(true)}
+            disabled={hasActiveRequest}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.newRequestButtonText}>Nova solicitação</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Ionicons name="log-out-outline" size={24} color="#fff" />
           </TouchableOpacity>
@@ -457,22 +757,53 @@ export default function ClientScreen() {
       </View>
 
       {currentRequest && (
-        <>
-          <View style={styles.activeRequestBanner}>
-            <Ionicons name="time-outline" size={20} color="#007AFF" />
-            <Text style={styles.activeRequestText}>{statusMessage}</Text>
+        <View style={styles.activeRequestCard}>
+          <View style={styles.activeRequestHeader}>
+            <View style={styles.activeIcon}>
+              <Ionicons name="briefcase-outline" size={22} color="#007AFF" />
+            </View>
+            <View style={styles.activeInfo}>
+              <Text style={styles.activeTitle}>{currentRequest.category}</Text>
+              <Text style={styles.activeStatus}>{statusMessage}</Text>
+            </View>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>{currentRequest.status.toUpperCase()}</Text>
+            </View>
           </View>
-          <TouchableOpacity style={styles.trackButton} onPress={() => setShowMap(true)}>
-            <Ionicons name="map-outline" size={20} color="#fff" />
-            <Text style={styles.trackButtonText}>Acompanhar pedido</Text>
-          </TouchableOpacity>
-        </>
+
+          {assignedProvider ? (
+            <View style={styles.activeProvider}>
+              <View style={styles.providerAvatar}>
+                <Ionicons name="person" size={20} color="#007AFF" />
+              </View>
+              <View>
+                <Text style={styles.activeProviderName}>{assignedProvider.name}</Text>
+                <Text style={styles.activeProviderCategory}>{assignedProvider.category}</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.waitingProviderText}>
+              Aguardando matching com o prestador ideal para você
+            </Text>
+          )}
+
+          <View style={styles.activeFooter}>
+            <View style={styles.infoChip}>
+              <Ionicons name="cash-outline" size={16} color="#007AFF" />
+              <Text style={styles.infoChipText}>R$ {currentRequest.price.toFixed(2)}</Text>
+            </View>
+            <TouchableOpacity style={styles.trackButton} onPress={() => setShowMap(true)}>
+              <Ionicons name="map-outline" size={20} color="#fff" />
+              <Text style={styles.trackButtonText}>Acompanhar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
 
-      {loading ? (
+      {loadingProviders ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Carregando prestadores...</Text>
+          <Text style={styles.loadingText}>Carregando prestadores próximos...</Text>
         </View>
       ) : (
         <FlatList
@@ -481,63 +812,143 @@ export default function ClientScreen() {
           renderItem={renderProvider}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            providers.length > 0 ? (
+              <Text style={styles.sectionTitle}>Prestadores disponíveis na sua região</Text>
+            ) : (
+              <Text style={styles.emptyListText}>
+                Nenhum prestador disponível ainda. Continue verificando mais tarde.
+              </Text>
+            )
+          }
         />
       )}
 
-      {/* Modal de confirmação do prestador */}
-      <Modal visible={showModal} transparent animationType="slide">
+      <Modal visible={showRequestModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            {selectedProvider && (
-              <>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{selectedProvider.name}</Text>
-                  <TouchableOpacity onPress={() => setShowModal(false)}>
-                    <Ionicons name="close" size={24} color="#666" />
-                  </TouchableOpacity>
-                </View>
+          <View style={styles.requestModal}>
+            <View style={styles.requestModalHeader}>
+              <Text style={styles.requestModalTitle}>Nova solicitação</Text>
+              <Text style={styles.requestModalSubtitle}>
+                Informe o serviço desejado e encontraremos o melhor prestador para você.
+              </Text>
+            </View>
 
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalCategory}>{selectedProvider.category}</Text>
-                  <Text style={styles.modalDescription}>{selectedProvider.description}</Text>
+            <ScrollView
+              style={styles.requestModalContent}
+              contentContainerStyle={{ paddingBottom: 12 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.inputLabel}>Categoria</Text>
+              <View style={styles.chipsContainer}>
+                {categoryOptions.map((category) => {
+                  const selected = requestForm.category === category;
+                  return (
+                    <TouchableOpacity
+                      key={category}
+                      style={[styles.categoryChip, selected && styles.categoryChipSelected]}
+                      onPress={() => setRequestForm((prev) => ({ ...prev, category }))}
+                    >
+                      <Text style={[styles.categoryChipText, selected && styles.categoryChipTextSelected]}>
+                        {category}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-                  <View style={styles.modalDetails}>
-                    <View style={styles.modalDetailItem}>
-                      <Ionicons name="cash-outline" size={20} color="#007AFF" />
-                      <Text style={styles.modalDetailText}>R$ {selectedProvider.price.toFixed(2)}</Text>
-                    </View>
-                    <View style={styles.modalDetailItem}>
-                      <Ionicons name="location-outline" size={20} color="#666" />
-                      <Text style={styles.modalDetailText}>{userLocation ? `${haversineDistance(userLocation.latitude, userLocation.longitude, selectedProvider.latitude, selectedProvider.longitude).toFixed(1)} km de distância` : 'Distância indisponível'}</Text>
-                    </View>
-                    <View style={styles.modalDetailItem}>
-                      <Ionicons name="star" size={20} color="#FFD700" />
-                      <Text style={styles.modalDetailText}>{selectedProvider.rating.toFixed(1)} estrelas</Text>
-                    </View>
-                  </View>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Ex: Encanador, Eletricista, Limpeza..."
+                value={requestForm.category}
+                onChangeText={(text) => setRequestForm((prev) => ({ ...prev, category: text }))}
+              />
 
-                  <Text style={styles.modalAddress}>Lat: {selectedProvider.latitude.toFixed(4)} | Lon: {selectedProvider.longitude.toFixed(4)}</Text>
-                </View>
+              <Text style={styles.inputLabel}>Valor estimado</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Informe um valor aproximado"
+                value={requestForm.price}
+                onChangeText={(text) => setRequestForm((prev) => ({ ...prev, price: text }))}
+                keyboardType="numeric"
+              />
 
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.cancelButton} onPress={() => setShowModal(false)}>
-                    <Text style={styles.cancelButtonText}>Cancelar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.confirmButton,
-                      (requestLoading || (currentRequest && currentRequest.provider_id === selectedProvider.id && currentRequest.status !== 'completed')) && styles.confirmButtonDisabled
-                    ]}
-                    onPress={handleRequestService}
-                    disabled={
-                      requestLoading || (currentRequest && currentRequest.provider_id === selectedProvider.id && currentRequest.status !== 'completed')
-                    }
-                  >
-                    {requestLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmButtonText}>Solicitar Serviço</Text>}
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+              <Text style={styles.inputLabel}>Detalhes do serviço</Text>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Conte brevemente o que precisa (opcional)"
+                value={requestForm.description}
+                onChangeText={(text) => setRequestForm((prev) => ({ ...prev, description: text }))}
+                multiline
+                numberOfLines={4}
+              />
+
+              <View style={styles.locationBox}>
+                <Ionicons name="location" size={20} color="#007AFF" />
+                <Text style={styles.locationText}>
+                  {userLocation
+                    ? `Lat: ${userLocation.latitude.toFixed(4)} | Lon: ${userLocation.longitude.toFixed(4)}`
+                    : 'Localização não disponível'}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.refreshLocationButton}
+                onPress={fetchCurrentLocation}
+              >
+                <Ionicons name="refresh" size={16} color="#007AFF" />
+                <Text style={styles.refreshLocationText}>Atualizar localização</Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowRequestModal(false);
+                  setRequestLoading(false);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmButton, requestLoading && styles.confirmButtonDisabled]}
+                onPress={handleRequestService}
+                disabled={requestLoading}
+              >
+                {requestLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Solicitar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showRatingModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.ratingModal}>
+            <Text style={styles.ratingTitle}>Avalie o Serviço</Text>
+            <Text style={styles.ratingSubtitle}>Como foi sua experiência?</Text>
+            <View style={styles.starsContainer}>{renderStars()}</View>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Deixe um comentário (opcional)"
+              value={ratingComment}
+              onChangeText={setRatingComment}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.ratingButtons}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowRatingModal(false)}>
+                <Text style={styles.cancelButtonText}>Pular</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitButton} onPress={handleRatingSubmit}>
+                <Text style={styles.submitButtonText}>Enviar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -548,35 +959,45 @@ export default function ClientScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
   header: {
-    backgroundColor: '#007AFF', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+    backgroundColor: '#007AFF',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
   greeting: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
-  subtitle: { fontSize: 14, color: '#E3F2FD', marginTop: 4 },
+  subtitle: { fontSize: 14, color: '#E3F2FD', marginTop: 4, maxWidth: 240 },
   headerActions: { alignItems: 'flex-end' },
   socketStatus: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   socketIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   socketText: { fontSize: 12, color: '#E3F2FD' },
+  newRequestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#34C759',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  newRequestButtonDisabled: { backgroundColor: '#8BC48B' },
+  newRequestButtonText: { color: '#fff', fontWeight: '600', marginLeft: 8 },
   logoutButton: { padding: 8 },
-
-  activeRequestBanner: {
-    backgroundColor: '#E3F2FD', flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#ddd',
-  },
-  activeRequestText: { flex: 1, marginLeft: 8, fontSize: 14, color: '#007AFF', fontWeight: '500' },
-  trackButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#007AFF', marginHorizontal: 20, marginVertical: 12, paddingVertical: 12, borderRadius: 12,
-  },
-  trackButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 8 },
-
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
-
-  listContainer: { padding: 20 },
+  listContainer: { padding: 20, paddingTop: 10, paddingBottom: 40 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1a1a1a', marginBottom: 12 },
+  emptyListText: { fontSize: 14, color: '#607D8B', textAlign: 'center', marginVertical: 20 },
   providerCard: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   providerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   providerInfo: { flex: 1 },
@@ -593,45 +1014,206 @@ const styles = StyleSheet.create({
   ratingContainer: { flexDirection: 'row', alignItems: 'center' },
   ratingText: { fontSize: 14, color: '#666', marginLeft: 4 },
   providerDescription: { fontSize: 14, color: '#666', lineHeight: 20 },
-  disabledProvider: { opacity: 0.5 },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContainer: { backgroundColor: '#fff', borderRadius: 20, margin: 20, maxHeight: height * 0.8 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#1a1a1a' },
-  modalContent: { paddingHorizontal: 20, paddingBottom: 20 },
-  modalCategory: { fontSize: 16, color: '#007AFF', fontWeight: '600', marginBottom: 8 },
-  modalDescription: { fontSize: 14, color: '#666', lineHeight: 20, marginBottom: 16 },
-  modalDetails: { marginBottom: 16 },
-  modalDetailItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  modalDetailText: { fontSize: 14, color: '#1a1a1a', marginLeft: 8 },
-  modalAddress: { fontSize: 12, color: '#999', fontStyle: 'italic' },
-  modalButtons: { flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 20 },
-  cancelButton: { flex: 1, paddingVertical: 12, alignItems: 'center', marginRight: 8, borderRadius: 12, borderWidth: 1, borderColor: '#ddd' },
+  activeRequestCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  activeRequestHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  activeIcon: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 20,
+    padding: 10,
+    marginRight: 12,
+  },
+  activeInfo: { flex: 1 },
+  activeTitle: { fontSize: 16, fontWeight: '600', color: '#1a1a1a' },
+  activeStatus: { fontSize: 14, color: '#007AFF', marginTop: 4 },
+  statusBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusBadgeText: { color: '#007AFF', fontWeight: '600', fontSize: 12 },
+  activeProvider: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  providerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E3F2FD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  activeProviderName: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
+  activeProviderCategory: { fontSize: 13, color: '#607D8B' },
+  waitingProviderText: { fontSize: 14, color: '#607D8B', marginBottom: 12 },
+  activeFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  infoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  infoChipText: { marginLeft: 6, fontWeight: '600', color: '#1a1a1a' },
+  trackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  trackButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 8 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  requestModal: { backgroundColor: '#fff', borderRadius: 20, width: '100%', maxHeight: height * 0.85 },
+  requestModalHeader: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  requestModalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1a1a1a' },
+  requestModalSubtitle: { fontSize: 14, color: '#666', marginTop: 4 },
+  requestModalContent: { paddingHorizontal: 20, paddingTop: 20 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#1a1a1a', marginBottom: 8 },
+  chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
+  categoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  categoryChipSelected: { backgroundColor: '#E3F2FD', borderColor: '#007AFF' },
+  categoryChipText: { color: '#4A5568', fontWeight: '500' },
+  categoryChipTextSelected: { color: '#007AFF' },
+  textInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#1a1a1a',
+    marginBottom: 16,
+  },
+  textArea: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 15,
+    color: '#1a1a1a',
+    marginBottom: 16,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  locationBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  locationText: { marginLeft: 8, color: '#1a1a1a', flex: 1 },
+  refreshLocationButton: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  refreshLocationText: { marginLeft: 6, color: '#007AFF', fontWeight: '600' },
+  modalActions: { flexDirection: 'row', padding: 20, borderTopWidth: 1, borderTopColor: '#eee' },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginRight: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
   cancelButtonText: { fontSize: 16, color: '#666', fontWeight: '500' },
-  confirmButton: { flex: 1, backgroundColor: '#007AFF', paddingVertical: 12, alignItems: 'center', marginLeft: 8, borderRadius: 12 },
-  confirmButtonDisabled: { backgroundColor: '#ccc' },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginLeft: 8,
+    borderRadius: 12,
+  },
+  confirmButtonDisabled: { backgroundColor: '#9ec9ff' },
   confirmButtonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
-
-  mapHeader: { backgroundColor: '#007AFF', flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20 },
+  ratingModal: { backgroundColor: '#fff', borderRadius: 20, padding: 24, margin: 20, alignItems: 'center', width: '90%' },
+  ratingTitle: { fontSize: 22, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 8 },
+  ratingSubtitle: { fontSize: 14, color: '#666', marginBottom: 20, textAlign: 'center' },
+  starsContainer: { flexDirection: 'row', marginBottom: 20 },
+  starButton: { padding: 4, marginHorizontal: 4 },
+  commentInput: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    textAlignVertical: 'top',
+    marginBottom: 20,
+    minHeight: 80,
+  },
+  ratingButtons: { flexDirection: 'row', width: '100%' },
+  submitButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginLeft: 8,
+    borderRadius: 12,
+  },
+  submitButtonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
+  mapHeader: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
   backButton: { padding: 8, marginRight: 16 },
   mapTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#fff' },
   menuButton: { padding: 8 },
   map: { flex: 1 },
-
-  statusContainer: { backgroundColor: '#fff', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 8 },
+  statusContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
   statusMessage: { fontSize: 16, fontWeight: '600', color: '#007AFF', textAlign: 'center', marginBottom: 12 },
   requestInfo: { alignItems: 'center' },
+  providerNameText: { fontSize: 18, fontWeight: 'bold', color: '#1a1a1a' },
+  providerCategoryText: { fontSize: 14, color: '#607D8B', marginTop: 4 },
   serviceDetails: { fontSize: 14, color: '#666', marginTop: 4 },
   estimatedTime: { fontSize: 12, color: '#999', marginTop: 4 },
-
-  ratingModal: { backgroundColor: '#fff', borderRadius: 20, padding: 24, margin: 20, alignItems: 'center' },
-  ratingTitle: { fontSize: 22, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 8 },
-  ratingSubtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
-  starsContainer: { flexDirection: 'row', marginBottom: 20 },
-  starButton: { padding: 4, marginHorizontal: 4 },
-  commentInput: { width: '100%', borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 12, fontSize: 14, textAlignVertical: 'top', marginBottom: 20 },
-  ratingButtons: { flexDirection: 'row', width: '100%' },
-  submitButton: { flex: 1, backgroundColor: '#007AFF', paddingVertical: 12, alignItems: 'center', marginLeft: 8, borderRadius: 12 },
-  submitButtonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
 });
