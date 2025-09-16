@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
-import axios from 'axios';
-
 export default function ProfileScreen({ onBack }: { onBack: () => void }) {
   const { user, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -25,12 +23,9 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Animações
-  const scaleAnim = new Animated.Value(0);
-  const slideAnim = new Animated.Value(-50);
-  const fadeAnim = new Animated.Value(0);
-
-  const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(-50)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Animação de entrada
@@ -53,7 +48,7 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fadeAnim, scaleAnim, slideAnim]);
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.phone.trim()) {
@@ -71,7 +66,8 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
       
       Alert.alert('Sucesso', 'Perfil atualizado com sucesso!');
       setIsEditing(false);
-    } catch (error: any) {
+    } catch (error) {
+      console.error('Erro ao atualizar o perfil:', error);
       Alert.alert('Erro', 'Não foi possível atualizar o perfil');
     } finally {
       setIsLoading(false);
@@ -99,9 +95,9 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
   };
 
   const LoadingSpinner = () => {
-    const spinValue = new Animated.Value(0);
-    
-    React.useEffect(() => {
+    const spinValue = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
       const spin = () => {
         spinValue.setValue(0);
         Animated.timing(spinValue, {
@@ -112,7 +108,7 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
         }).start(() => spin());
       };
       spin();
-    }, []);
+    }, [spinValue]);
 
     const spin = spinValue.interpolate({
       inputRange: [0, 1],
@@ -141,9 +137,10 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Meu Perfil</Text>
-        <TouchableOpacity 
-          onPress={() => setIsEditing(!isEditing)} 
+        <TouchableOpacity
+          onPress={() => setIsEditing(!isEditing)}
           style={styles.editButton}
+          testID="toggle-edit-button"
         >
           <Ionicons 
             name={isEditing ? "close" : "pencil"} 
@@ -244,6 +241,7 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
                   });
                 }}
                 disabled={isLoading}
+                testID="cancel-edit-button"
               >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
@@ -252,6 +250,7 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
                 style={[styles.button, styles.saveButton]}
                 onPress={handleSave}
                 disabled={isLoading}
+                testID="save-profile-button"
               >
                 {isLoading ? (
                   <LoadingSpinner />

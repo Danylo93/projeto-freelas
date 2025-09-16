@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,44 +11,77 @@ import {
   Animated,
   Dimensions,
   StatusBar,
-  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker';
+import axios from 'axios';
+
 import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
-import axios from 'axios';
 
 // 🔽 mapa estilo Uber
 import CustomMapView, { LatLng } from '@/components/CustomMapView';
-import CarMarker from '@/components/CarMarker';
+import { PROVIDERS_API_URL, REQUESTS_API_URL } from '@/utils/config';
+import { haversineDistance } from '@/utils/geo';
 
-const { width, height } = Dimensions.get('window');
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL + '/api';
+const { height } = Dimensions.get('window');
 
-interface ServiceRequest {
+interface ProviderProfile {
   id: string;
-  client_name: string;
-  client_phone: string;
+  name: string;
   category: string;
-  description: string;
   price: number;
-  distance?: number;
-  client_address: string;
+  description?: string;
+  latitude: number;
+  longitude: number;
+  status: string;
+  rating: number;
+  user_id: string;
+}
+
+interface RawServiceRequest {
+  id: string;
+  client_id: string;
+  provider_id?: string;
+  category: string;
+  description?: string;
+  price: number;
   status: string;
   client_latitude: number;
   client_longitude: number;
-  created_at: string;
+  created_at?: string;
+  client_name?: string;
+  client_phone?: string;
+  client_address?: string;
 }
+
+type ServiceRequest = RawServiceRequest & { distance?: number };
+
+const ACTIVE_STATUSES = ['accepted', 'in_progress', 'near_client', 'started'];
+const OFFER_STATUSES = ['pending', 'offered'];
+
+const formatId = (id: string) => {
+  if (!id) return '—';
+  return id.length > 10 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id;
+};
+
+const PROVIDER_SERVICE_CONFIG_ERROR =
+  'Serviço de prestadores indisponível. Configure EXPO_PUBLIC_PROVIDER_SERVICE_URL ou o gateway com /api/providers.';
+
+const REQUEST_SERVICE_CONFIG_ERROR =
+  'Serviço de solicitações indisponível. Configure EXPO_PUBLIC_REQUEST_SERVICE_URL ou o gateway com /api/requests.';
 
 export default function ProviderScreen() {
   const { user, token, logout } = useAuth();
   const { socket, isConnected } = useSocket();
 
+  const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [activeRequest, setActiveRequest] = useState<ServiceRequest | null>(null);
+  const activeRequestRef = useRef<ServiceRequest | null>(null);
 
   const [showModal, setShowModal] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -56,142 +89,382 @@ export default function ProviderScreen() {
 
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);   // região inicial no mapa
   const [providerPos, setProviderPos] = useState<{ latitude: number; longitude: number; heading?: number } | null>(null); // posição animada do carro
+  const providerPosRef = useRef<typeof providerPos>(null);
 
   const [statusMessage, setStatusMessage] = useState('');
-  const [showServiceModal, setShowServiceModal] = useState(false);
-  const [servicePhoto, setServicePhoto] = useState<string | null>(null);
-  const [serviceDescription, setServiceDescription] = useState('');
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const locationWatcher = useRef<Location.LocationSubscription | null>(null);
+  const providerProfileRef = useRef<ProviderProfile | null>(null);
+  const providerConfigAlertShown = useRef(false);
+  const requestConfigAlertShown = useRef(false);
+
 
   useEffect(() => {
-    loadRequests();
-    getCurrentLocation();
-    setupSocketListeners();
-
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
     ]).start();
+  }, [fadeAnim, scaleAnim]);
+
+  useEffect(() => {
+    if (!user || user.user_type !== 1) {
+      setProfileLoading(false);
+      return;
+    }
+    fetchProviderProfile();
+  }, [fetchProviderProfile, user]);
+
+  useEffect(() => {
+    if (!providerProfile) {
+      return;
+    }
+    loadRequests(providerProfile);
+    getCurrentLocation(providerProfile);
+  }, [getCurrentLocation, loadRequests, providerProfile]);
+
+  useEffect(() => {
+    const cleanup = setupSocketListeners();
+    return () => {
+      cleanup?.();
+    };
+  }, [setupSocketListeners]);
+
+  useEffect(() => {
+    return () => {
+      locationWatcher.current?.remove?.();
+    };
   }, []);
 
-  // ===== localização do prestador: pega atual, envia pro backend e mantém watcher (move o carro)
-  const getCurrentLocation = async () => {
+  useEffect(() => {
+    providerPosRef.current = providerPos;
+  }, [providerPos]);
+
+  useEffect(() => {
+    providerProfileRef.current = providerProfile;
+  }, [providerProfile]);
+
+  useEffect(() => {
+    activeRequestRef.current = activeRequest;
+  }, [activeRequest]);
+
+  const fetchProviderProfile = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+    setProfileLoading(true);
+    if (!PROVIDERS_API_URL) {
+      if (!providerConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+        providerConfigAlertShown.current = true;
+      }
+      setProfileError(PROVIDER_SERVICE_CONFIG_ERROR);
+      setProfileLoading(false);
+      return;
+    }
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permissão negada', 'Precisamos da sua localização para funcionar corretamente.');
+      const response = await axios.get(PROVIDERS_API_URL, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const providers: ProviderProfile[] = response.data;
+      const profile = providers.find((prov) => prov.user_id === user.id);
+      if (profile) {
+        setProviderProfile(profile);
+        setProfileError(null);
+      } else {
+        setProviderProfile(null);
+        setProfileError('Nenhum cadastro de prestador encontrado.');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar perfil do prestador:', error);
+      setProfileError('Não foi possível carregar os dados do prestador.');
+      Alert.alert('Erro', 'Não foi possível carregar os dados do prestador.');
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [token, user]);
+
+  // ===== localização do prestador: pega atual, envia pro backend e mantém watcher (move o carro)
+  const getCurrentLocation = useCallback(
+    async (profile: ProviderProfile) => {
+      if (!PROVIDERS_API_URL) {
+        if (!providerConfigAlertShown.current) {
+          Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+          providerConfigAlertShown.current = true;
+        }
         return;
       }
-
-      const current = await Location.getCurrentPositionAsync({});
-      const start = {
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
-      };
-      setUserLocation({ ...start, latitudeDelta: 0.05, longitudeDelta: 0.05 } as any);
-      setProviderPos({ ...start, heading: current.coords.heading ?? 0 });
-
-      // envia localização inicial
-      await axios.put(
-        `${API_BASE_URL}/provider/location`,
-        { latitude: start.latitude, longitude: start.longitude },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      // watcher para mover o carro suave no mapa e ir mandando pro backend
-      await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.Highest,
-          timeInterval: 1500,
-          distanceInterval: 5,
-        },
-        async (loc) => {
-          const next = {
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            heading: loc.coords.heading ?? bearing(
-              providerPos?.latitude ?? loc.coords.latitude,
-              providerPos?.longitude ?? loc.coords.longitude,
-              loc.coords.latitude,
-              loc.coords.longitude
-            ),
-          };
-          setProviderPos(next);
-
-          try {
-            await axios.put(
-              `${API_BASE_URL}/provider/location`,
-              { latitude: next.latitude, longitude: next.longitude },
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-          } catch (e) {
-            // sem alarde: pode falhar offline
-          }
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permissão negada', 'Precisamos da sua localização para funcionar corretamente.');
+          return;
         }
-      );
-    } catch (error) {
-      console.error('Erro ao obter localização:', error);
-    }
-  };
+
+        const current = await Location.getCurrentPositionAsync({});
+        const start = {
+          latitude: current.coords.latitude,
+          longitude: current.coords.longitude,
+          heading: current.coords.heading ?? 0,
+        };
+
+        providerPosRef.current = start;
+        setUserLocation({ ...start, latitudeDelta: 0.05, longitudeDelta: 0.05 } as any);
+        setProviderPos(start);
+
+        locationWatcher.current?.remove?.();
+
+        await axios.put(
+          `${PROVIDERS_API_URL}/${profile.id}/location`,
+          { latitude: start.latitude, longitude: start.longitude },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const watcher = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Highest,
+            timeInterval: 1500,
+            distanceInterval: 5,
+          },
+          async (loc) => {
+            const previous = providerPosRef.current ?? {
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+              heading: loc.coords.heading ?? 0,
+            };
+
+            const headingValue =
+              loc.coords.heading ??
+              bearing(previous.latitude, previous.longitude, loc.coords.latitude, loc.coords.longitude);
+
+            const next = {
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+              heading: headingValue,
+            };
+
+            providerPosRef.current = next;
+            setProviderPos(next);
+
+            setRequests((prev) =>
+              prev.map((req) => ({
+                ...req,
+                distance: haversineDistance(next.latitude, next.longitude, req.client_latitude, req.client_longitude),
+              }))
+            );
+            setActiveRequest((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    distance: haversineDistance(
+                      next.latitude,
+                      next.longitude,
+                      prev.client_latitude,
+                      prev.client_longitude
+                    ),
+                  }
+                : null
+            );
+
+            try {
+              await axios.put(
+                `${PROVIDERS_API_URL}/${profile.id}/location`,
+                { latitude: next.latitude, longitude: next.longitude },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+            } catch {
+              // silencioso: falhas offline serão sincronizadas posteriormente
+            }
+          }
+        );
+
+        locationWatcher.current = watcher;
+      } catch (error) {
+        console.error('Erro ao obter localização:', error);
+      }
+    },
+    [token]
+  );
 
   // ===== sockets (notificações de novas solicitações/cancelamentos)
-  const setupSocketListeners = () => {
-    if (!socket) return;
-    socket.on('new_request', (data) => {
-      loadRequests();
+  const setupSocketListeners = useCallback(() => {
+    if (!socket) {
+      return undefined;
+    }
+
+    const handleNewRequest = (data: any) => {
+      const profile = providerProfileRef.current;
+      if (profile && data?.provider_id && data.provider_id !== profile.id) {
+        return;
+      }
+      loadRequests(profile ?? undefined);
+      const clientLabel = data?.client_name ?? data?.client_id ?? 'Cliente';
       Alert.alert(
         '🔔 Nova Solicitação!',
-        `Cliente: ${data.client_name}\nServiço: ${data.category}\nValor: R$ ${data.price}\nDistância: ${data.distance}km`,
+        `Cliente: ${clientLabel}\nServiço: ${data?.category ?? 'n/d'}\nValor: R$ ${data?.price ?? 'n/d'}`,
         [{ text: 'OK' }]
       );
-    });
+    };
 
-    socket.on('request_cancelled', (data) => {
-      loadRequests();
-      if (activeRequest && activeRequest.id === data.request_id) {
+    const handleRequestCancelled = (data: any) => {
+      const profile = providerProfileRef.current;
+      if (profile && data?.provider_id && data.provider_id !== profile.id) {
+        return;
+      }
+      loadRequests(profile ?? undefined);
+      const currentActive = activeRequestRef.current;
+      if (currentActive && data?.request_id && currentActive.id === data.request_id) {
         setActiveRequest(null);
         setShowMap(false);
         Alert.alert('Solicitação Cancelada', 'O cliente cancelou a solicitação.');
       }
-    });
-  };
+    };
 
-  const loadRequests = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/requests`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    socket.off('new_request', handleNewRequest);
+    socket.off('request_cancelled', handleRequestCancelled);
+    socket.on('new_request', handleNewRequest);
+    socket.on('request_cancelled', handleRequestCancelled);
 
-      const pendingRequests = response.data.filter((req: ServiceRequest) => req.status === 'pending');
-      setRequests(pendingRequests);
+    return () => {
+      socket.off('new_request', handleNewRequest);
+      socket.off('request_cancelled', handleRequestCancelled);
+    };
+  }, [loadRequests, socket]);
 
-      const activeReq = response.data.find((req: ServiceRequest) =>
-        ['accepted', 'in_progress', 'near_client', 'started'].includes(req.status)
-      );
-      if (activeReq) {
-        setActiveRequest(activeReq);
-        updateStatusMessage(activeReq.status);
+  const loadRequests = useCallback(
+    async (profileOverride?: ProviderProfile) => {
+      const currentProfile = profileOverride ?? providerProfileRef.current;
+      if (!currentProfile) {
+        return;
       }
-    } catch (error) {
-      console.error('Erro ao carregar solicitações:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as solicitações');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const updateStatusMessage = (status: string) => {
+      if (!REQUESTS_API_URL) {
+        if (!requestConfigAlertShown.current) {
+          Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
+          requestConfigAlertShown.current = true;
+        }
+        setLoading(false);
+        setRequests([]);
+        setActiveRequest(null);
+        setStatusMessage('');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await axios.get(REQUESTS_API_URL, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const allRequests: RawServiceRequest[] = response.data;
+        const targeted = allRequests.filter((req) => req.provider_id === currentProfile.id);
+
+        const baseLat = providerPosRef.current?.latitude ?? currentProfile.latitude;
+        const baseLon = providerPosRef.current?.longitude ?? currentProfile.longitude;
+
+        const pendingRequests = targeted
+          .filter((req) => OFFER_STATUSES.includes(req.status))
+          .map((req) => ({
+            ...req,
+            distance:
+              baseLat != null && baseLon != null
+                ? haversineDistance(baseLat, baseLon, req.client_latitude, req.client_longitude)
+                : undefined,
+          }));
+
+        const activeReq = targeted.find((req) => ACTIVE_STATUSES.includes(req.status));
+
+        setRequests(pendingRequests);
+
+        let shouldCloseModal = false;
+        setSelectedRequest((prevSelected) => {
+          if (prevSelected && !pendingRequests.some((req) => req.id === prevSelected.id)) {
+            shouldCloseModal = true;
+            return null;
+          }
+          return prevSelected;
+        });
+        if (shouldCloseModal) {
+          setShowModal(false);
+        }
+
+        if (activeReq) {
+          const activeWithDistance: ServiceRequest = {
+            ...activeReq,
+            distance:
+              baseLat != null && baseLon != null
+                ? haversineDistance(baseLat, baseLon, activeReq.client_latitude, activeReq.client_longitude)
+                : undefined,
+          };
+          setActiveRequest(activeWithDistance);
+          updateStatusMessage(activeReq.status);
+        } else {
+          setActiveRequest(null);
+          setStatusMessage('');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar solicitações:', error);
+        Alert.alert('Erro', 'Não foi possível carregar as solicitações');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, updateStatusMessage]
+  );
+
+  const updateStatusMessage = useCallback((status: string) => {
     switch (status) {
-      case 'accepted': setStatusMessage('📍 Dirija-se ao cliente'); break;
-      case 'in_progress': setStatusMessage('🚗 A caminho do cliente'); break;
-      case 'near_client': setStatusMessage('📍 Você chegou! Clique para iniciar o serviço'); break;
-      case 'started': setStatusMessage('🔧 Serviço em andamento'); break;
-      default: setStatusMessage(''); break;
+      case 'offered':
+        setStatusMessage('📬 Solicitação disponível para aceite');
+        break;
+      case 'pending':
+        setStatusMessage('⏳ Aguardando confirmação');
+        break;
+      case 'accepted':
+        setStatusMessage('📍 Dirija-se ao cliente');
+        break;
+      case 'in_progress':
+        setStatusMessage('🚗 A caminho do cliente');
+        break;
+      case 'near_client':
+        setStatusMessage('📍 Você chegou! Clique para iniciar o serviço');
+        break;
+      case 'started':
+        setStatusMessage('🔧 Serviço em andamento');
+        break;
+      default:
+        setStatusMessage('');
+        break;
     }
-  };
+  }, []);
+
+  const updateProviderStatus = useCallback(
+    async (status: string) => {
+      const profile = providerProfileRef.current;
+      if (!profile) {
+        return;
+      }
+      if (!PROVIDERS_API_URL) {
+        if (!providerConfigAlertShown.current) {
+          Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+          providerConfigAlertShown.current = true;
+        }
+        return;
+      }
+      try {
+        await axios.put(
+          `${PROVIDERS_API_URL}/${profile.id}/status`,
+          { status },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setProviderProfile((prev) => (prev ? { ...prev, status } : prev));
+      } catch (error) {
+        console.error('Erro ao atualizar status do prestador:', error);
+      }
+    },
+    [token]
+  );
 
   const handleRequestSelect = (request: ServiceRequest) => {
     setSelectedRequest(request);
@@ -199,19 +472,28 @@ export default function ProviderScreen() {
   };
 
   const handleAcceptRequest = async () => {
-    if (!selectedRequest) return;
+    if (!selectedRequest || !providerProfile) return;
+    if (!REQUESTS_API_URL) {
+      if (!requestConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
+        requestConfigAlertShown.current = true;
+      }
+      return;
+    }
     try {
       await axios.put(
-        `${API_BASE_URL}/requests/${selectedRequest.id}/accept`,
-        {},
+        `${REQUESTS_API_URL}/${selectedRequest.id}/accept`,
+        { provider_id: providerProfile.id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setActiveRequest(selectedRequest);
+      const acceptedRequest: ServiceRequest = { ...selectedRequest, status: 'accepted' };
+      setActiveRequest(acceptedRequest);
       setShowModal(false);
       setSelectedRequest(null);
       setShowMap(true);
       setStatusMessage('📍 Dirija-se ao cliente');
       setRequests((prev) => prev.filter((req) => req.id !== selectedRequest.id));
+      updateProviderStatus('busy');
       Alert.alert('Sucesso', 'Solicitação aceita! Dirija-se ao cliente.');
     } catch (error) {
       console.error('Erro ao aceitar solicitação:', error);
@@ -221,27 +503,32 @@ export default function ProviderScreen() {
 
   const handleStatusUpdate = async (newStatus: string) => {
     if (!activeRequest) return;
+    if (!REQUESTS_API_URL) {
+      if (!requestConfigAlertShown.current) {
+        Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
+        requestConfigAlertShown.current = true;
+      }
+      return;
+    }
     try {
       await axios.put(
-        `${API_BASE_URL}/requests/${activeRequest.id}/update-status`,
-        { status: newStatus, message: getStatusMessage(newStatus) },
+        `${REQUESTS_API_URL}/${activeRequest.id}/status`,
+        { status: newStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setActiveRequest((prev) => (prev ? { ...prev, status: newStatus } : null));
       updateStatusMessage(newStatus);
+
+      if (newStatus === 'completed') {
+        updateProviderStatus('available');
+        setShowMap(false);
+        setStatusMessage('✅ Serviço concluído!');
+        setActiveRequest(null);
+        loadRequests(providerProfile ?? undefined);
+      }
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       Alert.alert('Erro', 'Não foi possível atualizar o status');
-    }
-  };
-
-  const getStatusMessage = (status: string) => {
-    switch (status) {
-      case 'in_progress': return 'Prestador a caminho';
-      case 'near_client': return 'Prestador chegou';
-      case 'started': return 'Serviço iniciado';
-      case 'completed': return 'Serviço concluído';
-      default: return '';
     }
   };
 
@@ -252,88 +539,83 @@ export default function ProviderScreen() {
     ]);
   };
 
-  const handleCompleteService = () => setShowServiceModal(true);
-
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0].base64) {
-      setServicePhoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
-    }
+  const handleCompleteService = () => {
+    Alert.alert('Concluir Serviço', 'Deseja marcar o serviço como concluído?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Concluir', onPress: () => handleStatusUpdate('completed') },
+    ]);
   };
 
-  const handleServiceComplete = async () => {
-    if (!activeRequest) return;
-    if (!servicePhoto) {
-      Alert.alert('Foto obrigatória', 'Por favor, adicione uma foto do serviço concluído.');
-      return;
-    }
-    try {
-      await axios.put(
-        `${API_BASE_URL}/requests/${activeRequest.id}/update-status`,
-        { status: 'completed', photo_url: servicePhoto, message: serviceDescription || 'Serviço concluído' },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      Alert.alert('Sucesso!', 'Serviço concluído com sucesso!');
-      setActiveRequest(null);
-      setShowMap(false);
-      setShowServiceModal(false);
-      setServicePhoto(null);
-      setServiceDescription('');
-      setStatusMessage('');
-      loadRequests();
-    } catch (error) {
-      console.error('Erro ao concluir serviço:', error);
-      Alert.alert('Erro', 'Não foi possível concluir o serviço');
-    }
+  if (profileLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Carregando dados do prestador...</Text>
+      </View>
+    );
+  }
+
+  if (!providerProfile) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
+        <View style={styles.emptyContainer}>
+          <Ionicons name="construct-outline" size={60} color="#ccc" />
+          <Text style={styles.emptyTitle}>Cadastre seu perfil de prestador</Text>
+          <Text style={styles.emptySubtitle}>
+            {profileError || 'Finalize o cadastro de prestador para receber solicitações.'}
+          </Text>
+          <TouchableOpacity style={styles.trackButton} onPress={fetchProviderProfile}>
+            <Ionicons name="refresh" size={20} color="#fff" />
+            <Text style={styles.trackButtonText}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  const renderRequest = ({ item }: { item: ServiceRequest }) => {
+    const distanceText = item.distance != null ? `${item.distance.toFixed(1)} km` : '—';
+    const coordinatesText = `Lat: ${item.client_latitude.toFixed(4)} • Lon: ${item.client_longitude.toFixed(4)}`;
+
+    return (
+      <Animated.View style={[styles.requestCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+        <TouchableOpacity onPress={() => handleRequestSelect(item)}>
+          <View style={styles.requestHeader}>
+            <View style={styles.clientInfo}>
+              <Text style={styles.clientName}>Solicitação {formatId(item.id)}</Text>
+              <Text style={styles.serviceCategory}>{item.category}</Text>
+            </View>
+            <View style={styles.priceContainer}>
+              <Text style={styles.priceLabel}>Ganho</Text>
+              <Text style={styles.priceValue}>R$ {item.price.toFixed(2)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.requestDetails}>
+            <View style={styles.distanceContainer}>
+              <Ionicons name="location-outline" size={16} color="#666" />
+              <Text style={styles.distanceText}>{distanceText}</Text>
+            </View>
+
+            <View style={styles.timeContainer}>
+              <Ionicons name="time-outline" size={16} color="#666" />
+              <Text style={styles.timeText}>Status: {item.status}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.requestDescription} numberOfLines={2}>
+            {item.description || 'Sem descrição fornecida.'}
+          </Text>
+          <Text style={styles.clientAddress} numberOfLines={1}>📍 {coordinatesText}</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
   };
 
-  const renderRequest = ({ item }: { item: ServiceRequest }) => (
-    <Animated.View style={[styles.requestCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-      <TouchableOpacity onPress={() => handleRequestSelect(item)}>
-        <View style={styles.requestHeader}>
-          <View style={styles.clientInfo}>
-            <Text style={styles.clientName}>{item.client_name}</Text>
-            <Text style={styles.serviceCategory}>{item.category}</Text>
-          </View>
-          <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>Ganho</Text>
-            <Text style={styles.priceValue}>R$ {item.price.toFixed(2)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.requestDetails}>
-          <View style={styles.distanceContainer}>
-            <Ionicons name="location-outline" size={16} color="#666" />
-            <Text style={styles.distanceText}>{item.distance || '0'} km</Text>
-          </View>
-
-          <View style={styles.timeContainer}>
-            <Ionicons name="time-outline" size={16} color="#666" />
-            <Text style={styles.timeText}>
-              {new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.requestDescription} numberOfLines={2}>{item.description}</Text>
-        <Text style={styles.clientAddress} numberOfLines={1}>📍 {item.client_address}</Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-
-  // ===== Tela do mapa (serviço ativo) — agora com CustomMapView + CarMarker
+  // ===== Tela do mapa (serviço ativo)
   if (showMap && activeRequest) {
-    const clientPoint: LatLng = {
-      latitude: activeRequest.client_latitude,
-      longitude: activeRequest.client_longitude,
-    };
-
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
@@ -389,11 +671,11 @@ export default function ProviderScreen() {
         <View style={styles.statusContainer}>
           <Text style={styles.statusMessage}>{statusMessage}</Text>
           <View style={styles.requestInfo}>
-            <Text style={styles.clientName}>{activeRequest.client_name}</Text>
+            <Text style={styles.clientName}>Solicitação {formatId(activeRequest.id)}</Text>
             <Text style={styles.serviceDetails}>
               {activeRequest.category} - R$ {activeRequest.price.toFixed(2)}
             </Text>
-            <Text style={styles.clientPhone}>📞 {activeRequest.client_phone}</Text>
+            <Text style={styles.clientPhone}>Cliente: {formatId(activeRequest.client_id)}</Text>
           </View>
 
           <View style={styles.actionButtons}>
@@ -420,51 +702,6 @@ export default function ProviderScreen() {
           </View>
         </View>
 
-        {/* Modal de conclusão */}
-        <Modal visible={showServiceModal} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.serviceModal}>
-              <Text style={styles.serviceModalTitle}>Concluir Serviço</Text>
-              <Text style={styles.serviceModalSubtitle}>Adicione uma foto do trabalho realizado</Text>
-
-              <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-                {servicePhoto ? (
-                  <View style={styles.photoPreview}>
-                    <Text style={styles.photoSelectedText}>✅ Foto selecionada</Text>
-                  </View>
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Ionicons name="camera" size={40} color="#007AFF" />
-                    <Text style={styles.photoPlaceholderText}>Adicionar Foto</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <TextInput
-                style={styles.descriptionInput}
-                placeholder="Descrição do serviço realizado (opcional)"
-                value={serviceDescription}
-                onChangeText={setServiceDescription}
-                multiline
-                numberOfLines={3}
-              />
-
-              <View style={styles.serviceModalButtons}>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => setShowServiceModal(false)}>
-                  <Text style={styles.cancelButtonText}>Cancelar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.completeServiceButton, !servicePhoto && styles.disabledButton]}
-                  onPress={handleServiceComplete}
-                  disabled={!servicePhoto}
-                >
-                  <Text style={styles.completeServiceButtonText}>Concluir</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </View>
     );
   }
@@ -493,7 +730,7 @@ export default function ProviderScreen() {
       {activeRequest && (
         <TouchableOpacity style={styles.activeRequestBanner} onPress={() => setShowMap(true)}>
           <Ionicons name="construct-outline" size={20} color="#007AFF" />
-          <Text style={styles.activeRequestText}>Serviço ativo - {activeRequest.client_name}</Text>
+          <Text style={styles.activeRequestText}>Serviço ativo - {activeRequest.category}</Text>
           <Ionicons name="chevron-forward" size={20} color="#007AFF" />
         </TouchableOpacity>
       )}
@@ -535,8 +772,8 @@ export default function ProviderScreen() {
                 <View style={styles.modalContent}>
                   <View style={styles.clientSection}>
                     <Text style={styles.clientLabel}>Cliente</Text>
-                    <Text style={styles.clientName}>{selectedRequest.client_name}</Text>
-                    <Text style={styles.clientPhone}>📞 {selectedRequest.client_phone}</Text>
+                    <Text style={styles.clientName}>{formatId(selectedRequest.client_id)}</Text>
+                    <Text style={styles.clientPhone}>ID completo: {selectedRequest.client_id}</Text>
                   </View>
 
                   <View style={styles.serviceSection}>
@@ -552,15 +789,16 @@ export default function ProviderScreen() {
                       <Text style={styles.detailValue}>R$ {selectedRequest.price.toFixed(2)}</Text>
                     </View>
 
-                    <View className="detailItem">
+                    <View style={styles.detailItem}>
                       <Ionicons name="location-outline" size={20} color="#666" />
                       <Text style={styles.detailLabel}>Distância</Text>
-                      <Text style={styles.detailValue}>{selectedRequest.distance || '0'} km</Text>
+                      <Text style={styles.detailValue}>{selectedRequest.distance != null ? `${selectedRequest.distance.toFixed(1)} km` : '—'}</Text>
                     </View>
                   </View>
 
-                  <Text style={styles.addressLabel}>Endereço</Text>
-                  <Text style={styles.addressText}>{selectedRequest.client_address}</Text>
+                  <Text style={styles.addressLabel}>Local do cliente</Text>
+                  <Text style={styles.addressText}>Lat: {selectedRequest.client_latitude.toFixed(4)}
+Lon: {selectedRequest.client_longitude.toFixed(4)}</Text>
                 </View>
 
                 <View style={styles.modalButtons}>

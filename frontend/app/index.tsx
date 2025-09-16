@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,10 +10,8 @@ export default function Index() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
 
-  // Animações da splash
-  const scaleAnim = new Animated.Value(0);
-  const rotateAnim = new Animated.Value(0);
-  const fadeAnim = new Animated.Value(0);
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Se não está carregando e já temos dados de auth, esconder splash
@@ -27,7 +25,6 @@ export default function Index() {
   }, [isLoading]);
 
   useEffect(() => {
-    // Animação da splash screen (simplificada)
     if (showSplash) {
       Animated.parallel([
         Animated.timing(scaleAnim, {
@@ -43,7 +40,7 @@ export default function Index() {
         }),
       ]).start();
     }
-  }, [showSplash]);
+  }, [fadeAnim, scaleAnim, showSplash]);
 
   const SplashScreen = () => {
     return (
