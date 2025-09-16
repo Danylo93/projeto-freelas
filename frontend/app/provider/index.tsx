@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -81,6 +81,7 @@ export default function ProviderScreen() {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [activeRequest, setActiveRequest] = useState<ServiceRequest | null>(null);
+  const activeRequestRef = useRef<ServiceRequest | null>(null);
 
   const [showModal, setShowModal] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -88,12 +89,14 @@ export default function ProviderScreen() {
 
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);   // região inicial no mapa
   const [providerPos, setProviderPos] = useState<{ latitude: number; longitude: number; heading?: number } | null>(null); // posição animada do carro
+  const providerPosRef = useRef<typeof providerPos>(null);
 
   const [statusMessage, setStatusMessage] = useState('');
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const locationWatcher = useRef<Location.LocationSubscription | null>(null);
+  const providerProfileRef = useRef<ProviderProfile | null>(null);
   const providerConfigAlertShown = useRef(false);
   const requestConfigAlertShown = useRef(false);
 
@@ -103,7 +106,7 @@ export default function ProviderScreen() {
       Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [fadeAnim, scaleAnim]);
 
   useEffect(() => {
     if (!user || user.user_type !== 1) {
@@ -111,7 +114,7 @@ export default function ProviderScreen() {
       return;
     }
     fetchProviderProfile();
-  }, [user?.id]);
+  }, [fetchProviderProfile, user]);
 
   useEffect(() => {
     if (!providerProfile) {
@@ -119,11 +122,14 @@ export default function ProviderScreen() {
     }
     loadRequests(providerProfile);
     getCurrentLocation(providerProfile);
-  }, [providerProfile]);
+  }, [getCurrentLocation, loadRequests, providerProfile]);
 
   useEffect(() => {
-    setupSocketListeners();
-  }, [socket, providerProfile, activeRequest?.id]);
+    const cleanup = setupSocketListeners();
+    return () => {
+      cleanup?.();
+    };
+  }, [setupSocketListeners]);
 
   useEffect(() => {
     return () => {
@@ -131,8 +137,22 @@ export default function ProviderScreen() {
     };
   }, []);
 
-  const fetchProviderProfile = async () => {
-    if (!user) return;
+  useEffect(() => {
+    providerPosRef.current = providerPos;
+  }, [providerPos]);
+
+  useEffect(() => {
+    providerProfileRef.current = providerProfile;
+  }, [providerProfile]);
+
+  useEffect(() => {
+    activeRequestRef.current = activeRequest;
+  }, [activeRequest]);
+
+  const fetchProviderProfile = useCallback(async () => {
+    if (!user) {
+      return;
+    }
     setProfileLoading(true);
     if (!PROVIDERS_API_URL) {
       if (!providerConfigAlertShown.current) {
@@ -163,224 +183,237 @@ export default function ProviderScreen() {
     } finally {
       setProfileLoading(false);
     }
-  };
-
-  if (profileLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Carregando dados do prestador...</Text>
-      </View>
-    );
-  }
-
-  if (!providerProfile) {
-    return (
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
-        <View style={styles.emptyContainer}>
-          <Ionicons name="construct-outline" size={60} color="#ccc" />
-          <Text style={styles.emptyTitle}>Cadastre seu perfil de prestador</Text>
-          <Text style={styles.emptySubtitle}>
-            {profileError || 'Finalize o cadastro de prestador para receber solicitações.'}
-          </Text>
-          <TouchableOpacity style={styles.trackButton} onPress={fetchProviderProfile}>
-            <Ionicons name="refresh" size={20} color="#fff" />
-            <Text style={styles.trackButtonText}>Tentar novamente</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  }, [token, user]);
 
   // ===== localização do prestador: pega atual, envia pro backend e mantém watcher (move o carro)
-  const getCurrentLocation = async (profile: ProviderProfile) => {
-    if (!PROVIDERS_API_URL) {
-      if (!providerConfigAlertShown.current) {
-        Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
-        providerConfigAlertShown.current = true;
-      }
-      return;
-    }
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permissão negada', 'Precisamos da sua localização para funcionar corretamente.');
+  const getCurrentLocation = useCallback(
+    async (profile: ProviderProfile) => {
+      if (!PROVIDERS_API_URL) {
+        if (!providerConfigAlertShown.current) {
+          Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+          providerConfigAlertShown.current = true;
+        }
         return;
       }
-
-      const current = await Location.getCurrentPositionAsync({});
-      const start = {
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
-      };
-      setUserLocation({ ...start, latitudeDelta: 0.05, longitudeDelta: 0.05 } as any);
-      setProviderPos({ ...start, heading: current.coords.heading ?? 0 });
-
-      locationWatcher.current?.remove?.();
-
-      await axios.put(
-        `${PROVIDERS_API_URL}/${profile.id}/location`,
-        { latitude: start.latitude, longitude: start.longitude },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const watcher = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.Highest,
-          timeInterval: 1500,
-          distanceInterval: 5,
-        },
-        async (loc) => {
-          const next = {
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            heading: loc.coords.heading ?? bearing(
-              providerPos?.latitude ?? loc.coords.latitude,
-              providerPos?.longitude ?? loc.coords.longitude,
-              loc.coords.latitude,
-              loc.coords.longitude
-            ),
-          };
-          setProviderPos(next);
-
-          setRequests((prev) =>
-            prev.map((req) => ({
-              ...req,
-              distance: haversineDistance(next.latitude, next.longitude, req.client_latitude, req.client_longitude),
-            }))
-          );
-          setActiveRequest((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  distance: haversineDistance(next.latitude, next.longitude, prev.client_latitude, prev.client_longitude),
-                }
-              : null
-          );
-
-          try {
-            await axios.put(
-              `${PROVIDERS_API_URL}/${profile.id}/location`,
-              { latitude: next.latitude, longitude: next.longitude },
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-          } catch (_error) {
-            // sem alarde: pode falhar offline
-          }
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permissão negada', 'Precisamos da sua localização para funcionar corretamente.');
+          return;
         }
-      );
 
-      locationWatcher.current = watcher;
-    } catch (error) {
-      console.error('Erro ao obter localização:', error);
-    }
-  };
+        const current = await Location.getCurrentPositionAsync({});
+        const start = {
+          latitude: current.coords.latitude,
+          longitude: current.coords.longitude,
+          heading: current.coords.heading ?? 0,
+        };
+
+        providerPosRef.current = start;
+        setUserLocation({ ...start, latitudeDelta: 0.05, longitudeDelta: 0.05 } as any);
+        setProviderPos(start);
+
+        locationWatcher.current?.remove?.();
+
+        await axios.put(
+          `${PROVIDERS_API_URL}/${profile.id}/location`,
+          { latitude: start.latitude, longitude: start.longitude },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const watcher = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Highest,
+            timeInterval: 1500,
+            distanceInterval: 5,
+          },
+          async (loc) => {
+            const previous = providerPosRef.current ?? {
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+              heading: loc.coords.heading ?? 0,
+            };
+
+            const headingValue =
+              loc.coords.heading ??
+              bearing(previous.latitude, previous.longitude, loc.coords.latitude, loc.coords.longitude);
+
+            const next = {
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+              heading: headingValue,
+            };
+
+            providerPosRef.current = next;
+            setProviderPos(next);
+
+            setRequests((prev) =>
+              prev.map((req) => ({
+                ...req,
+                distance: haversineDistance(next.latitude, next.longitude, req.client_latitude, req.client_longitude),
+              }))
+            );
+            setActiveRequest((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    distance: haversineDistance(
+                      next.latitude,
+                      next.longitude,
+                      prev.client_latitude,
+                      prev.client_longitude
+                    ),
+                  }
+                : null
+            );
+
+            try {
+              await axios.put(
+                `${PROVIDERS_API_URL}/${profile.id}/location`,
+                { latitude: next.latitude, longitude: next.longitude },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+            } catch {
+              // silencioso: falhas offline serão sincronizadas posteriormente
+            }
+          }
+        );
+
+        locationWatcher.current = watcher;
+      } catch (error) {
+        console.error('Erro ao obter localização:', error);
+      }
+    },
+    [token]
+  );
 
   // ===== sockets (notificações de novas solicitações/cancelamentos)
-  const setupSocketListeners = () => {
-    if (!socket) return;
+  const setupSocketListeners = useCallback(() => {
+    if (!socket) {
+      return undefined;
+    }
 
-    socket.off('new_request');
-    socket.off('request_cancelled');
-
-    socket.on('new_request', (data) => {
-      if (providerProfile && data?.provider_id && data.provider_id !== providerProfile.id) {
+    const handleNewRequest = (data: any) => {
+      const profile = providerProfileRef.current;
+      if (profile && data?.provider_id && data.provider_id !== profile.id) {
         return;
       }
-      loadRequests(providerProfile ?? undefined);
+      loadRequests(profile ?? undefined);
       const clientLabel = data?.client_name ?? data?.client_id ?? 'Cliente';
       Alert.alert(
         '🔔 Nova Solicitação!',
         `Cliente: ${clientLabel}\nServiço: ${data?.category ?? 'n/d'}\nValor: R$ ${data?.price ?? 'n/d'}`,
         [{ text: 'OK' }]
       );
-    });
+    };
 
-    socket.on('request_cancelled', (data) => {
-      if (providerProfile && data?.provider_id && data.provider_id !== providerProfile.id) {
+    const handleRequestCancelled = (data: any) => {
+      const profile = providerProfileRef.current;
+      if (profile && data?.provider_id && data.provider_id !== profile.id) {
         return;
       }
-      loadRequests(providerProfile ?? undefined);
-      if (activeRequest && data?.request_id && activeRequest.id === data.request_id) {
+      loadRequests(profile ?? undefined);
+      const currentActive = activeRequestRef.current;
+      if (currentActive && data?.request_id && currentActive.id === data.request_id) {
         setActiveRequest(null);
         setShowMap(false);
         Alert.alert('Solicitação Cancelada', 'O cliente cancelou a solicitação.');
       }
-    });
-  };
+    };
 
-  const loadRequests = async (profile?: ProviderProfile) => {
-    const currentProfile = profile ?? providerProfile;
-    if (!currentProfile) return;
+    socket.off('new_request', handleNewRequest);
+    socket.off('request_cancelled', handleRequestCancelled);
+    socket.on('new_request', handleNewRequest);
+    socket.on('request_cancelled', handleRequestCancelled);
 
-    if (!REQUESTS_API_URL) {
-      if (!requestConfigAlertShown.current) {
-        Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
-        requestConfigAlertShown.current = true;
-      }
-      setLoading(false);
-      setRequests([]);
-      setActiveRequest(null);
-      setStatusMessage('');
-      return;
-    }
+    return () => {
+      socket.off('new_request', handleNewRequest);
+      socket.off('request_cancelled', handleRequestCancelled);
+    };
+  }, [loadRequests, socket]);
 
-    try {
-      setLoading(true);
-      const response = await axios.get(REQUESTS_API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const allRequests: RawServiceRequest[] = response.data;
-      const targeted = allRequests.filter((req) => req.provider_id === currentProfile.id);
-
-      const baseLat = providerPos?.latitude ?? currentProfile.latitude;
-      const baseLon = providerPos?.longitude ?? currentProfile.longitude;
-
-      const pendingRequests = targeted
-        .filter((req) => OFFER_STATUSES.includes(req.status))
-        .map((req) => ({
-          ...req,
-          distance:
-            baseLat != null && baseLon != null
-              ? haversineDistance(baseLat, baseLon, req.client_latitude, req.client_longitude)
-              : undefined,
-        }));
-
-      const activeReq = targeted.find((req) => ACTIVE_STATUSES.includes(req.status));
-
-      setRequests(pendingRequests);
-
-      if (selectedRequest && !pendingRequests.find((req) => req.id === selectedRequest.id)) {
-        setShowModal(false);
-        setSelectedRequest(null);
+  const loadRequests = useCallback(
+    async (profileOverride?: ProviderProfile) => {
+      const currentProfile = profileOverride ?? providerProfileRef.current;
+      if (!currentProfile) {
+        return;
       }
 
-      if (activeReq) {
-        const activeWithDistance: ServiceRequest = {
-          ...activeReq,
-          distance:
-            baseLat != null && baseLon != null
-              ? haversineDistance(baseLat, baseLon, activeReq.client_latitude, activeReq.client_longitude)
-              : undefined,
-        };
-        setActiveRequest(activeWithDistance);
-        updateStatusMessage(activeReq.status);
-      } else {
+      if (!REQUESTS_API_URL) {
+        if (!requestConfigAlertShown.current) {
+          Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
+          requestConfigAlertShown.current = true;
+        }
+        setLoading(false);
+        setRequests([]);
         setActiveRequest(null);
         setStatusMessage('');
+        return;
       }
-    } catch (error) {
-      console.error('Erro ao carregar solicitações:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as solicitações');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const updateStatusMessage = (status: string) => {
+      try {
+        setLoading(true);
+        const response = await axios.get(REQUESTS_API_URL, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const allRequests: RawServiceRequest[] = response.data;
+        const targeted = allRequests.filter((req) => req.provider_id === currentProfile.id);
+
+        const baseLat = providerPosRef.current?.latitude ?? currentProfile.latitude;
+        const baseLon = providerPosRef.current?.longitude ?? currentProfile.longitude;
+
+        const pendingRequests = targeted
+          .filter((req) => OFFER_STATUSES.includes(req.status))
+          .map((req) => ({
+            ...req,
+            distance:
+              baseLat != null && baseLon != null
+                ? haversineDistance(baseLat, baseLon, req.client_latitude, req.client_longitude)
+                : undefined,
+          }));
+
+        const activeReq = targeted.find((req) => ACTIVE_STATUSES.includes(req.status));
+
+        setRequests(pendingRequests);
+
+        let shouldCloseModal = false;
+        setSelectedRequest((prevSelected) => {
+          if (prevSelected && !pendingRequests.some((req) => req.id === prevSelected.id)) {
+            shouldCloseModal = true;
+            return null;
+          }
+          return prevSelected;
+        });
+        if (shouldCloseModal) {
+          setShowModal(false);
+        }
+
+        if (activeReq) {
+          const activeWithDistance: ServiceRequest = {
+            ...activeReq,
+            distance:
+              baseLat != null && baseLon != null
+                ? haversineDistance(baseLat, baseLon, activeReq.client_latitude, activeReq.client_longitude)
+                : undefined,
+          };
+          setActiveRequest(activeWithDistance);
+          updateStatusMessage(activeReq.status);
+        } else {
+          setActiveRequest(null);
+          setStatusMessage('');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar solicitações:', error);
+        Alert.alert('Erro', 'Não foi possível carregar as solicitações');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, updateStatusMessage]
+  );
+
+  const updateStatusMessage = useCallback((status: string) => {
     switch (status) {
       case 'offered':
         setStatusMessage('📬 Solicitação disponível para aceite');
@@ -404,28 +437,34 @@ export default function ProviderScreen() {
         setStatusMessage('');
         break;
     }
-  };
+  }, []);
 
-  const updateProviderStatus = async (status: string) => {
-    if (!providerProfile) return;
-    if (!PROVIDERS_API_URL) {
-      if (!providerConfigAlertShown.current) {
-        Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
-        providerConfigAlertShown.current = true;
+  const updateProviderStatus = useCallback(
+    async (status: string) => {
+      const profile = providerProfileRef.current;
+      if (!profile) {
+        return;
       }
-      return;
-    }
-    try {
-      await axios.put(
-        `${PROVIDERS_API_URL}/${providerProfile.id}/status`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setProviderProfile((prev) => (prev ? { ...prev, status } : prev));
-    } catch (error) {
-      console.error('Erro ao atualizar status do prestador:', error);
-    }
-  };
+      if (!PROVIDERS_API_URL) {
+        if (!providerConfigAlertShown.current) {
+          Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
+          providerConfigAlertShown.current = true;
+        }
+        return;
+      }
+      try {
+        await axios.put(
+          `${PROVIDERS_API_URL}/${profile.id}/status`,
+          { status },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setProviderProfile((prev) => (prev ? { ...prev, status } : prev));
+      } catch (error) {
+        console.error('Erro ao atualizar status do prestador:', error);
+      }
+    },
+    [token]
+  );
 
   const handleRequestSelect = (request: ServiceRequest) => {
     setSelectedRequest(request);
@@ -506,6 +545,35 @@ export default function ProviderScreen() {
       { text: 'Concluir', onPress: () => handleStatusUpdate('completed') },
     ]);
   };
+
+  if (profileLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Carregando dados do prestador...</Text>
+      </View>
+    );
+  }
+
+  if (!providerProfile) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
+        <View style={styles.emptyContainer}>
+          <Ionicons name="construct-outline" size={60} color="#ccc" />
+          <Text style={styles.emptyTitle}>Cadastre seu perfil de prestador</Text>
+          <Text style={styles.emptySubtitle}>
+            {profileError || 'Finalize o cadastro de prestador para receber solicitações.'}
+          </Text>
+          <TouchableOpacity style={styles.trackButton} onPress={fetchProviderProfile}>
+            <Ionicons name="refresh" size={20} color="#fff" />
+            <Text style={styles.trackButtonText}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   const renderRequest = ({ item }: { item: ServiceRequest }) => {
     const distanceText = item.distance != null ? `${item.distance.toFixed(1)} km` : '—';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, Alert,
   ActivityIndicator, Animated, Dimensions, StatusBar, TextInput,
@@ -48,6 +48,26 @@ interface ServiceRequest {
   provider_longitude?: number;
 }
 
+interface RequestAcceptedPayload {
+  request_id: string;
+  provider_latitude?: number;
+  provider_longitude?: number;
+  estimated_time?: number;
+}
+
+interface ProviderLocationUpdatePayload {
+  request_id: string;
+  provider_latitude: number;
+  provider_longitude: number;
+  distance: number;
+  estimated_time: number;
+}
+
+interface RequestStatusPayload {
+  request_id: string;
+  status: string;
+}
+
 export default function ClientScreen() {
   const { user, token, logout } = useAuth();
   const { socket, isConnected } = useSocket();
@@ -73,18 +93,7 @@ export default function ClientScreen() {
   const providerConfigAlertShown = useRef(false);
   const requestConfigAlertShown = useRef(false);
 
-  useEffect(() => {
-    loadProviders();
-    getCurrentLocation();
-    setupSocketListeners();
-
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  const getCurrentLocation = async () => {
+  const getCurrentLocation = useCallback(async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -96,51 +105,9 @@ export default function ClientScreen() {
     } catch (error) {
       console.error('Erro ao obter localização:', error);
     }
-  };
+  }, []);
 
-  const setupSocketListeners = () => {
-    if (!socket) return;
-
-    socket.on('request_accepted', (data) => {
-      // data: { request_id, provider_name, provider_phone, provider_latitude, provider_longitude, ... }
-      setCurrentRequest(prev => prev ? {
-        ...prev,
-        status: 'accepted',
-        provider_latitude: data.provider_latitude ?? prev.provider_latitude,
-        provider_longitude: data.provider_longitude ?? prev.provider_longitude,
-        estimated_time: data.estimated_time ?? prev.estimated_time,
-      } : null);
-      setStatusMessage('🎉 Solicitação aceita! O prestador está a caminho.');
-      setShowMap(true);
-    });
-
-    socket.on('provider_location_update', (data) => {
-      // data: { request_id, provider_latitude, provider_longitude, distance, estimated_time }
-      if (!currentRequest || data.request_id !== currentRequest.id) return;
-      setCurrentRequest(prev => prev ? {
-        ...prev,
-        provider_latitude: data.provider_latitude,
-        provider_longitude: data.provider_longitude,
-        estimated_time: data.estimated_time
-      } : null);
-      setStatusMessage(`🚗 Prestador chegando em ${data.estimated_time} min (${data.distance} km)`);
-    });
-
-    socket.on('status_updated', (data) => {
-      if (!currentRequest || data.request_id !== currentRequest.id) return;
-      setCurrentRequest(prev => prev ? { ...prev, status: data.status } : null);
-      switch (data.status) {
-        case 'near_client': setStatusMessage('📍 O prestador chegou!'); break;
-        case 'started': setStatusMessage('🔧 Serviço iniciado.'); break;
-        case 'completed':
-          setStatusMessage('✅ Serviço concluído!');
-          setShowRatingModal(true);
-          break;
-      }
-    });
-  };
-
-  const loadProviders = async () => {
+  const loadProviders = useCallback(async () => {
     if (!PROVIDERS_API_URL) {
       if (!providerConfigAlertShown.current) {
         Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
@@ -162,7 +129,111 @@ export default function ClientScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  const setupSocketListeners = useCallback(() => {
+    if (!socket) return undefined;
+
+    const handleRequestAccepted = (data: RequestAcceptedPayload) => {
+      setCurrentRequest((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'accepted',
+              provider_latitude: data.provider_latitude ?? prev.provider_latitude,
+              provider_longitude: data.provider_longitude ?? prev.provider_longitude,
+              estimated_time: data.estimated_time ?? prev.estimated_time,
+            }
+          : null
+      );
+      setStatusMessage('🎉 Solicitação aceita! O prestador está a caminho.');
+      setShowMap(true);
+    };
+
+    const handleProviderLocationUpdate = (data: ProviderLocationUpdatePayload) => {
+      let shouldUpdateStatus = false;
+      let estimatedTime: number | undefined;
+      let distance: number | undefined;
+
+      setCurrentRequest((prev) => {
+        if (!prev || data.request_id !== prev.id) {
+          return prev;
+        }
+
+        shouldUpdateStatus = true;
+        estimatedTime = data.estimated_time;
+        distance = data.distance;
+
+        return {
+          ...prev,
+          provider_latitude: data.provider_latitude,
+          provider_longitude: data.provider_longitude,
+          estimated_time: data.estimated_time,
+        };
+      });
+
+      if (shouldUpdateStatus && estimatedTime != null && distance != null) {
+        setStatusMessage(`🚗 Prestador chegando em ${estimatedTime} min (${distance} km)`);
+      }
+    };
+
+    const handleStatusUpdated = (data: RequestStatusPayload) => {
+      let updatedStatus: string | undefined;
+
+      setCurrentRequest((prev) => {
+        if (!prev || data.request_id !== prev.id) {
+          return prev;
+        }
+
+        updatedStatus = data.status;
+        return { ...prev, status: data.status };
+      });
+
+      if (!updatedStatus) {
+        return;
+      }
+
+      switch (updatedStatus) {
+        case 'near_client':
+          setStatusMessage('📍 O prestador chegou!');
+          break;
+        case 'started':
+          setStatusMessage('🔧 Serviço iniciado.');
+          break;
+        case 'completed':
+          setStatusMessage('✅ Serviço concluído!');
+          setShowRatingModal(true);
+          break;
+        default:
+          break;
+      }
+    };
+
+    socket.on('request_accepted', handleRequestAccepted);
+    socket.on('provider_location_update', handleProviderLocationUpdate);
+    socket.on('status_updated', handleStatusUpdated);
+
+    return () => {
+      socket.off('request_accepted', handleRequestAccepted);
+      socket.off('provider_location_update', handleProviderLocationUpdate);
+      socket.off('status_updated', handleStatusUpdated);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    loadProviders();
+    getCurrentLocation();
+    const cleanup = setupSocketListeners();
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
+    ]).start();
+
+    return () => {
+      cleanup?.();
+    };
+  }, [fadeAnim, scaleAnim, getCurrentLocation, loadProviders, setupSocketListeners]);
 
   const handleProviderSelect = (provider: Provider) => {
     setSelectedProvider(provider);

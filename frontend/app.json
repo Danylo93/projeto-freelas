@@ -15,7 +15,6 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    
     "ios": {
       "supportsTablet": true,
       "config": {
@@ -64,12 +63,14 @@
           "photosPermission": "Este app precisa acessar suas fotos para validar serviços concluídos.",
           "cameraPermission": "Este app precisa da câmera para validar serviços concluídos."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "scheme": "servico-app",
     "extra": {
-      "googleSdkKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",      
-      "googleWebKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",    
+      "googleSdkKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",
+      "googleWebKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",
       "router": {
         "origin": false
       },

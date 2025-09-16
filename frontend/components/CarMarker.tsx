@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import MapView, { AnimatedRegion, MarkerAnimated } from 'react-native-maps';
 import { Image } from 'react-native';
 
@@ -15,10 +15,14 @@ type Props = {
 function clampAngle(a: number) { return ((a % 360) + 360) % 360; }
 
 export default function CarMarker({ position, duration = 800, onStep, mapRef }: Props) {
-  const region = useMemo(
-    () => new AnimatedRegion({ latitude: position.latitude, longitude: position.longitude, latitudeDelta: 0, longitudeDelta: 0 }),
-    []
-  );
+  const region = useRef(
+    new AnimatedRegion({
+      latitude: position.latitude,
+      longitude: position.longitude,
+      latitudeDelta: 0,
+      longitudeDelta: 0,
+    })
+  ).current;
   const lastHeading = useRef(position.heading ?? 0);
 
   useEffect(() => {
@@ -34,7 +38,7 @@ export default function CarMarker({ position, duration = 800, onStep, mapRef }: 
       mapRef.current.animateCamera({ center: { latitude: position.latitude, longitude: position.longitude }, zoom: 16 }, { duration: duration * 0.9 });
     }
     lastHeading.current = position.heading ?? lastHeading.current;
-  }, [position.latitude, position.longitude]);
+  }, [duration, mapRef, onStep, position, position.heading, position.latitude, position.longitude, region]);
 
   const rotation = clampAngle(position.heading ?? lastHeading.current);
 
