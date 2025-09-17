@@ -82,11 +82,17 @@ const resolveExpoHost = () => {
 
 const expoHost = resolveExpoHost();
 const DEV_PROTOCOL = process.env.EXPO_PUBLIC_DEV_PROTOCOL || 'http';
-const DEV_API_PORT = process.env.EXPO_PUBLIC_API_PORT || '8001';
+const DEFAULT_GATEWAY_PORT = process.env.EXPO_PUBLIC_GATEWAY_PORT || '8015';
+const DEV_API_PORT = process.env.EXPO_PUBLIC_API_PORT || DEFAULT_GATEWAY_PORT;
 const DEV_SOCKET_PORT = process.env.EXPO_PUBLIC_SOCKET_PORT || DEV_API_PORT;
 
-const fallbackApiHost = expoHost ? `${DEV_PROTOCOL}://${expoHost}:${DEV_API_PORT}` : '';
-const fallbackSocketHost = expoHost ? `${DEV_PROTOCOL}://${expoHost}:${DEV_SOCKET_PORT}` : '';
+const fallbackHost = expoHost || (Platform.OS === 'android' ? '10.0.2.2' : 'localhost');
+const fallbackApiHost = fallbackHost
+  ? `${DEV_PROTOCOL}://${fallbackHost}:${DEV_API_PORT}`
+  : '';
+const fallbackSocketHost = fallbackHost
+  ? `${DEV_PROTOCOL}://${fallbackHost}:${DEV_SOCKET_PORT}`
+  : '';
 
 const resolveServiceUrl = (explicit?: string, fallbackBase?: string, fallbackPath?: string) => {
   const trimmedExplicit = stripTrailingSlash(explicit);
@@ -112,7 +118,7 @@ export const API_URL =
   rawApiUrl ||
   rawApiGatewayUrl ||
   fallbackApiHost ||
-  'https://eedfd16e8f89.ngrok-free.app';
+  `${DEV_PROTOCOL}://localhost:${DEV_API_PORT}`;
 export const API_BASE_URL = rawApiBaseUrl || ensurePath(API_URL, '/api');
 
 // Endpoints específicos

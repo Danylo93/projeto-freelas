@@ -1,9 +1,16 @@
-import os, asyncio, math
+import os, asyncio, math, sys
+from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from dotenv import load_dotenv
+
+# Permite executar o serviço sem precisar exportar PYTHONPATH manualmente.
+BASE_DIR = Path(__file__).resolve().parent
+COMMON_DIR = BASE_DIR.parent / "common"
+if str(COMMON_DIR) not in sys.path:
+    sys.path.insert(0, str(COMMON_DIR))
 
 from common.kafka import make_consumer, make_producer
 from common.events import TOPIC_REQ_LIFECYCLE, EV_REQUEST_OFFERED
