@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { Alert } from 'react-native';
@@ -27,11 +34,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isConnected, setIsConnected] = useState(false);
   const { user, token } = useAuth();
   const socketRef = useRef<Socket | null>(null);
+  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const attemptReconnectRef = useRef<((attempt?: number) => void) | null>(null);
 
   console.log('🔍 [SOCKET] Estado atual:', { user: user?.name, token: !!token, isConnected });
 
   // Função para conectar o socket
-  const connectSocket = () => {
+  const connectSocket = useCallback(() => {
     if (!SOCKET_URL || !user || !token) return;
     
     console.log('🔌 [SOCKET] Conectando em:', SOCKET_URL);
@@ -80,12 +89,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     newSocket.on('disconnect', (reason) => {
       console.log('❌ [SOCKET] Desconectado. Motivo:', reason);
       setIsConnected(false);
-      
+
       // Iniciar reconexão para certos tipos de desconexão
       if (reason === 'io server disconnect' || reason === 'transport close' || reason === 'transport error') {
         console.log('🔄 [SOCKET] Iniciando reconexão após desconexão:', reason);
         if (!reconnectTimerRef.current) {
-          attemptReconnect(0);
+          attemptReconnectRef.current?.(0);
         }
       }
     });
@@ -98,7 +107,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (error.message.includes('xhr poll error')) {
         console.log('🔧 [SOCKET] Tentando configuração alternativa para xhr poll error');
         if (!reconnectTimerRef.current) {
-          attemptReconnect(0);
+          attemptReconnectRef.current?.(0);
         }
       }
     });
@@ -151,37 +160,41 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Salvar referências
     socketRef.current = newSocket;
     setSocket(newSocket);
-  };
+  }, [token, user]);
 
-  // Referência para o timer de reconexão
-  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
   // Função para tentar reconexão com backoff exponencial
-  const attemptReconnect = useRef((attempt = 0) => {
-    const maxAttempts = 20;
-    const baseDelay = 2000;
-    const maxDelay = 30000;
-    
-    if (attempt >= maxAttempts) {
-      console.warn('⚠️ [SOCKET] Número máximo de tentativas de reconexão atingido');
-      return;
-    }
-    
-    // Cálculo de backoff exponencial com jitter
-    const delay = Math.min(baseDelay * Math.pow(1.5, attempt), maxDelay);
-    const jitter = delay * 0.2 * Math.random();
-    const finalDelay = delay + jitter;
-    
-    console.log(`🔄 [SOCKET] Tentativa de reconexão ${attempt + 1}/${maxAttempts} em ${Math.round(finalDelay)}ms`);
-    
-    reconnectTimerRef.current = setTimeout(() => {
-      if (!socketRef.current || !socketRef.current.connected) {
-        console.log('🔌 [SOCKET] Tentando reconectar...');
-        connectSocket();
-        attemptReconnect.current(attempt + 1);
+  const attemptReconnect = useCallback(
+    (attempt = 0) => {
+      const maxAttempts = 20;
+      const baseDelay = 2000;
+      const maxDelay = 30000;
+
+      if (attempt >= maxAttempts) {
+        console.warn('⚠️ [SOCKET] Número máximo de tentativas de reconexão atingido');
+        return;
       }
-    }, finalDelay);
-  }).current;
+
+      // Cálculo de backoff exponencial com jitter
+      const delay = Math.min(baseDelay * Math.pow(1.5, attempt), maxDelay);
+      const jitter = delay * 0.2 * Math.random();
+      const finalDelay = delay + jitter;
+
+      console.log(`🔄 [SOCKET] Tentativa de reconexão ${attempt + 1}/${maxAttempts} em ${Math.round(finalDelay)}ms`);
+
+      reconnectTimerRef.current = setTimeout(() => {
+        if (!socketRef.current || !socketRef.current.connected) {
+          console.log('🔌 [SOCKET] Tentando reconectar...');
+          connectSocket();
+          attemptReconnectRef.current?.(attempt + 1);
+        }
+      }, finalDelay);
+    },
+    [connectSocket]
+  );
+
+  useEffect(() => {
+    attemptReconnectRef.current = attemptReconnect;
+  }, [attemptReconnect]);
 
   // Iniciar conexão quando o usuário estiver autenticado
   useEffect(() => {
@@ -210,7 +223,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const connectionCheckInterval = setInterval(() => {
         if (socketRef.current && !socketRef.current.connected && !reconnectTimerRef.current) {
           console.log('🔄 [SOCKET] Conexão perdida, iniciando reconexão automática');
-          attemptReconnect(0);
+          attemptReconnectRef.current?.(0);
         }
       }, 5000);
       
@@ -238,7 +251,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         reconnectTimerRef.current = null;
       }
     };
-  }, [user, token]);
+  }, [connectSocket, user, token]);
 
   // Função para enviar mensagens
   const sendMessage = (event: string, data: any) => {

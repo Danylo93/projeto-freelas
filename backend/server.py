@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -324,12 +324,21 @@ async def create_provider_profile(
     return profile
 
 @api_router.get("/providers", response_model=List[Dict[str, Any]])
-async def get_providers(current_user: User = Depends(get_current_user)):
-    if current_user.user_type != UserType.CLIENTE:
+async def get_providers(
+    user_id: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+):
+    is_requesting_own_profile = user_id is not None and user_id == current_user.id
+
+    if not is_requesting_own_profile and current_user.user_type != UserType.CLIENTE:
         raise HTTPException(status_code=403, detail="Only clients can view providers")
-    
+
+    query: Dict[str, Any] = {}
+    if user_id:
+        query["user_id"] = user_id
+
     providers = []
-    async for provider in db.provider_profiles.find({}, {"_id": 0}):
+    async for provider in db.provider_profiles.find(query, {"_id": 0}):
         user = await db.users.find_one({"id": provider["user_id"]}, {"_id": 0})
         if user:
             # Calculate distance (assuming client is at a default location for now)
