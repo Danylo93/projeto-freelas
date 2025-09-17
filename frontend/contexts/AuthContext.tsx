@@ -73,6 +73,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const storedToken = await AsyncStorage.getItem('token');
       const storedUser = await AsyncStorage.getItem('user');
       
+      // Sempre configurar o header ngrok-skip-browser-warning
+      axios.defaults.headers.common['ngrok-skip-browser-warning'] = '1';
+      
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));

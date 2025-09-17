@@ -40,7 +40,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       if (token && AUTH_API_URL && expoToken) {
         try {
           await axios.post(`${AUTH_API_URL}/push-token`, { token: expoToken }, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'ngrok-skip-browser-warning': '1'
+            },
           });
         } catch (e) {
           console.warn('Failed to register push token', e);

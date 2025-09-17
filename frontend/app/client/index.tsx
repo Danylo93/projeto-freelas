@@ -199,7 +199,14 @@ export default function ClientScreen() {
   }, [currentRequest]);
 
   const getAuthHeaders = useCallback(() => {
-    return token ? { Authorization: `Bearer ${token}` } : undefined;
+    if (!token) {
+      console.warn('⚠️ [CLIENT] Token não encontrado ao criar headers de autenticação');
+      return { 'ngrok-skip-browser-warning': '1' };
+    }
+    return { 
+      Authorization: `Bearer ${token}`,
+      'ngrok-skip-browser-warning': '1'
+    };
   }, [token]);
 
   const fetchCurrentLocation = useCallback(async (): Promise<LatLng | null> => {
@@ -371,7 +378,9 @@ export default function ClientScreen() {
       }
     } catch (error) {
       console.error('Erro ao carregar prestadores:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os prestadores');
+      // Não exibir alerta para permitir que a tela carregue mesmo sem prestadores
+      setProviders([]);
+      setAvailableCategories([]);
     } finally {
       setLoadingProviders(false);
     }

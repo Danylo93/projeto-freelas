@@ -138,7 +138,10 @@ export default function ProviderScreen() {
       const url = `${PROVIDERS_API_URL}?user_id=${encodeURIComponent(user.id)}`;
       console.log('🌐 [PROVIDER] Fazendo requisição para:', url);
       const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': '1'
+        },
       });
       console.log('📊 [PROVIDER] Resposta recebida:', response.data);
       const providers: ProviderProfile[] = Array.isArray(response.data) ? response.data : [];
@@ -208,7 +211,12 @@ export default function ProviderScreen() {
               await axios.put(
                 `${PROVIDERS_API_URL}/${savedProfile.id}/location`,
                 coords,
-                { headers: { Authorization: `Bearer ${token}` } }
+                { 
+                  headers: { 
+                    Authorization: `Bearer ${token}`,
+                    'ngrok-skip-browser-warning': '1'
+                  } 
+                }
               );
               
               setProviderProfile(prev => prev ? { ...prev, ...coords } : prev);
@@ -279,10 +287,13 @@ export default function ProviderScreen() {
         locationWatcher.current?.remove?.();
 
         await axios.put(
-          `${PROVIDERS_API_URL}/${profile.id}/location`,
-          { latitude: start.latitude, longitude: start.longitude },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        `${PROVIDERS_API_URL}/${profile.id}/location`,
+        { latitude: start.latitude, longitude: start.longitude },
+        { headers: { 
+          Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': '1'
+        } }
+      );
 
         const watcher = await Location.watchPositionAsync(
           {
@@ -678,7 +689,10 @@ export default function ProviderScreen() {
         await axios.put(
           `${PROVIDERS_API_URL}/${profile.id}/status`,
           { status },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { 
+            Authorization: `Bearer ${token}`,
+            'ngrok-skip-browser-warning': '1'
+          } }
         );
         setProviderProfile((prev) => (prev ? { ...prev, status } : prev));
       } catch (error) {

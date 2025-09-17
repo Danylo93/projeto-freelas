@@ -5,6 +5,10 @@ const ensurePath = (base: string, segment: string) => {
   return base.endsWith(segment) ? base : `${base}${segment}`;
 };
 
+// Configuração global do axios para incluir o header ngrok-skip-browser-warning
+import axios from 'axios';
+axios.defaults.headers.common['ngrok-skip-browser-warning'] = '1';
+
 const resolveServiceUrl = (explicit?: string, fallbackBase?: string, fallbackPath?: string) => {
   const trimmedExplicit = stripTrailingSlash(explicit);
   if (trimmedExplicit) {
