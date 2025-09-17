@@ -22,6 +22,7 @@ interface AuthContextType {
   register: (userData: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  getAuthHeaders: () => Record<string, string>;
 }
 
 interface RegisterData {
@@ -50,6 +51,19 @@ if (API_BASE_URL) {
   );
 }
 
+// Interceptor para tratar erros de autenticação globalmente
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      console.warn('🔒 [AUTH] Token inválido ou expirado, fazendo logout...');
+      // Não fazer logout automático aqui para evitar loops
+      // O componente pode decidir quando fazer logout
+    }
+    return Promise.reject(error);
+  }
+);
+
 if (!AUTH_API_URL) {
   console.warn(
     '⚠️ URL do serviço de autenticação não configurada. Defina EXPO_PUBLIC_AUTH_SERVICE_URL ou um gateway com /api/auth.'
@@ -63,6 +77,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const getAuthHeaders = useCallback(() => {
+    const headers: Record<string, string> = {
+      'ngrok-skip-browser-warning': '1',
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      console.warn('⚠️ [AUTH] Token não encontrado ao criar headers de autenticação');
+    }
+    
+    return headers;
+  }, [token]);
 
   useEffect(() => {
     loadStoredAuth();
@@ -116,7 +145,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
     } catch (error: any) {
       console.error('❌ [AUTH] Erro no login:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.detail || 'Erro ao fazer login');
+      
+      // Tratar erros específicos de autenticação
+      if (error.response?.status === 403) {
+        throw new Error('Acesso negado. Verifique suas credenciais.');
+      } else if (error.response?.status === 401) {
+        throw new Error('Credenciais inválidas.');
+      } else if (error.response?.status === 404) {
+        throw new Error('Serviço de autenticação não encontrado.');
+      } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+        throw new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+      }
+      
+      throw new Error(error.response?.data?.detail || error.response?.data?.message || 'Erro ao fazer login');
     } finally {
       console.log('🏁 [AUTH] Finalizando processo de login');
       setIsLoading(false);
@@ -149,7 +190,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
     } catch (error: any) {
       console.error('❌ [AUTH] Erro no registro:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.detail || 'Erro ao fazer registro');
+      
+      // Tratar erros específicos de registro
+      if (error.response?.status === 403) {
+        throw new Error('Acesso negado. Verifique suas permissões.');
+      } else if (error.response?.status === 401) {
+        throw new Error('Não autorizado para criar conta.');
+      } else if (error.response?.status === 400) {
+        throw new Error('Dados inválidos. Verifique as informações fornecidas.');
+      } else if (error.response?.status === 409) {
+        throw new Error('Email já cadastrado. Tente fazer login.');
+      } else if (error.response?.status === 404) {
+        throw new Error('Serviço de autenticação não encontrado.');
+      } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+        throw new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+      }
+      
+      throw new Error(error.response?.data?.detail || error.response?.data?.message || 'Erro ao fazer registro');
     } finally {
       console.log('🏁 [AUTH] Finalizando processo de registro');
       setIsLoading(false);
@@ -182,6 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register,
     logout,
     isAuthenticated: !!user && !!token,
+    getAuthHeaders,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

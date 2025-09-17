@@ -155,7 +155,7 @@ const getStatusCopy = (status: string, providerName?: string | null) => {
 };
 
 export default function ClientScreen() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, getAuthHeaders } = useAuth();
   const { startPayment } = usePayment();
   const { socket, isConnected } = useSocket();
 
@@ -198,16 +198,6 @@ export default function ClientScreen() {
     currentRequestRef.current = currentRequest;
   }, [currentRequest]);
 
-  const getAuthHeaders = useCallback(() => {
-    if (!token) {
-      console.warn('⚠️ [CLIENT] Token não encontrado ao criar headers de autenticação');
-      return { 'ngrok-skip-browser-warning': '1' };
-    }
-    return { 
-      Authorization: `Bearer ${token}`,
-      'ngrok-skip-browser-warning': '1'
-    };
-  }, [token]);
 
   const fetchCurrentLocation = useCallback(async (): Promise<LatLng | null> => {
     try {
@@ -376,9 +366,21 @@ export default function ClientScreen() {
           setAssignedProvider(match);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar prestadores:', error);
-      // Não exibir alerta para permitir que a tela carregue mesmo sem prestadores
+      
+      // Tratar erros específicos
+      if (error.response?.status === 403) {
+        Alert.alert('Acesso Negado', 'Você não tem permissão para acessar os prestadores. Faça login novamente.');
+        logout();
+        return;
+      } else if (error.response?.status === 401) {
+        Alert.alert('Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+        logout();
+        return;
+      }
+      
+      // Não exibir alerta para outros erros para permitir que a tela carregue
       setProviders([]);
       setAvailableCategories([]);
     } finally {
@@ -423,8 +425,19 @@ export default function ClientScreen() {
       }
 
       startRequestPolling(latest.id);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar solicitações ativas:', error);
+      
+      // Tratar erros específicos
+      if (error.response?.status === 403) {
+        Alert.alert('Acesso Negado', 'Você não tem permissão para acessar as solicitações. Faça login novamente.');
+        logout();
+        return;
+      } else if (error.response?.status === 401) {
+        Alert.alert('Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+        logout();
+        return;
+      }
     }
   }, [getAuthHeaders, providers, startRequestPolling, stopRequestPolling, syncAssignedProvider, user]);
 

@@ -76,7 +76,7 @@ const REQUEST_SERVICE_CONFIG_ERROR =
   'Serviço de solicitações indisponível. Configure EXPO_PUBLIC_REQUEST_SERVICE_URL ou o gateway com /api/requests.';
 
 export default function ProviderScreen() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, getAuthHeaders } = useAuth();
   const { socket, isConnected } = useSocket();
 
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
@@ -138,10 +138,7 @@ export default function ProviderScreen() {
       const url = `${PROVIDERS_API_URL}?user_id=${encodeURIComponent(user.id)}`;
       console.log('🌐 [PROVIDER] Fazendo requisição para:', url);
       const response = await axios.get(url, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'ngrok-skip-browser-warning': '1'
-        },
+        headers: getAuthHeaders(),
       });
       console.log('📊 [PROVIDER] Resposta recebida:', response.data);
       const providers: ProviderProfile[] = Array.isArray(response.data) ? response.data : [];
@@ -191,7 +188,7 @@ export default function ProviderScreen() {
         try {
           console.log('💾 [PROVIDER] Salvando perfil básico no backend...');
           const response = await axios.post(PROVIDERS_API_URL, basicProfile, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: getAuthHeaders(),
           });
           const savedProfile = response.data || basicProfile;
           console.log('✅ [PROVIDER] Perfil básico salvo no backend:', savedProfile);
@@ -212,10 +209,7 @@ export default function ProviderScreen() {
                 `${PROVIDERS_API_URL}/${savedProfile.id}/location`,
                 coords,
                 { 
-                  headers: { 
-                    Authorization: `Bearer ${token}`,
-                    'ngrok-skip-browser-warning': '1'
-                  } 
+                  headers: getAuthHeaders()
                 }
               );
               
@@ -230,8 +224,22 @@ export default function ProviderScreen() {
           console.warn('⚠️ [PROVIDER] Erro ao salvar perfil básico:', error);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ [PROVIDER] Erro ao carregar perfil do prestador:', error);
+      
+      // Tratar erros específicos
+      if (error.response?.status === 403) {
+        setProfileError('Acesso negado. Faça login novamente.');
+        Alert.alert('Acesso Negado', 'Você não tem permissão para acessar os dados do prestador. Faça login novamente.');
+        logout();
+        return;
+      } else if (error.response?.status === 401) {
+        setProfileError('Sessão expirada. Faça login novamente.');
+        Alert.alert('Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+        logout();
+        return;
+      }
+      
       setProfileError('Não foi possível carregar os dados do prestador.');
       Alert.alert('Erro', 'Não foi possível carregar os dados do prestador.');
     } finally {
@@ -289,10 +297,7 @@ export default function ProviderScreen() {
         await axios.put(
         `${PROVIDERS_API_URL}/${profile.id}/location`,
         { latitude: start.latitude, longitude: start.longitude },
-        { headers: { 
-          Authorization: `Bearer ${token}`,
-          'ngrok-skip-browser-warning': '1'
-        } }
+        { headers: getAuthHeaders() }
       );
 
         const watcher = await Location.watchPositionAsync(
@@ -345,7 +350,7 @@ export default function ProviderScreen() {
               await axios.put(
                 `${PROVIDERS_API_URL}/${profile.id}/location`,
                 { latitude: next.latitude, longitude: next.longitude },
-                { headers: { Authorization: `Bearer ${token}` } }
+                { headers: getAuthHeaders() }
               );
             } catch {
               // silencioso: falhas offline serão sincronizadas posteriormente
@@ -409,7 +414,7 @@ export default function ProviderScreen() {
       try {
         setLoading(true);
         const response = await axios.get(REQUESTS_API_URL, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAuthHeaders(),
         });
 
         const allRequests: RawServiceRequest[] = response.data;
@@ -458,8 +463,20 @@ export default function ProviderScreen() {
           setActiveRequest(null);
           setStatusMessage('');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erro ao carregar solicitações:', error);
+        
+        // Tratar erros específicos
+        if (error.response?.status === 403) {
+          Alert.alert('Acesso Negado', 'Você não tem permissão para acessar as solicitações. Faça login novamente.');
+          logout();
+          return;
+        } else if (error.response?.status === 401) {
+          Alert.alert('Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+          logout();
+          return;
+        }
+        
         Alert.alert('Erro', 'Não foi possível carregar as solicitações');
       } finally {
         setLoading(false);
@@ -638,7 +655,7 @@ export default function ProviderScreen() {
 
     setSetupLoading(true);
     try {
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = getAuthHeaders();
       const request = existingProfile
         ? axios.put(
             `${PROVIDERS_API_URL}/${encodeURIComponent(providerId)}`,
@@ -689,10 +706,7 @@ export default function ProviderScreen() {
         await axios.put(
           `${PROVIDERS_API_URL}/${profile.id}/status`,
           { status },
-          { headers: { 
-            Authorization: `Bearer ${token}`,
-            'ngrok-skip-browser-warning': '1'
-          } }
+          { headers: getAuthHeaders() }
         );
         setProviderProfile((prev) => (prev ? { ...prev, status } : prev));
       } catch (error) {
@@ -735,7 +749,7 @@ export default function ProviderScreen() {
       await axios.put(
         `${REQUESTS_API_URL}/${selectedRequest.id}/accept`,
         { provider_id: providerProfile.id },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getAuthHeaders() }
       );
       const acceptedRequest: ServiceRequest = { ...selectedRequest, status: 'accepted' };
       setActiveRequest(acceptedRequest);
@@ -765,7 +779,7 @@ export default function ProviderScreen() {
       await axios.put(
         `${REQUESTS_API_URL}/${activeRequest.id}/status`,
         { status: newStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getAuthHeaders() }
       );
       setActiveRequest((prev) => (prev ? { ...prev, status: newStatus } : null));
       updateStatusMessage(newStatus);
