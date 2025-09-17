@@ -646,7 +646,10 @@ export default function ClientScreen() {
     const distanceText = distanceKm != null ? `${distanceKm.toFixed(1)} km` : '—';
 
     return (
-      <Animated.View style={[styles.providerCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>        <View style={styles.providerHeader}>
+      <Animated.View
+        style={[styles.providerCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}
+      >
+        <View style={styles.providerHeader}>
           <View style={styles.providerInfo}>
             <Text style={styles.providerName}>{item.name}</Text>
             <Text style={styles.providerCategory}>{item.category}</Text>
