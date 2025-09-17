@@ -51,11 +51,76 @@ if (API_BASE_URL) {
   );
 }
 
+// Throttling de requisições para evitar limite do ngrok
+const requestQueue: Array<() => Promise<any>> = [];
+let isProcessingQueue = false;
+const MAX_REQUESTS_PER_MINUTE = 100; // Limite conservador
+let requestCount = 0;
+let lastResetTime = Date.now();
+
+const processRequestQueue = async () => {
+  if (isProcessingQueue || requestQueue.length === 0) return;
+  
+  isProcessingQueue = true;
+  
+  while (requestQueue.length > 0) {
+    // Reset contador a cada minuto
+    if (Date.now() - lastResetTime > 60000) {
+      requestCount = 0;
+      lastResetTime = Date.now();
+    }
+    
+    // Se atingiu o limite, aguarda
+    if (requestCount >= MAX_REQUESTS_PER_MINUTE) {
+      const waitTime = 60000 - (Date.now() - lastResetTime);
+      if (waitTime > 0) {
+        console.log(`⏳ [AUTH] Aguardando ${Math.ceil(waitTime/1000)}s para evitar limite do ngrok...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        requestCount = 0;
+        lastResetTime = Date.now();
+      }
+    }
+    
+    const request = requestQueue.shift();
+    if (request) {
+      try {
+        await request();
+        requestCount++;
+      } catch (error) {
+        console.error('❌ [AUTH] Erro na fila de requisições:', error);
+      }
+    }
+  }
+  
+  isProcessingQueue = false;
+};
+
+// Interceptor para throttling de requisições
+axios.interceptors.request.use(
+  (config) => {
+    return new Promise((resolve) => {
+      requestQueue.push(async () => {
+        resolve(config);
+      });
+      processRequestQueue();
+    });
+  },
+  (error) => Promise.reject(error)
+);
+
 // Interceptor para tratar erros de autenticação globalmente
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    // Tratar erro específico do ngrok
+    if (error.response?.status === 403 && 
+        error.response?.data?.includes?.('ERR_NGROK_734')) {
+      console.warn('🚫 [AUTH] Limite do ngrok excedido. Aguardando...');
+      // Retry após 60 segundos
+      setTimeout(() => {
+        console.log('🔄 [AUTH] Tentando novamente após limite do ngrok...');
+      }, 60000);
+    } else if (error.response?.status === 401 || error.response?.status === 403) {
       console.warn('🔒 [AUTH] Token inválido ou expirado, fazendo logout...');
       // Não fazer logout automático aqui para evitar loops
       // O componente pode decidir quando fazer logout
@@ -148,6 +213,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Tratar erros específicos de autenticação
       if (error.response?.status === 403) {
+        // Verificar se é erro do ngrok
+        if (error.response?.data?.includes?.('ERR_NGROK_734')) {
+          throw new Error('Limite de requisições excedido. Aguarde 1 minuto e tente novamente.');
+        }
         throw new Error('Acesso negado. Verifique suas credenciais.');
       } else if (error.response?.status === 401) {
         throw new Error('Credenciais inválidas.');
@@ -193,6 +262,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Tratar erros específicos de registro
       if (error.response?.status === 403) {
+        // Verificar se é erro do ngrok
+        if (error.response?.data?.includes?.('ERR_NGROK_734')) {
+          throw new Error('Limite de requisições excedido. Aguarde 1 minuto e tente novamente.');
+        }
         throw new Error('Acesso negado. Verifique suas permissões.');
       } else if (error.response?.status === 401) {
         throw new Error('Não autorizado para criar conta.');
