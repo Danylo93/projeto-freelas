@@ -165,6 +165,38 @@ class ProviderStatusUpdate(BaseModel):
     status: ServiceStatus
 
 # Helper functions
+def normalize_user_type(user_type_value: Any) -> Optional[UserType]:
+    """Normalize user type values that may arrive as enums, ints or strings."""
+    if isinstance(user_type_value, UserType):
+        return user_type_value
+
+    if isinstance(user_type_value, (int, float)):
+        try:
+            return UserType(int(user_type_value))
+        except ValueError:
+            return None
+
+    if isinstance(user_type_value, str):
+        raw = user_type_value.strip().lower()
+        if raw.isdigit():
+            try:
+                return UserType(int(raw))
+            except ValueError:
+                return None
+
+        aliases = {
+            "cliente": UserType.CLIENTE,
+            "client": UserType.CLIENTE,
+            "customer": UserType.CLIENTE,
+            "prestador": UserType.PRESTADOR,
+            "provider": UserType.PRESTADOR,
+            "freelancer": UserType.PRESTADOR,
+        }
+        return aliases.get(raw)
+
+    return None
+
+
 def get_password_hash(password):
     return pwd_context.hash(password)
 
@@ -330,8 +362,15 @@ async def get_providers(
 ):
     is_requesting_own_profile = user_id is not None and user_id == current_user.id
 
-    if not is_requesting_own_profile and current_user.user_type != UserType.CLIENTE:
-        raise HTTPException(status_code=403, detail="Only clients can view providers")
+    if not is_requesting_own_profile:
+        normalized_type = normalize_user_type(current_user.user_type)
+        if normalized_type != UserType.CLIENTE:
+            detail = (
+                "Unable to determine user permissions to list providers"
+                if normalized_type is None
+                else "Only clients can view providers"
+            )
+            raise HTTPException(status_code=403, detail=detail)
 
     query: Dict[str, Any] = {}
     if user_id:
