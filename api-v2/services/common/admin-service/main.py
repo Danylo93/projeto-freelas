@@ -8,9 +8,11 @@ from dotenv import load_dotenv
 
 # Garante que os módulos compartilhados sejam encontrados sem PYTHONPATH manual.
 BASE_DIR = Path(__file__).resolve().parent
-COMMON_DIR = BASE_DIR.parent / "common"
-if str(COMMON_DIR) not in sys.path:
-    sys.path.insert(0, str(COMMON_DIR))
+
+SERVICE_ROOT = BASE_DIR.parent
+if str(SERVICE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SERVICE_ROOT))
+
 
 from common.rbac import require_roles
 

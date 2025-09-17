@@ -1,10 +1,17 @@
-import os
+import os, sys
 from fastapi import FastAPI, HTTPException, Header, Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import stripe
 from typing import Optional
 from aiokafka import AIOKafkaProducer
+from pathlib import Path
+
+# Permite acessar o pacote compartilhado "common" ao rodar localmente ou no container.
+BASE_DIR = Path(__file__).resolve().parent
+SERVICE_ROOT = BASE_DIR.parent
+if str(SERVICE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SERVICE_ROOT))
 
 from common.events import TOPIC_REQ_LIFECYCLE
 from common.kafka import make_producer

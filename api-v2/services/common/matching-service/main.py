@@ -8,11 +8,13 @@ from dotenv import load_dotenv
 
 # Permite executar o serviço sem precisar exportar PYTHONPATH manualmente.
 BASE_DIR = Path(__file__).resolve().parent
-COMMON_DIR = BASE_DIR.parent / "common"
-if str(COMMON_DIR) not in sys.path:
-    sys.path.insert(0, str(COMMON_DIR))
 
-from common.kafka import make_consumer, make_producer
+SERVICE_ROOT = BASE_DIR.parent
+if str(SERVICE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SERVICE_ROOT))
+
+from common.kafka import make_consumer_with_retry, make_producer
+
 from common.events import TOPIC_REQ_LIFECYCLE, EV_REQUEST_OFFERED
 
 load_dotenv()
@@ -87,8 +89,10 @@ async def consume():
 @app.on_event("startup")
 async def start():
     global consumer, producer
-    consumer = make_consumer(REQ_TOPIC, group_id="matching-service")
-    await consumer.start()
+    consumer = await make_consumer_with_retry(
+        REQ_TOPIC,
+        group_id="matching-service",
+    )
     producer = await make_producer()
     asyncio.create_task(consume())
 
