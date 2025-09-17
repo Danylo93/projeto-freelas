@@ -4,7 +4,7 @@
     "slug": "servico-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -24,12 +24,26 @@
         "NSLocationWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar prestadores próximos.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar prestadores próximos.",
         "NSCameraUsageDescription": "Este app precisa da câmera para validar serviços concluídos.",
-        "NSPhotoLibraryUsageDescription": "Este app precisa acessar suas fotos para validar serviços concluídos."
+        "NSPhotoLibraryUsageDescription": "Este app precisa acessar suas fotos para validar serviços concluídos.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true,
+          "NSExceptionDomains": {
+            "localhost": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            },
+            "127.0.0.1": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            }
+          }
+        }
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -40,6 +54,7 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO"
       ],
+      "usesCleartextTraffic": true,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY"

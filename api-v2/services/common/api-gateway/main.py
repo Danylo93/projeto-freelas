@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import httpx
@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import asyncio
 from typing import Optional
 import socketio
+from websocket_handler import websocket_endpoint
 
 load_dotenv()
 
@@ -53,6 +54,17 @@ async def shutdown():
 async def health():
     """Health check do gateway"""
     return {"status": "ok", "service": "api-gateway"}
+
+@app.websocket("/ws")
+async def websocket_route(websocket: WebSocket, user_id: str = None, user_type: int = None, token: str = None):
+    """Endpoint WebSocket para comunicação em tempo real"""
+    # Extrair parâmetros da query string
+    query_params = websocket.query_params
+    user_id = query_params.get("user_id") or user_id
+    user_type = int(query_params.get("user_type", 0)) or user_type
+    token = query_params.get("token") or token
+    
+    await websocket_endpoint(websocket, user_id, user_type, token)
 
 @app.get("/api/health")
 async def api_health():

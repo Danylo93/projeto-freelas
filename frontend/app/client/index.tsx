@@ -21,7 +21,7 @@ import axios, { isAxiosError } from 'axios';
 import CustomMapView, { LatLng } from '@/components/CustomMapView';
 import { usePayment } from '@/contexts/PaymentContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { useSocket } from '../../contexts/SocketContext';
+import { useRealtime } from '../../contexts/RealtimeContext';
 import { PROVIDERS_API_URL, REQUESTS_API_URL } from '@/utils/config';
 import { haversineDistance } from '@/utils/geo';
 
@@ -155,9 +155,9 @@ const getStatusCopy = (status: string, providerName?: string | null) => {
 };
 
 export default function ClientScreen() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, getAuthHeaders } = useAuth();
   const { startPayment } = usePayment();
-  const { socket, isConnected } = useSocket();
+  const { isConnected, sendMessage, joinRoom, leaveRoom } = useRealtime();
 
   const [providers, setProviders] = useState<NormalizedProvider[]>([]);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
@@ -165,6 +165,7 @@ export default function ClientScreen() {
 
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
 
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -198,9 +199,6 @@ export default function ClientScreen() {
     currentRequestRef.current = currentRequest;
   }, [currentRequest]);
 
-  const getAuthHeaders = useCallback(() => {
-    return token ? { Authorization: `Bearer ${token}` } : undefined;
-  }, [token]);
 
   const fetchCurrentLocation = useCallback(async (): Promise<LatLng | null> => {
     try {
@@ -329,9 +327,10 @@ export default function ClientScreen() {
       if (!REQUESTS_API_URL) {
         return;
       }
+      // Aumentar intervalo para reduzir requisições
       requestPollRef.current = setInterval(() => {
         refreshCurrentRequest(requestId);
-      }, 5000) as any;
+      }, 10000) as any; // 10 segundos em vez de 5
     },
     [refreshCurrentRequest, stopRequestPolling]
   );
@@ -347,7 +346,14 @@ export default function ClientScreen() {
       return;
     }
 
+    // Evitar múltiplas requisições simultâneas
+    if (isRequesting) {
+      console.log('⏳ [CLIENT] Requisição já em andamento, ignorando...');
+      return;
+    }
+
     try {
+      setIsRequesting(true);
       setLoadingProviders(true);
       const response = await axios.get(PROVIDERS_API_URL, {
         headers: getAuthHeaders(),
@@ -369,13 +375,28 @@ export default function ClientScreen() {
           setAssignedProvider(match);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar prestadores:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os prestadores');
+      
+      // Tratar erros específicos
+      if (error.response?.status === 403) {
+        Alert.alert('Acesso Negado', 'Você não tem permissão para acessar os prestadores. Faça login novamente.');
+        logout();
+        return;
+      } else if (error.response?.status === 401) {
+        Alert.alert('Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+        logout();
+        return;
+      }
+      
+      // Não exibir alerta para outros erros para permitir que a tela carregue
+      setProviders([]);
+      setAvailableCategories([]);
     } finally {
       setLoadingProviders(false);
+      setIsRequesting(false);
     }
-  }, [getAuthHeaders]);
+  }, [getAuthHeaders, isRequesting]);
 
   const loadActiveRequest = useCallback(async () => {
     if (!REQUESTS_API_URL || !user) {
@@ -414,8 +435,19 @@ export default function ClientScreen() {
       }
 
       startRequestPolling(latest.id);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar solicitações ativas:', error);
+      
+      // Tratar erros específicos
+      if (error.response?.status === 403) {
+        Alert.alert('Acesso Negado', 'Você não tem permissão para acessar as solicitações. Faça login novamente.');
+        logout();
+        return;
+      } else if (error.response?.status === 401) {
+        Alert.alert('Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+        logout();
+        return;
+      }
     }
   }, [getAuthHeaders, providers, startRequestPolling, stopRequestPolling, syncAssignedProvider, user]);
 
@@ -505,43 +537,18 @@ export default function ClientScreen() {
     []
   );
 
-  const setupSocketListeners = useCallback(() => {
-    if (!socket) {
-      return undefined;
-    }
-
-    const lifecycleEvents = [
-      'request_offered',
-      'request.offered',
-      'request_accepted',
-      'request.accepted',
-      'request_status_changed',
-      'request.status_changed',
-      'status_updated',
-      'request.lifecycle',
-      'request_cancelled',
-      'request.cancelled',
-      'request_completed',
-      'request.completed',
-    ];
-
-    const locationEvents = ['provider_location_update', 'provider.location'];
-
-    lifecycleEvents.forEach((event) => socket.on(event, handleLifecycleEvent));
-    locationEvents.forEach((event) => socket.on(event, handleProviderLocationUpdate));
-
-    return () => {
-      lifecycleEvents.forEach((event) => socket.off(event, handleLifecycleEvent));
-      locationEvents.forEach((event) => socket.off(event, handleProviderLocationUpdate));
-    };
-  }, [handleLifecycleEvent, handleProviderLocationUpdate, socket]);
+  const setupRealtimeListeners = useCallback(() => {
+    // Os listeners são configurados automaticamente no RealtimeContext
+    // Não precisamos configurar manualmente aqui
+    return undefined;
+  }, []);
 
   useEffect(() => {
-    const cleanup = setupSocketListeners();
+    const cleanup = setupRealtimeListeners();
     return () => {
       cleanup?.();
     };
-  }, [setupSocketListeners]);
+  }, [setupRealtimeListeners]);
 
   const handleRequestService = async () => {
     if (!user) {

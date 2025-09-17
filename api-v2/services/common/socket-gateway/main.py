@@ -12,7 +12,7 @@ from common.events import (
     TOPIC_REQ_LIFECYCLE,
     EV_PROVIDER_LOCATION,
 )
-from common.kafka import make_consumer
+from common.kafka import make_consumer_with_retry
 
 load_dotenv()
 
@@ -224,10 +224,14 @@ async def consume_and_emit(consumer, event_name):
 @app.on_event("startup")
 async def start_ws():
     global consumer_locations, consumer_lifecycle
-    consumer_locations = make_consumer(TOPIC_PROV_LOCATION, group_id="socket-gateway")
-    consumer_lifecycle = make_consumer(TOPIC_REQ_LIFECYCLE, group_id="socket-gateway")
-    await consumer_locations.start()
-    await consumer_lifecycle.start()
+    consumer_locations = await make_consumer_with_retry(
+        TOPIC_PROV_LOCATION,
+        group_id="socket-gateway",
+    )
+    consumer_lifecycle = await make_consumer_with_retry(
+        TOPIC_REQ_LIFECYCLE,
+        group_id="socket-gateway",
+    )
     asyncio.create_task(consume_and_emit(consumer_locations, 'location_updated'))
     asyncio.create_task(consume_and_emit(consumer_lifecycle, 'lifecycle'))
 

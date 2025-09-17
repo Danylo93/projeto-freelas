@@ -43,3 +43,29 @@ def make_consumer(topic: str, group_id: str) -> AIOKafkaConsumer:
         value_deserializer=lambda v: json.loads(v.decode()),
         auto_offset_reset="latest"
     )
+
+
+async def make_consumer_with_retry(
+    topic: str,
+    group_id: str,
+    max_attempts: int = 5,
+    backoff: float = 1.5,
+) -> AIOKafkaConsumer:
+    attempt = 0
+    last_error: Exception | None = None
+
+    while attempt < max_attempts:
+        consumer = make_consumer(topic, group_id)
+        try:
+            await consumer.start()
+            return consumer
+        except Exception as exc:  # pragma: no cover - defensive guard
+            last_error = exc
+            try:
+                await consumer.stop()
+            finally:
+                await asyncio.sleep(backoff * (attempt + 1))
+        attempt += 1
+
+    assert last_error is not None
+    raise last_error

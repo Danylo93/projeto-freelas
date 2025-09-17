@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 
-const gateway = 'https://b34b1c97cd37.ngrok-free.app'
+const gateway = 'https://eedfd16e8f89.ngrok-free.app'
 
 interface Category {
   id: string

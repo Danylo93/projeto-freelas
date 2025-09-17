@@ -19,6 +19,7 @@ export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
   const [isProvider, setIsProvider] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -67,7 +68,27 @@ export default function AuthScreen() {
       }
       // Remover router.replace('/') pois o redirecionamento é automático
     } catch (error: any) {
-      Alert.alert('Erro', error.message || 'Erro ao processar solicitação');
+      console.error('Erro na autenticação:', error.message);
+      
+      // Se for erro de limite do ngrok, mostrar opção de retry
+      if (error.message?.includes('Limite de requisições excedido')) {
+        Alert.alert(
+          'Limite de Requisições',
+          'O ngrok atingiu o limite de requisições. Aguarde 1 minuto ou tente novamente.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+              text: 'Tentar Novamente', 
+              onPress: () => {
+                setRetryCount(prev => prev + 1);
+                setTimeout(() => handleSubmit(), 2000);
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Erro', error.message || 'Erro ao processar solicitação');
+      }
     } finally {
       setLoading(false);
     }
