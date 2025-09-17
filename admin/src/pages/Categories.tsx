@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 
-const gateway = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8015'
+const gateway = 'https://b34b1c97cd37.ngrok-free.app'
 
 interface Category {
   id: string

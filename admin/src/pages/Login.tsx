@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import axios from 'axios'
 
-const gateway = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8015'
+const gateway =  'https://b34b1c97cd37.ngrok-free.app'
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('admin@example.com')
