@@ -22,10 +22,10 @@ export default function RootLayout() {
                   }}
                 >
                   <Stack.Screen name="index" />
-                  <Stack.Screen name="auth" />
-                  <Stack.Screen name="client" />
-                  <Stack.Screen name="provider" />
-                  <Stack.Screen name="profile" />
+                  <Stack.Screen name="auth/index" />
+                  <Stack.Screen name="client/index" />
+                  <Stack.Screen name="provider/index" />
+                  <Stack.Screen name="profile/index" />
                 </Stack>
               </NotificationsProvider>
             </PaymentProvider>

@@ -58,6 +58,12 @@ async def health():
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket, user_id: str = None, user_type: int = None, token: str = None):
     """Endpoint WebSocket para comunicação em tempo real"""
+    # Extrair parâmetros da query string
+    query_params = websocket.query_params
+    user_id = query_params.get("user_id") or user_id
+    user_type = int(query_params.get("user_type", 0)) or user_type
+    token = query_params.get("token") or token
+    
     await websocket_endpoint(websocket, user_id, user_type, token)
 
 @app.get("/api/health")

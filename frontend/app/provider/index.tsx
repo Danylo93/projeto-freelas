@@ -485,49 +485,11 @@ export default function ProviderScreen() {
     [token, updateStatusMessage]
   );
 
-  const setupSocketListeners = useCallback(() => {
-    if (!socket) {
-      return undefined;
-    }
-
-    const handleNewRequest = (data: any) => {
-      const profile = providerProfileRef.current;
-      if (profile && data?.provider_id && data.provider_id !== profile.id) {
-        return;
-      }
-      loadRequests(profile ?? undefined);
-      const clientLabel = data?.client_name ?? data?.client_id ?? 'Cliente';
-      Alert.alert(
-        '🔔 Nova Solicitação!',
-        `Cliente: ${clientLabel}\nServiço: ${data?.category ?? 'n/d'}\nValor: R$ ${data?.price ?? 'n/d'}`,
-        [{ text: 'OK' }]
-      );
-    };
-
-    const handleRequestCancelled = (data: any) => {
-      const profile = providerProfileRef.current;
-      if (profile && data?.provider_id && data.provider_id !== profile.id) {
-        return;
-      }
-      loadRequests(profile ?? undefined);
-      const currentActive = activeRequestRef.current;
-      if (currentActive && data?.request_id && currentActive.id === data.request_id) {
-        setActiveRequest(null);
-        setShowMap(false);
-        Alert.alert('Solicitação Cancelada', 'O cliente cancelou a solicitação.');
-      }
-    };
-
-    socket.off('new_request', handleNewRequest);
-    socket.off('request_cancelled', handleRequestCancelled);
-    socket.on('new_request', handleNewRequest);
-    socket.on('request_cancelled', handleRequestCancelled);
-
-    return () => {
-      socket.off('new_request', handleNewRequest);
-      socket.off('request_cancelled', handleRequestCancelled);
-    };
-  }, [loadRequests, socket]);
+  const setupRealtimeListeners = useCallback(() => {
+    // Os listeners são configurados automaticamente no RealtimeContext
+    // Não precisamos configurar manualmente aqui
+    return undefined;
+  }, []);
 
   useEffect(() => {
     Animated.parallel([
@@ -553,11 +515,11 @@ export default function ProviderScreen() {
   }, [getCurrentLocation, loadRequests, providerProfile]);
 
   useEffect(() => {
-    const cleanup = setupSocketListeners();
+    const cleanup = setupRealtimeListeners();
     return () => {
       cleanup?.();
     };
-  }, [setupSocketListeners]);
+  }, [setupRealtimeListeners]);
 
   useEffect(() => {
     return () => {

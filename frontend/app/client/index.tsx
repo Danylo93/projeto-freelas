@@ -537,43 +537,18 @@ export default function ClientScreen() {
     []
   );
 
-  const setupSocketListeners = useCallback(() => {
-    if (!socket) {
-      return undefined;
-    }
-
-    const lifecycleEvents = [
-      'request_offered',
-      'request.offered',
-      'request_accepted',
-      'request.accepted',
-      'request_status_changed',
-      'request.status_changed',
-      'status_updated',
-      'request.lifecycle',
-      'request_cancelled',
-      'request.cancelled',
-      'request_completed',
-      'request.completed',
-    ];
-
-    const locationEvents = ['provider_location_update', 'provider.location'];
-
-    lifecycleEvents.forEach((event) => socket.on(event, handleLifecycleEvent));
-    locationEvents.forEach((event) => socket.on(event, handleProviderLocationUpdate));
-
-    return () => {
-      lifecycleEvents.forEach((event) => socket.off(event, handleLifecycleEvent));
-      locationEvents.forEach((event) => socket.off(event, handleProviderLocationUpdate));
-    };
-  }, [handleLifecycleEvent, handleProviderLocationUpdate, socket]);
+  const setupRealtimeListeners = useCallback(() => {
+    // Os listeners são configurados automaticamente no RealtimeContext
+    // Não precisamos configurar manualmente aqui
+    return undefined;
+  }, []);
 
   useEffect(() => {
-    const cleanup = setupSocketListeners();
+    const cleanup = setupRealtimeListeners();
     return () => {
       cleanup?.();
     };
-  }, [setupSocketListeners]);
+  }, [setupRealtimeListeners]);
 
   const handleRequestService = async () => {
     if (!user) {

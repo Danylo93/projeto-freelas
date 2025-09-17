@@ -106,10 +106,19 @@ export const PushNotificationProvider: React.FC<{ children: React.ReactNode }> =
 
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+        // Usar a API correta do Expo
+        try {
+          Notifications.removeNotificationSubscription(notificationListener.current);
+        } catch (error) {
+          console.warn('⚠️ [PUSH] Erro ao remover listener de notificação:', error);
+        }
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+        try {
+          Notifications.removeNotificationSubscription(responseListener.current);
+        } catch (error) {
+          console.warn('⚠️ [PUSH] Erro ao remover listener de resposta:', error);
+        }
       }
     };
   }, []);
