@@ -184,6 +184,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
             secure: socketUrl.startsWith('https://'),
+            rejectUnauthorized: false, // Para ngrok
+            autoConnect: true,
           });
 
           activeSocket = createdSocket;

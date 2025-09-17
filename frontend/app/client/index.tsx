@@ -331,7 +331,7 @@ export default function ClientScreen() {
       }
       requestPollRef.current = setInterval(() => {
         refreshCurrentRequest(requestId);
-      }, 5000);
+      }, 5000) as any;
     },
     [refreshCurrentRequest, stopRequestPolling]
   );
@@ -801,29 +801,34 @@ export default function ClientScreen() {
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}> 
-      <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
 
+      {/* Header estilo Uber */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Olá, {user?.name}! 👋</Text>
-          <Text style={styles.subtitle}>Solicite o serviço que precisa e acompanhe em tempo real</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <View style={styles.socketStatus}>
-            <View style={[styles.socketIndicator, { backgroundColor: isConnected ? '#4CAF50' : '#f44336' }]} />
-            <Text style={styles.socketText}>{isConnected ? 'Conectado' : 'Desconectado'}</Text>
+        <View style={styles.headerTop}>
+          <View style={styles.userInfo}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'U'}</Text>
+            </View>
+            <View style={styles.userDetails}>
+              <Text style={styles.greeting}>Olá, {user?.name}! 👋</Text>
+              <Text style={styles.subtitle}>Onde você precisa de ajuda?</Text>
+            </View>
           </View>
-          <TouchableOpacity
-            style={[styles.newRequestButton, hasActiveRequest && styles.newRequestButtonDisabled]}
-            onPress={() => setShowRequestModal(true)}
-            disabled={hasActiveRequest}
-          >
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.newRequestButtonText}>Nova solicitação</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-            <Ionicons name="log-out-outline" size={24} color="#fff" />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.notificationButton}>
+              <Ionicons name="notifications-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuButton} onPress={logout}>
+              <Ionicons name="menu" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Status de conexão discreto */}
+        <View style={styles.connectionStatus}>
+          <View style={[styles.socketIndicator, { backgroundColor: isConnected ? '#4CAF50' : '#f44336' }]} />
+          <Text style={styles.socketText}>{isConnected ? 'Online' : 'Offline'}</Text>
         </View>
       </View>
 
@@ -868,7 +873,7 @@ export default function ClientScreen() {
               <Text style={styles.trackButtonText}>Acompanhar</Text>
             </TouchableOpacity>
             {canPayNow && (
-              <TouchableOpacity style={styles.payButton} onPress={handlePayNow}>
+              <TouchableOpacity style={styles.trackButton} onPress={handlePayNow}>
                 <Ionicons name="card-outline" size={20} color="#fff" />
                 <Text style={styles.trackButtonText}>Pagar agora</Text>
               </TouchableOpacity>
@@ -877,29 +882,64 @@ export default function ClientScreen() {
         </View>
       )}
 
+      {/* Mapa principal estilo Uber */}
+      <View style={styles.mapContainer}>
+        <CustomMapView
+          style={styles.map}
+          origin={userLocation || undefined}
+          destination={undefined}
+          initialRegion={userLocation ? {
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          } : undefined}
+          showsUserLocation
+          showsMyLocationButton
+        />
+        
+        {/* Botão de localização */}
+        <TouchableOpacity style={styles.locationButton} onPress={fetchCurrentLocation}>
+          <Ionicons name="locate" size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Lista de prestadores em overlay */}
       {loadingProviders ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Carregando prestadores próximos...</Text>
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#000" />
+          <Text style={styles.loadingText}>Buscando prestadores próximos...</Text>
         </View>
       ) : (
-        <FlatList
-          data={providers}
-          keyExtractor={(item) => item.__cacheKey}
-          renderItem={renderProvider}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            providers.length > 0 ? (
-              <Text style={styles.sectionTitle}>Prestadores disponíveis na sua região</Text>
-            ) : (
-              <Text style={styles.emptyListText}>
-                Nenhum prestador disponível ainda. Continue verificando mais tarde.
-              </Text>
-            )
-          }
-        />
+        <View style={styles.providersOverlay}>
+          <View style={styles.providersHeader}>
+            <Text style={styles.sectionTitle}>
+              {providers.length > 0 ? 'Prestadores próximos' : 'Nenhum prestador disponível'}
+            </Text>
+            <TouchableOpacity style={styles.refreshButton} onPress={loadProviders}>
+              <Ionicons name="refresh" size={20} color="#000" />
+            </TouchableOpacity>
+          </View>
+          
+          <FlatList
+            data={providers.slice(0, 3)} // Mostra apenas os 3 mais próximos
+            keyExtractor={(item) => item.__cacheKey}
+            renderItem={renderProvider}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          />
+        </View>
       )}
+
+      {/* Botão de solicitação flutuante estilo Uber */}
+      <TouchableOpacity
+        style={[styles.floatingRequestButton, hasActiveRequest && styles.floatingRequestButtonDisabled]}
+        onPress={() => setShowRequestModal(true)}
+        disabled={hasActiveRequest}
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
 
       <Modal visible={showRequestModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -1034,42 +1074,168 @@ export default function ClientScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#000' },
   header: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#000',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  greeting: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
-  subtitle: { fontSize: 14, color: '#E3F2FD', marginTop: 4, maxWidth: 240 },
-  headerActions: { alignItems: 'flex-end' },
-  socketStatus: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  socketIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  socketText: { fontSize: 12, color: '#E3F2FD' },
-  newRequestButton: {
+  userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#34C759',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    flex: 1,
   },
-  newRequestButtonDisabled: { backgroundColor: '#8BC48B' },
-  newRequestButtonText: { color: '#fff', fontWeight: '600', marginLeft: 8 },
-  logoutButton: { padding: 8 },
-  listContainer: { padding: 20, paddingTop: 10, paddingBottom: 40 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1a1a1a', marginBottom: 12 },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#333',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  avatarText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  userDetails: {
+    flex: 1,
+  },
+  greeting: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  subtitle: { fontSize: 14, color: '#ccc', marginTop: 2 },
+  headerActions: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  notificationButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  menuButton: { 
+    padding: 8,
+  },
+  connectionStatus: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  socketIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  socketText: { fontSize: 12, color: '#ccc' },
+  
+  // Estilos do mapa
+  mapContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  map: {
+    flex: 1,
+  },
+  locationButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  
+  // Overlay de prestadores
+  providersOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    maxHeight: 200,
+  },
+  providersHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: '#000',
+  },
+  refreshButton: {
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+  },
+  horizontalList: {
+    paddingHorizontal: 0,
+  },
+  
+  // Botão flutuante
+  floatingRequestButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#000',
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  floatingRequestButtonDisabled: {
+    backgroundColor: '#666',
+  },
+  
+  // Loading overlay
+  loadingOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: { 
+    marginTop: 16, 
+    fontSize: 16, 
+    color: '#666',
+    textAlign: 'center',
+  },
+  
   emptyListText: { fontSize: 14, color: '#607D8B', textAlign: 'center', marginVertical: 20 },
   providerCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    marginRight: 12,
+    width: 200,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -1154,7 +1320,7 @@ const styles = StyleSheet.create({
   },
   trackButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 8 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1264,6 +1430,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   submitButtonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
+  
+  // Map view styles
   mapHeader: {
     backgroundColor: '#007AFF',
     flexDirection: 'row',
@@ -1274,8 +1442,6 @@ const styles = StyleSheet.create({
   },
   backButton: { padding: 8, marginRight: 16 },
   mapTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  menuButton: { padding: 8 },
-  map: { flex: 1 },
   statusContainer: {
     backgroundColor: '#fff',
     padding: 20,

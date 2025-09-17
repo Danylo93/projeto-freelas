@@ -116,66 +116,16 @@ export default function ProviderScreen() {
   const requestConfigAlertShown = useRef(false);
 
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
-    ]).start();
-  }, [fadeAnim, scaleAnim]);
-
-  useEffect(() => {
-    if (!user || user.user_type !== 1) {
-      setProfileLoading(false);
-      return;
-    }
-    fetchProviderProfile();
-  }, [fetchProviderProfile, user]);
-
-  useEffect(() => {
-    if (!providerProfile) {
-      return;
-    }
-    loadRequests(providerProfile);
-    getCurrentLocation(providerProfile);
-  }, [getCurrentLocation, loadRequests, providerProfile]);
-
-  useEffect(() => {
-    const cleanup = setupSocketListeners();
-    return () => {
-      cleanup?.();
-    };
-  }, [setupSocketListeners]);
-
-  useEffect(() => {
-    return () => {
-      locationWatcher.current?.remove?.();
-    };
-  }, []);
-
-  useEffect(() => {
-    providerPosRef.current = providerPos;
-  }, [providerPos]);
-
-  useEffect(() => {
-    providerProfileRef.current = providerProfile;
-  }, [providerProfile]);
-
-  useEffect(() => {
-    activeRequestRef.current = activeRequest;
-  }, [activeRequest]);
-
-  useEffect(() => {
-    if (showSetupModal) {
-      fetchSetupLocation();
-    }
-  }, [fetchSetupLocation, showSetupModal]);
-
+  // Funções definidas antes dos useEffect para evitar erros de hoisting
   const fetchProviderProfile = useCallback(async () => {
     if (!user) {
+      console.log('❌ [PROVIDER] Nenhum usuário encontrado');
       return;
     }
+    console.log('🔍 [PROVIDER] Iniciando busca do perfil para usuário:', user.id, user.name);
     setProfileLoading(true);
     if (!PROVIDERS_API_URL) {
+      console.log('❌ [PROVIDER] PROVIDERS_API_URL não configurada');
       if (!providerConfigAlertShown.current) {
         Alert.alert('Configuração necessária', PROVIDER_SERVICE_CONFIG_ERROR);
         providerConfigAlertShown.current = true;
@@ -186,11 +136,14 @@ export default function ProviderScreen() {
     }
     try {
       const url = `${PROVIDERS_API_URL}?user_id=${encodeURIComponent(user.id)}`;
+      console.log('🌐 [PROVIDER] Fazendo requisição para:', url);
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      console.log('📊 [PROVIDER] Resposta recebida:', response.data);
       const providers: ProviderProfile[] = Array.isArray(response.data) ? response.data : [];
       const profile = providers.find((prov) => prov.user_id === user.id);
+      console.log('👤 [PROVIDER] Perfil encontrado:', profile ? 'Sim' : 'Não');
 
       if (profile) {
         setProviderProfile(profile);
@@ -204,25 +157,77 @@ export default function ProviderScreen() {
         });
         setSetupLocation({ latitude: profile.latitude, longitude: profile.longitude });
       } else {
-        setProviderProfile(null);
-        setProfileError('Nenhum cadastro de prestador encontrado.');
+        // Se o usuário é prestador mas não tem perfil, criar automaticamente um perfil básico
+        console.log('👷 [PROVIDER] Usuário prestador sem perfil, criando perfil básico...');
+        const basicProfile: ProviderProfile = {
+          id: `prov-${user.id}`,
+          name: user.name || 'Prestador',
+          category: 'Serviços Gerais',
+          price: 50.0,
+          description: `Serviços de ${user.name || 'prestador'}`,
+          latitude: 0,
+          longitude: 0,
+          status: 'offline',
+          rating: 5.0,
+          user_id: user.id,
+        };
+        
+        console.log('📝 [PROVIDER] Perfil básico criado:', basicProfile);
+        setProviderProfile(basicProfile);
+        setProfileError(null);
+        hasPromptedSetup.current = false;
         setSetupForm({
-          name: user.name || '',
-          category: '',
-          price: '',
-          description: '',
+          name: basicProfile.name,
+          category: basicProfile.category,
+          price: String(basicProfile.price),
+          description: basicProfile.description || '',
         });
-        setSetupLocation(null);
-        if (!hasPromptedSetup.current) {
-          hasPromptedSetup.current = true;
-          setShowSetupModal(true);
+        setSetupLocation({ latitude: basicProfile.latitude, longitude: basicProfile.longitude });
+        
+        // Salvar o perfil básico no backend
+        try {
+          console.log('💾 [PROVIDER] Salvando perfil básico no backend...');
+          const response = await axios.post(PROVIDERS_API_URL, basicProfile, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const savedProfile = response.data || basicProfile;
+          console.log('✅ [PROVIDER] Perfil básico salvo no backend:', savedProfile);
+          setProviderProfile(savedProfile);
+          console.log('✅ [PROVIDER] Perfil básico criado automaticamente');
+          
+          // Tentar obter localização atual e atualizar o perfil
+          try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+              const current = await Location.getCurrentPositionAsync({});
+              const coords = {
+                latitude: current.coords.latitude,
+                longitude: current.coords.longitude,
+              };
+              
+              await axios.put(
+                `${PROVIDERS_API_URL}/${savedProfile.id}/location`,
+                coords,
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              
+              setProviderProfile(prev => prev ? { ...prev, ...coords } : prev);
+              setSetupLocation(coords);
+              console.log('📍 [PROVIDER] Localização atualizada automaticamente');
+            }
+          } catch (locationError) {
+            console.warn('⚠️ [PROVIDER] Erro ao obter localização:', locationError);
+          }
+        } catch (error) {
+          console.warn('⚠️ [PROVIDER] Erro ao salvar perfil básico:', error);
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar perfil do prestador:', error);
+      console.error('❌ [PROVIDER] Erro ao carregar perfil do prestador:', error);
       setProfileError('Não foi possível carregar os dados do prestador.');
       Alert.alert('Erro', 'Não foi possível carregar os dados do prestador.');
     } finally {
+      console.log('🏁 [PROVIDER] Finalizando carregamento do perfil');
       setProfileLoading(false);
     }
   }, [token, user]);
@@ -244,7 +249,6 @@ export default function ProviderScreen() {
     }
   }, []);
 
-  // ===== localização do prestador: pega atual, envia pro backend e mantém watcher (move o carro)
   const getCurrentLocation = useCallback(
     async (profile: ProviderProfile) => {
       if (!PROVIDERS_API_URL) {
@@ -345,6 +349,212 @@ export default function ProviderScreen() {
     },
     [token]
   );
+
+  const updateStatusMessage = useCallback((status: string) => {
+    switch (status) {
+      case 'offered':
+        setStatusMessage('📬 Solicitação disponível para aceite');
+        break;
+      case 'pending':
+        setStatusMessage('⏳ Aguardando confirmação');
+        break;
+      case 'accepted':
+        setStatusMessage('📍 Dirija-se ao cliente');
+        break;
+      case 'in_progress':
+        setStatusMessage('🚗 A caminho do cliente');
+        break;
+      case 'near_client':
+        setStatusMessage('📍 Você chegou! Clique para iniciar o serviço');
+        break;
+      case 'started':
+        setStatusMessage('🔧 Serviço em andamento');
+        break;
+      default:
+        setStatusMessage('');
+        break;
+    }
+  }, []);
+
+  const loadRequests = useCallback(
+    async (profileOverride?: ProviderProfile) => {
+      const currentProfile = profileOverride ?? providerProfileRef.current;
+      if (!currentProfile) {
+        return;
+      }
+
+      if (!REQUESTS_API_URL) {
+        if (!requestConfigAlertShown.current) {
+          Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
+          requestConfigAlertShown.current = true;
+        }
+        setLoading(false);
+        setRequests([]);
+        setActiveRequest(null);
+        setStatusMessage('');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await axios.get(REQUESTS_API_URL, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const allRequests: RawServiceRequest[] = response.data;
+        const targeted = allRequests.filter((req) => req.provider_id === currentProfile.id);
+
+        const baseLat = providerPosRef.current?.latitude ?? currentProfile.latitude;
+        const baseLon = providerPosRef.current?.longitude ?? currentProfile.longitude;
+
+        const pendingRequests = targeted
+          .filter((req) => OFFER_STATUSES.includes(req.status))
+          .map((req) => ({
+            ...req,
+            distance:
+              baseLat != null && baseLon != null
+                ? haversineDistance(baseLat, baseLon, req.client_latitude, req.client_longitude)
+                : undefined,
+          }));
+
+        const activeReq = targeted.find((req) => ACTIVE_STATUSES.includes(req.status));
+
+        setRequests(pendingRequests);
+
+        let shouldCloseModal = false;
+        setSelectedRequest((prevSelected) => {
+          if (prevSelected && !pendingRequests.some((req) => req.id === prevSelected.id)) {
+            shouldCloseModal = true;
+            return null;
+          }
+          return prevSelected;
+        });
+        if (shouldCloseModal) {
+          setShowModal(false);
+        }
+
+        if (activeReq) {
+          const activeWithDistance: ServiceRequest = {
+            ...activeReq,
+            distance:
+              baseLat != null && baseLon != null
+                ? haversineDistance(baseLat, baseLon, activeReq.client_latitude, activeReq.client_longitude)
+                : undefined,
+          };
+          setActiveRequest(activeWithDistance);
+          updateStatusMessage(activeReq.status);
+        } else {
+          setActiveRequest(null);
+          setStatusMessage('');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar solicitações:', error);
+        Alert.alert('Erro', 'Não foi possível carregar as solicitações');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, updateStatusMessage]
+  );
+
+  const setupSocketListeners = useCallback(() => {
+    if (!socket) {
+      return undefined;
+    }
+
+    const handleNewRequest = (data: any) => {
+      const profile = providerProfileRef.current;
+      if (profile && data?.provider_id && data.provider_id !== profile.id) {
+        return;
+      }
+      loadRequests(profile ?? undefined);
+      const clientLabel = data?.client_name ?? data?.client_id ?? 'Cliente';
+      Alert.alert(
+        '🔔 Nova Solicitação!',
+        `Cliente: ${clientLabel}\nServiço: ${data?.category ?? 'n/d'}\nValor: R$ ${data?.price ?? 'n/d'}`,
+        [{ text: 'OK' }]
+      );
+    };
+
+    const handleRequestCancelled = (data: any) => {
+      const profile = providerProfileRef.current;
+      if (profile && data?.provider_id && data.provider_id !== profile.id) {
+        return;
+      }
+      loadRequests(profile ?? undefined);
+      const currentActive = activeRequestRef.current;
+      if (currentActive && data?.request_id && currentActive.id === data.request_id) {
+        setActiveRequest(null);
+        setShowMap(false);
+        Alert.alert('Solicitação Cancelada', 'O cliente cancelou a solicitação.');
+      }
+    };
+
+    socket.off('new_request', handleNewRequest);
+    socket.off('request_cancelled', handleRequestCancelled);
+    socket.on('new_request', handleNewRequest);
+    socket.on('request_cancelled', handleRequestCancelled);
+
+    return () => {
+      socket.off('new_request', handleNewRequest);
+      socket.off('request_cancelled', handleRequestCancelled);
+    };
+  }, [loadRequests, socket]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
+    ]).start();
+  }, [fadeAnim, scaleAnim]);
+
+  useEffect(() => {
+    if (!user || user.user_type !== 1) {
+      setProfileLoading(false);
+      return;
+    }
+    fetchProviderProfile();
+  }, [fetchProviderProfile, user]);
+
+  useEffect(() => {
+    if (!providerProfile) {
+      return;
+    }
+    loadRequests(providerProfile);
+    getCurrentLocation(providerProfile);
+  }, [getCurrentLocation, loadRequests, providerProfile]);
+
+  useEffect(() => {
+    const cleanup = setupSocketListeners();
+    return () => {
+      cleanup?.();
+    };
+  }, [setupSocketListeners]);
+
+  useEffect(() => {
+    return () => {
+      locationWatcher.current?.remove?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    providerPosRef.current = providerPos;
+  }, [providerPos]);
+
+  useEffect(() => {
+    providerProfileRef.current = providerProfile;
+  }, [providerProfile]);
+
+  useEffect(() => {
+    activeRequestRef.current = activeRequest;
+  }, [activeRequest]);
+
+  useEffect(() => {
+    if (showSetupModal) {
+      fetchSetupLocation();
+    }
+  }, [fetchSetupLocation, showSetupModal]);
+
 
   const handleOpenSetupModal = useCallback(() => {
     const profile = providerProfileRef.current;
@@ -449,158 +659,6 @@ export default function ProviderScreen() {
       setSetupLoading(false);
     }
   }, [fetchSetupLocation, loadRequests, providerConfigAlertShown, setupForm, setupLocation, token, user]);
-
-  // ===== sockets (notificações de novas solicitações/cancelamentos)
-  const setupSocketListeners = useCallback(() => {
-    if (!socket) {
-      return undefined;
-    }
-
-    const handleNewRequest = (data: any) => {
-      const profile = providerProfileRef.current;
-      if (profile && data?.provider_id && data.provider_id !== profile.id) {
-        return;
-      }
-      loadRequests(profile ?? undefined);
-      const clientLabel = data?.client_name ?? data?.client_id ?? 'Cliente';
-      Alert.alert(
-        '🔔 Nova Solicitação!',
-        `Cliente: ${clientLabel}\nServiço: ${data?.category ?? 'n/d'}\nValor: R$ ${data?.price ?? 'n/d'}`,
-        [{ text: 'OK' }]
-      );
-    };
-
-    const handleRequestCancelled = (data: any) => {
-      const profile = providerProfileRef.current;
-      if (profile && data?.provider_id && data.provider_id !== profile.id) {
-        return;
-      }
-      loadRequests(profile ?? undefined);
-      const currentActive = activeRequestRef.current;
-      if (currentActive && data?.request_id && currentActive.id === data.request_id) {
-        setActiveRequest(null);
-        setShowMap(false);
-        Alert.alert('Solicitação Cancelada', 'O cliente cancelou a solicitação.');
-      }
-    };
-
-    socket.off('new_request', handleNewRequest);
-    socket.off('request_cancelled', handleRequestCancelled);
-    socket.on('new_request', handleNewRequest);
-    socket.on('request_cancelled', handleRequestCancelled);
-
-    return () => {
-      socket.off('new_request', handleNewRequest);
-      socket.off('request_cancelled', handleRequestCancelled);
-    };
-  }, [loadRequests, socket]);
-
-  const loadRequests = useCallback(
-    async (profileOverride?: ProviderProfile) => {
-      const currentProfile = profileOverride ?? providerProfileRef.current;
-      if (!currentProfile) {
-        return;
-      }
-
-      if (!REQUESTS_API_URL) {
-        if (!requestConfigAlertShown.current) {
-          Alert.alert('Configuração necessária', REQUEST_SERVICE_CONFIG_ERROR);
-          requestConfigAlertShown.current = true;
-        }
-        setLoading(false);
-        setRequests([]);
-        setActiveRequest(null);
-        setStatusMessage('');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const response = await axios.get(REQUESTS_API_URL, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const allRequests: RawServiceRequest[] = response.data;
-        const targeted = allRequests.filter((req) => req.provider_id === currentProfile.id);
-
-        const baseLat = providerPosRef.current?.latitude ?? currentProfile.latitude;
-        const baseLon = providerPosRef.current?.longitude ?? currentProfile.longitude;
-
-        const pendingRequests = targeted
-          .filter((req) => OFFER_STATUSES.includes(req.status))
-          .map((req) => ({
-            ...req,
-            distance:
-              baseLat != null && baseLon != null
-                ? haversineDistance(baseLat, baseLon, req.client_latitude, req.client_longitude)
-                : undefined,
-          }));
-
-        const activeReq = targeted.find((req) => ACTIVE_STATUSES.includes(req.status));
-
-        setRequests(pendingRequests);
-
-        let shouldCloseModal = false;
-        setSelectedRequest((prevSelected) => {
-          if (prevSelected && !pendingRequests.some((req) => req.id === prevSelected.id)) {
-            shouldCloseModal = true;
-            return null;
-          }
-          return prevSelected;
-        });
-        if (shouldCloseModal) {
-          setShowModal(false);
-        }
-
-        if (activeReq) {
-          const activeWithDistance: ServiceRequest = {
-            ...activeReq,
-            distance:
-              baseLat != null && baseLon != null
-                ? haversineDistance(baseLat, baseLon, activeReq.client_latitude, activeReq.client_longitude)
-                : undefined,
-          };
-          setActiveRequest(activeWithDistance);
-          updateStatusMessage(activeReq.status);
-        } else {
-          setActiveRequest(null);
-          setStatusMessage('');
-        }
-      } catch (error) {
-        console.error('Erro ao carregar solicitações:', error);
-        Alert.alert('Erro', 'Não foi possível carregar as solicitações');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [token, updateStatusMessage]
-  );
-
-  const updateStatusMessage = useCallback((status: string) => {
-    switch (status) {
-      case 'offered':
-        setStatusMessage('📬 Solicitação disponível para aceite');
-        break;
-      case 'pending':
-        setStatusMessage('⏳ Aguardando confirmação');
-        break;
-      case 'accepted':
-        setStatusMessage('📍 Dirija-se ao cliente');
-        break;
-      case 'in_progress':
-        setStatusMessage('🚗 A caminho do cliente');
-        break;
-      case 'near_client':
-        setStatusMessage('📍 Você chegou! Clique para iniciar o serviço');
-        break;
-      case 'started':
-        setStatusMessage('🔧 Serviço em andamento');
-        break;
-      default:
-        setStatusMessage('');
-        break;
-    }
-  }, []);
 
   const updateProviderStatus = useCallback(
     async (status: string) => {
@@ -741,14 +799,10 @@ export default function ProviderScreen() {
         <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
         <View style={styles.emptyContainer}>
           <Ionicons name="construct-outline" size={60} color="#ccc" />
-          <Text style={styles.emptyTitle}>Cadastre seu perfil de prestador</Text>
+          <Text style={styles.emptyTitle}>Carregando perfil...</Text>
           <Text style={styles.emptySubtitle}>
-            {profileError || 'Finalize o cadastro de prestador para receber solicitações.'}
+            {profileError || 'Aguarde enquanto carregamos seus dados.'}
           </Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleOpenSetupModal}>
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.primaryButtonText}>Criar perfil de serviço</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.trackButton} onPress={fetchProviderProfile}>
             <Ionicons name="refresh" size={20} color="#fff" />
             <Text style={styles.trackButtonText}>Tentar novamente</Text>
@@ -892,54 +946,69 @@ export default function ProviderScreen() {
   // ===== Lista de solicitações
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
 
+      {/* Header estilo Uber Driver */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Olá, {user?.name}! 🔧</Text>
-          <Text style={styles.subtitle}>Solicitações disponíveis</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <View style={styles.socketStatus}>
-            <View style={[styles.socketIndicator, { backgroundColor: isConnected ? '#4CAF50' : '#f44336' }]} />
-            <Text style={styles.socketText}>{isConnected ? 'Online' : 'Offline'}</Text>
+        <View style={styles.headerTop}>
+          <View style={styles.driverInfo}>
+            <View style={styles.driverAvatar}>
+              <Text style={styles.driverAvatarText}>{user?.name?.charAt(0) || 'D'}</Text>
+            </View>
+            <View style={styles.driverDetails}>
+              <Text style={styles.greeting}>Olá, {user?.name}! 🔧</Text>
+              <Text style={styles.subtitle}>Pronto para trabalhar?</Text>
+            </View>
           </View>
-          {providerProfile && (
-            <TouchableOpacity
-              style={[
-                styles.availabilityButton,
-                (statusUpdating || providerProfile.status === 'busy') && styles.availabilityButtonDisabled,
-              ]}
-              onPress={handleToggleAvailability}
-              disabled={statusUpdating || providerProfile.status === 'busy'}
-            >
-              <View
-                style={[
-                  styles.availabilityIndicator,
-                  {
-                    backgroundColor:
-                      providerProfile.status === 'available'
-                        ? '#4CAF50'
-                        : providerProfile.status === 'busy'
-                        ? '#FF9800'
-                        : '#9E9E9E',
-                  },
-                ]}
-              />
-              <Text style={styles.availabilityText}>
-                {statusUpdating
-                  ? 'Atualizando...'
-                  : providerProfile.status === 'available'
-                  ? 'Disponível'
-                  : providerProfile.status === 'busy'
-                  ? 'Em serviço'
-                  : 'Offline'}
-              </Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.notificationButton}>
+              <Ionicons name="notifications-outline" size={24} color="#fff" />
             </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-            <Ionicons name="log-out-outline" size={24} color="#fff" />
+            <TouchableOpacity style={styles.menuButton} onPress={logout}>
+              <Ionicons name="menu" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Status de disponibilidade */}
+        {providerProfile && (
+          <TouchableOpacity
+            style={[
+              styles.availabilityButton,
+              (statusUpdating || providerProfile.status === 'busy') && styles.availabilityButtonDisabled,
+            ]}
+            onPress={handleToggleAvailability}
+            disabled={statusUpdating || providerProfile.status === 'busy'}
+          >
+            <View
+              style={[
+                styles.availabilityIndicator,
+                {
+                  backgroundColor:
+                    providerProfile.status === 'available'
+                      ? '#4CAF50'
+                      : providerProfile.status === 'busy'
+                      ? '#FF9800'
+                      : '#9E9E9E',
+                },
+              ]}
+            />
+            <Text style={styles.availabilityText}>
+              {statusUpdating
+                ? 'Atualizando...'
+                : providerProfile.status === 'available'
+                ? 'Disponível para trabalhar'
+                : providerProfile.status === 'busy'
+                ? 'Em serviço'
+                : 'Offline'}
+            </Text>
           </TouchableOpacity>
+        )}
+        
+        {/* Status de conexão discreto */}
+        <View style={styles.connectionStatus}>
+          <View style={[styles.socketIndicator, { backgroundColor: isConnected ? '#4CAF50' : '#f44336' }]} />
+          <Text style={styles.socketText}>{isConnected ? 'Online' : 'Offline'}</Text>
         </View>
       </View>
 
@@ -951,26 +1020,69 @@ export default function ProviderScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Mapa principal para prestador */}
+      <View style={styles.mapContainer}>
+        <CustomMapView
+          style={styles.map}
+          origin={userLocation || undefined}
+          destination={undefined}
+          initialRegion={userLocation ? {
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          } : undefined}
+          showsUserLocation
+          showsMyLocationButton
+        />
+        
+        {/* Botão de localização */}
+        <TouchableOpacity style={styles.locationButton} onPress={() => getCurrentLocation(providerProfile!)}>
+          <Ionicons name="locate" size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Lista de solicitações em overlay */}
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Carregando solicitações...</Text>
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#000" />
+          <Text style={styles.loadingText}>Buscando solicitações...</Text>
         </View>
       ) : requests.length === 0 ? (
-        <View style={styles.emptyContainer}>
+        <View style={styles.emptyOverlay}>
           <Ionicons name="hourglass-outline" size={60} color="#ccc" />
           <Text style={styles.emptyTitle}>Nenhuma solicitação disponível</Text>
           <Text style={styles.emptySubtitle}>Aguarde novas solicitações de clientes</Text>
         </View>
       ) : (
-        <FlatList
-          data={requests}
-          keyExtractor={(item) => item.id}
-          renderItem={renderRequest}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
+        <View style={styles.requestsOverlay}>
+          <View style={styles.requestsHeader}>
+            <Text style={styles.sectionTitle}>
+              {requests.length} solicitação{requests.length !== 1 ? 'ões' : ''} disponível{requests.length !== 1 ? 'eis' : ''}
+            </Text>
+            <TouchableOpacity style={styles.refreshButton} onPress={() => loadRequests(providerProfile)}>
+              <Ionicons name="refresh" size={20} color="#000" />
+            </TouchableOpacity>
+          </View>
+          
+          <FlatList
+            data={requests}
+            keyExtractor={(item) => item.id}
+            renderItem={renderRequest}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          />
+        </View>
       )}
+
+      {/* Botão de configurações flutuante */}
+      <TouchableOpacity
+        style={styles.floatingSettingsButton}
+        onPress={handleOpenSetupModal}
+      >
+        <Ionicons name="settings" size={24} color="#fff" />
+      </TouchableOpacity>
 
       {/* Detalhes da solicitação */}
       <Modal visible={showModal} transparent animationType="slide">
@@ -1036,7 +1148,9 @@ Lon: {selectedRequest.client_longitude.toFixed(4)}</Text>
         <View style={styles.modalOverlay}>
           <View style={styles.setupModal}>
             <View style={styles.setupHeader}>
-              <Text style={styles.setupTitle}>Cadastrar perfil de serviço</Text>
+              <Text style={styles.setupTitle}>
+                {providerProfile ? 'Editar perfil de serviço' : 'Cadastrar perfil de serviço'}
+              </Text>
               <TouchableOpacity onPress={handleCloseSetupModal}>
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
@@ -1125,7 +1239,9 @@ Lon: {selectedRequest.client_longitude.toFixed(4)}</Text>
                 {setupLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.confirmButtonText}>Cadastrar</Text>
+                  <Text style={styles.confirmButtonText}>
+                    {providerProfile ? 'Atualizar' : 'Cadastrar'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1149,35 +1265,181 @@ function bearing(lat1: number, lon1: number, lat2: number, lon2: number) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#000' },
   header: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#000',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  greeting: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
-  subtitle: { fontSize: 14, color: '#E3F2FD', marginTop: 4 },
-  headerActions: { alignItems: 'flex-end' },
-  socketStatus: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  socketIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  socketText: { fontSize: 12, color: '#E3F2FD' },
+  driverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  driverAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#333',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  driverAvatarText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  driverDetails: {
+    flex: 1,
+  },
+  greeting: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  subtitle: { fontSize: 14, color: '#ccc', marginTop: 2 },
+  headerActions: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  notificationButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  menuButton: { 
+    padding: 8,
+  },
   availabilityButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
   },
   availabilityButtonDisabled: { opacity: 0.6 },
-  availabilityIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  availabilityText: { color: '#fff', fontWeight: '600', fontSize: 12 },
-  logoutButton: { padding: 8 },
+  availabilityIndicator: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+  availabilityText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  connectionStatus: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  socketIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  socketText: { fontSize: 12, color: '#ccc' },
+  
+  // Estilos do mapa
+  mapContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  map: {
+    flex: 1,
+  },
+  locationButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  
+  // Overlay de solicitações
+  requestsOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    maxHeight: 250,
+  },
+  requestsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: '#000',
+  },
+  refreshButton: {
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+  },
+  horizontalList: {
+    paddingHorizontal: 0,
+  },
+  
+  // Loading e empty overlays
+  loadingOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: { 
+    marginTop: 16, 
+    fontSize: 16, 
+    color: '#666',
+    textAlign: 'center',
+  },
+  
+  // Botão flutuante de configurações
+  floatingSettingsButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#000',
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
 
   activeRequestBanner: {
     backgroundColor: '#E3F2FD',
@@ -1191,7 +1453,6 @@ const styles = StyleSheet.create({
   activeRequestText: { flex: 1, marginLeft: 8, fontSize: 14, color: '#007AFF', fontWeight: '600' },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#666', marginTop: 16 },
@@ -1219,12 +1480,12 @@ const styles = StyleSheet.create({
   },
   trackButtonText: { color: '#007AFF', fontSize: 16, fontWeight: '600', marginLeft: 8 },
 
-  listContainer: { padding: 20 },
   requestCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    marginRight: 12,
+    width: 280,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -1246,6 +1507,7 @@ const styles = StyleSheet.create({
   requestDescription: { fontSize: 14, color: '#666', lineHeight: 20, marginBottom: 8 },
   clientAddress: { fontSize: 12, color: '#999', fontStyle: 'italic' },
 
+  // Modal styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContainer: { backgroundColor: '#fff', borderRadius: 20, margin: 20, maxHeight: height * 0.8 },
   setupModal: { backgroundColor: '#fff', borderRadius: 20, margin: 20, maxHeight: height * 0.85, width: '100%' },
@@ -1332,8 +1594,6 @@ const styles = StyleSheet.create({
   mapHeader: { backgroundColor: '#007AFF', flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20 },
   backButton: { padding: 8, marginRight: 16 },
   mapTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  menuButton: { padding: 8 },
-  map: { flex: 1 },
 
   statusContainer: { backgroundColor: '#fff', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 8 },
   statusMessage: { fontSize: 16, fontWeight: '600', color: '#007AFF', textAlign: 'center', marginBottom: 12 },
@@ -1355,9 +1615,15 @@ const styles = StyleSheet.create({
   photoSelectedText: { fontSize: 16, color: '#4CAF50', fontWeight: '600' },
   descriptionInput: { width: '100%', borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 16, fontSize: 14, textAlignVertical: 'top', marginBottom: 20, minHeight: 80 },
   serviceModalButtons: { flexDirection: 'row', width: '100%' },
-  cancelButton: { flex: 1, paddingVertical: 12, alignItems: 'center', marginRight: 8, borderRadius: 12, borderWidth: 1, borderColor: '#ddd' },
-  cancelButtonText: { fontSize: 16, color: '#666', fontWeight: '500' },
   completeServiceButton: { flex: 1, backgroundColor: '#4CAF50', paddingVertical: 12, alignItems: 'center', marginLeft: 8, borderRadius: 12 },
   disabledButton: { backgroundColor: '#ccc' },
   completeServiceButtonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
+  
+  // Estilos para o modal de setup
+  modalActions: { flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 20 },
+  cancelButton: { flex: 1, paddingVertical: 14, alignItems: 'center', marginRight: 8, borderRadius: 12, borderWidth: 1, borderColor: '#ddd' },
+  cancelButtonText: { fontSize: 16, color: '#666', fontWeight: '500' },
+  confirmButton: { flex: 1, backgroundColor: '#007AFF', paddingVertical: 12, alignItems: 'center', marginLeft: 8, borderRadius: 12 },
+  confirmButtonDisabled: { backgroundColor: '#ccc' },
+  confirmButtonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
 });

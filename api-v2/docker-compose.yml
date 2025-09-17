@@ -43,6 +43,34 @@ services:
 
   # ----------------- NOSSOS SERVIÇOS -----------------
 
+  api-gateway:
+    build:
+      context: ./services/common
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports: ["8000:8000"]
+    networks: [core]
+    depends_on:
+      - provider-service
+      - request-service
+      - auth-service
+      - matching-service
+      - payment-service
+      - admin-service
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8014
+      - PROVIDER_SERVICE_URL=http://provider-service:8011
+      - REQUEST_SERVICE_URL=http://request-service:8012
+      - MATCHING_SERVICE_URL=http://matching-service:8013
+      - PAYMENT_SERVICE_URL=http://payment-service:8016
+      - ADMIN_SERVICE_URL=http://admin-service:8017
+      - SOCKET_SERVICE_URL=http://socket-gateway:8015
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   provider-service:
     build:
       context: ./services/common
@@ -126,7 +154,6 @@ services:
       context: ./services/common/socket-gateway
       dockerfile: Dockerfile
     container_name: socket-gateway
-    ports: ["8015:8015"]
     networks: [core]
     depends_on:
       provider-service:

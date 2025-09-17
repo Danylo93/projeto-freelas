@@ -52,6 +52,8 @@ export default function AuthScreen() {
     try {
       if (isLogin) {
         await login(formData.email, formData.password);
+        // O redirecionamento será feito automaticamente pelo AuthContext
+        // baseado no user_type retornado pelo backend
       } else {
         await register({
           name: formData.name,
@@ -60,8 +62,10 @@ export default function AuthScreen() {
           password: formData.password,
           user_type: isProvider ? 1 : 2, // 1 = prestador, 2 = cliente
         });
+        // O redirecionamento será feito automaticamente pelo AuthContext
+        // baseado no user_type retornado pelo backend
       }
-      router.replace('/');
+      // Remover router.replace('/') pois o redirecionamento é automático
     } catch (error: any) {
       Alert.alert('Erro', error.message || 'Erro ao processar solicitação');
     } finally {
