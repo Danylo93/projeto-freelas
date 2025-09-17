@@ -8,11 +8,13 @@ from dotenv import load_dotenv
 
 # Permite executar o serviço sem precisar exportar PYTHONPATH manualmente.
 BASE_DIR = Path(__file__).resolve().parent
+
 SERVICE_ROOT = BASE_DIR.parent
 if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
 from common.kafka import make_consumer_with_retry, make_producer
+
 from common.events import TOPIC_REQ_LIFECYCLE, EV_REQUEST_OFFERED
 
 load_dotenv()
