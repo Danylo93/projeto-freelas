@@ -51,62 +51,7 @@ if (API_BASE_URL) {
   );
 }
 
-// Throttling de requisições para evitar limite do ngrok
-const requestQueue: Array<() => Promise<any>> = [];
-let isProcessingQueue = false;
-const MAX_REQUESTS_PER_MINUTE = 100; // Limite conservador
-let requestCount = 0;
-let lastResetTime = Date.now();
-
-const processRequestQueue = async () => {
-  if (isProcessingQueue || requestQueue.length === 0) return;
-  
-  isProcessingQueue = true;
-  
-  while (requestQueue.length > 0) {
-    // Reset contador a cada minuto
-    if (Date.now() - lastResetTime > 60000) {
-      requestCount = 0;
-      lastResetTime = Date.now();
-    }
-    
-    // Se atingiu o limite, aguarda
-    if (requestCount >= MAX_REQUESTS_PER_MINUTE) {
-      const waitTime = 60000 - (Date.now() - lastResetTime);
-      if (waitTime > 0) {
-        console.log(`⏳ [AUTH] Aguardando ${Math.ceil(waitTime/1000)}s para evitar limite do ngrok...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        requestCount = 0;
-        lastResetTime = Date.now();
-      }
-    }
-    
-    const request = requestQueue.shift();
-    if (request) {
-      try {
-        await request();
-        requestCount++;
-      } catch (error) {
-        console.error('❌ [AUTH] Erro na fila de requisições:', error);
-      }
-    }
-  }
-  
-  isProcessingQueue = false;
-};
-
-// Interceptor para throttling de requisições
-axios.interceptors.request.use(
-  (config) => {
-    return new Promise((resolve) => {
-      requestQueue.push(async () => {
-        resolve(config);
-      });
-      processRequestQueue();
-    });
-  },
-  (error) => Promise.reject(error)
-);
+// Configuração simples do axios
 
 // Interceptor para tratar erros de autenticação globalmente
 axios.interceptors.response.use(

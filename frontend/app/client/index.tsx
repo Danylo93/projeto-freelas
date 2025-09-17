@@ -21,7 +21,7 @@ import axios, { isAxiosError } from 'axios';
 import CustomMapView, { LatLng } from '@/components/CustomMapView';
 import { usePayment } from '@/contexts/PaymentContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { useSocket } from '../../contexts/SocketContext';
+import { useRealtime } from '../../contexts/RealtimeContext';
 import { PROVIDERS_API_URL, REQUESTS_API_URL } from '@/utils/config';
 import { haversineDistance } from '@/utils/geo';
 
@@ -157,7 +157,7 @@ const getStatusCopy = (status: string, providerName?: string | null) => {
 export default function ClientScreen() {
   const { user, token, logout, getAuthHeaders } = useAuth();
   const { startPayment } = usePayment();
-  const { socket, isConnected } = useSocket();
+  const { isConnected, sendMessage, joinRoom, leaveRoom } = useRealtime();
 
   const [providers, setProviders] = useState<NormalizedProvider[]>([]);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);

@@ -19,7 +19,7 @@ import * as Location from 'expo-location';
 import axios from 'axios';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { useSocket } from '../../contexts/SocketContext';
+import { useRealtime } from '../../contexts/RealtimeContext';
 
 // 🔽 mapa estilo Uber
 import CustomMapView, { LatLng } from '@/components/CustomMapView';
@@ -77,7 +77,7 @@ const REQUEST_SERVICE_CONFIG_ERROR =
 
 export default function ProviderScreen() {
   const { user, token, logout, getAuthHeaders } = useAuth();
-  const { socket, isConnected } = useSocket();
+  const { isConnected, sendMessage, joinRoom, leaveRoom } = useRealtime();
 
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
