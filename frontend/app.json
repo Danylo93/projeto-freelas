@@ -24,7 +24,21 @@
         "NSLocationWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar prestadores próximos.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar prestadores próximos.",
         "NSCameraUsageDescription": "Este app precisa da câmera para validar serviços concluídos.",
-        "NSPhotoLibraryUsageDescription": "Este app precisa acessar suas fotos para validar serviços concluídos."
+        "NSPhotoLibraryUsageDescription": "Este app precisa acessar suas fotos para validar serviços concluídos.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true,
+          "NSExceptionDomains": {
+            "localhost": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            },
+            "127.0.0.1": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            }
+          }
+        }
       }
     },
     "android": {
@@ -40,6 +54,7 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO"
       ],
+      "usesCleartextTraffic": true,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY"
