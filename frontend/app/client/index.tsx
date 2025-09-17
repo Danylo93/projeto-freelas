@@ -165,6 +165,7 @@ export default function ClientScreen() {
 
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
 
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -326,9 +327,10 @@ export default function ClientScreen() {
       if (!REQUESTS_API_URL) {
         return;
       }
+      // Aumentar intervalo para reduzir requisições
       requestPollRef.current = setInterval(() => {
         refreshCurrentRequest(requestId);
-      }, 5000) as any;
+      }, 10000) as any; // 10 segundos em vez de 5
     },
     [refreshCurrentRequest, stopRequestPolling]
   );
@@ -344,7 +346,14 @@ export default function ClientScreen() {
       return;
     }
 
+    // Evitar múltiplas requisições simultâneas
+    if (isRequesting) {
+      console.log('⏳ [CLIENT] Requisição já em andamento, ignorando...');
+      return;
+    }
+
     try {
+      setIsRequesting(true);
       setLoadingProviders(true);
       const response = await axios.get(PROVIDERS_API_URL, {
         headers: getAuthHeaders(),
@@ -385,8 +394,9 @@ export default function ClientScreen() {
       setAvailableCategories([]);
     } finally {
       setLoadingProviders(false);
+      setIsRequesting(false);
     }
-  }, [getAuthHeaders]);
+  }, [getAuthHeaders, isRequesting]);
 
   const loadActiveRequest = useCallback(async () => {
     if (!REQUESTS_API_URL || !user) {
