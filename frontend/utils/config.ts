@@ -6,8 +6,87 @@ const ensurePath = (base: string, segment: string) => {
 };
 
 // Configuração global do axios para incluir o header ngrok-skip-browser-warning
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import axios from 'axios';
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = '1';
+
+const safeJsonParse = <T = any>(value?: string | null): T | null => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch (error) {
+    return null;
+  }
+};
+
+const extractHost = (uri?: string | null) => {
+  if (!uri) return '';
+  const cleaned = uri
+    .replace('exp://', '')
+    .replace('http://', '')
+    .replace('https://', '')
+    .split('?')[0];
+
+  const hostPort = cleaned.split('/')[0];
+  const host = hostPort.split(':')[0];
+  if (host === 'localhost' || host === '127.0.0.1') {
+    if (Platform.OS === 'android') {
+      return '10.0.2.2';
+    }
+    return 'localhost';
+  }
+  return host;
+};
+
+const resolveExpoHost = () => {
+  const manifest = Constants.manifest;
+  const manifest2 = Constants.manifest2 as any;
+
+  const potentialHosts = [
+    Constants.expoConfig?.hostUri,
+    manifest?.hostUri,
+    manifest?.debuggerHost,
+    manifest2?.extra?.expoClient?.hostUri,
+    manifest2?.extra?.expoClient?.manifest?.hostUri,
+    manifest2?.extra?.expoGo?.projectConfig?.hostUri,
+  ];
+
+  for (const candidate of potentialHosts) {
+    const host = extractHost(candidate);
+    if (host) {
+      return host;
+    }
+  }
+
+  const linkingUri = Constants.linkingUri;
+  const experienceUrl = (Constants as any).experienceUrl as string | undefined;
+  const fallbackHost = extractHost(linkingUri || experienceUrl);
+  if (fallbackHost) {
+    return fallbackHost;
+  }
+
+  // For Expo Router in development we can inspect Updates configuration
+  const updatesConfiguration = safeJsonParse<{ url?: string }>(
+    manifest2?.extra?.expoClient?.manifestString
+  );
+  if (updatesConfiguration?.url) {
+    const hostFromUpdates = extractHost(updatesConfiguration.url);
+    if (hostFromUpdates) {
+      return hostFromUpdates;
+    }
+  }
+
+  return '';
+};
+
+const expoHost = resolveExpoHost();
+const DEV_PROTOCOL = process.env.EXPO_PUBLIC_DEV_PROTOCOL || 'http';
+const DEV_API_PORT = process.env.EXPO_PUBLIC_API_PORT || '8001';
+const DEV_SOCKET_PORT = process.env.EXPO_PUBLIC_SOCKET_PORT || DEV_API_PORT;
+
+const fallbackApiHost = expoHost ? `${DEV_PROTOCOL}://${expoHost}:${DEV_API_PORT}` : '';
+const fallbackSocketHost = expoHost ? `${DEV_PROTOCOL}://${expoHost}:${DEV_SOCKET_PORT}` : '';
 
 const resolveServiceUrl = (explicit?: string, fallbackBase?: string, fallbackPath?: string) => {
   const trimmedExplicit = stripTrailingSlash(explicit);
@@ -29,7 +108,11 @@ const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const rawSupabaseAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 // URLs centralizadas através do gateway
-export const API_URL = rawApiUrl || rawApiGatewayUrl || 'https://b34b1c97cd37.ngrok-free.app';
+export const API_URL =
+  rawApiUrl ||
+  rawApiGatewayUrl ||
+  fallbackApiHost ||
+  'https://b34b1c97cd37.ngrok-free.app';
 export const API_BASE_URL = rawApiBaseUrl || ensurePath(API_URL, '/api');
 
 // Endpoints específicos
@@ -66,7 +149,9 @@ export const ADMIN_API_URL = resolveServiceUrl(
 
 // Socket URL (usando HTTPS para ngrok)
 export const SOCKET_URL =
-  stripTrailingSlash(process.env.EXPO_PUBLIC_SOCKET_URL) || API_URL;
+  stripTrailingSlash(process.env.EXPO_PUBLIC_SOCKET_URL) ||
+  fallbackSocketHost ||
+  API_URL;
 
 // Outras configurações
 export const STRIPE_PUBLISHABLE_KEY = rawStripePk || '';
