@@ -112,7 +112,7 @@ export const API_URL =
   rawApiUrl ||
   rawApiGatewayUrl ||
   fallbackApiHost ||
-  'https://b34b1c97cd37.ngrok-free.app';
+  'https://eedfd16e8f89.ngrok-free.app';
 export const API_BASE_URL = rawApiBaseUrl || ensurePath(API_URL, '/api');
 
 // Endpoints específicos

@@ -178,7 +178,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!socketRef.current || !socketRef.current.connected) {
         console.log('🔌 [SOCKET] Tentando reconectar...');
         connectSocket();
-        attemptReconnect.current(attempt + 1);
+        attemptReconnect.apply(attempt + 1);
       }
     }, finalDelay);
   }).current;
