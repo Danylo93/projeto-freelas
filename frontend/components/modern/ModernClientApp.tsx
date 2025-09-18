@@ -20,11 +20,23 @@ import { ServiceGrid, FeaturedService } from './ServiceCard';
 import { TripInfoCard } from './TripInfoCard';
 import { useToast } from './Toast';
 import { LoadingAnimation } from './LoadingAnimation';
+import { SmartLoadingAnimation } from './SmartLoadingAnimation';
+import { analyticsService } from '../../services/analyticsService';
+import { feedbackService } from '../../services/feedbackService';
+import { cacheService } from '../../services/cacheService';
+import { retryService } from '../../services/retryService';
 import { UserProfileModal } from '../UserProfileModal';
 import { ClientHistoryModal } from './ClientHistoryModal';
 import { BottomTabNavigation } from '../BottomTabNavigation';
 import { PriceOfferModal } from './PriceOfferModal';
+import { ClientProgressTracker } from './ClientProgressTracker';
+import { InteractiveFeedback } from './InteractiveFeedback';
+import { PaymentCheckoutModal } from '../PaymentCheckoutModal';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const API_BASE_URL = 'http://192.168.100.8:8000';
 
 const SERVICE_CATEGORIES = [
   { id: 'eletricista', name: 'Eletricista', icon: '⚡', color: '#FF6B35' },
@@ -45,8 +57,11 @@ export const ModernClientApp: React.FC = () => {
     searchingProviders,
     requestService,
     cancelRequest,
+    completeService,
     isConnected,
   } = useMatching();
+  const insets = useSafeAreaInsets();
+
 
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
@@ -54,11 +69,16 @@ export const ModernClientApp: React.FC = () => {
     address?: string;
   } | null>(null);
   
-  const [appState, setAppState] = useState<'home' | 'services' | 'serviceSelected' | 'searching' | 'matched' | 'inService' | 'completed'>('home');
+  const [appState, setAppState] = useState<'home' | 'services' | 'serviceSelected' | 'searching' | 'matched' | 'inService' | 'completed' | 'payment' | 'paymentSuccess'>('home');
   const [selectedService, setSelectedService] = useState<any>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showPriceOfferModal, setShowPriceOfferModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [serviceCompleted, setServiceCompleted] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const headerAnimation = useRef(new Animated.Value(0)).current;
   const { showSuccess, showError, showInfo, ToastComponent } = useToast();
@@ -81,6 +101,7 @@ export const ModernClientApp: React.FC = () => {
         case 'searching':
         case 'pending':
           setAppState('searching');
+          setHasRated(false); // Reset rating state for new request
           break;
         case 'offered':
           setAppState('matched');
@@ -141,23 +162,41 @@ export const ModernClientApp: React.FC = () => {
 
   const handleConfirmService = async () => {
     if (!userLocation || !selectedService) {
+      await feedbackService.error();
       Alert.alert('Erro', 'Localização ou serviço não disponível. Tente novamente.');
       return;
     }
 
     try {
-      setAppState('searching');
-      showInfo('Procurando prestadores próximos...');
-      await requestService({
-        category: selectedService.name,
-        description: `Preciso de um ${selectedService.name.toLowerCase()}`,
-        latitude: userLocation.latitude,
-        longitude: userLocation.longitude,
-        address: userLocation.address || 'Localização atual',
-        price: 50, // Preço inicial - será definido pelo prestador
+      await analyticsService.trackPerformance('request_service', async () => {
+        setAppState('searching');
+        await feedbackService.buttonPress();
+        showInfo('Procurando prestadores próximos...');
+
+        // Analytics do serviço solicitado
+        analyticsService.trackServiceRequest(selectedService.name, userLocation);
+
+        // Simular fluxo completo para demonstração
+        setTimeout(() => {
+          setAppState('matched');
+          showInfo('Prestador encontrado!');
+
+          // Após 2 segundos, ir para pagamento
+          setTimeout(() => {
+            const serviceAmount = 150.00; // R$ 150,00
+            setPaymentAmount(serviceAmount);
+            setAppState('payment');
+            setShowPaymentModal(true);
+            showInfo('Proceda com o pagamento antes do serviço iniciar.');
+          }, 2000);
+        }, 3000);
+
+        await feedbackService.success();
       });
     } catch (error) {
       console.error('Erro ao solicitar serviço:', error);
+      await feedbackService.error();
+      analyticsService.trackError(error, 'request_service');
       showError('Não foi possível solicitar o serviço. Tente novamente.');
       setAppState('home');
     }
@@ -168,17 +207,133 @@ export const ModernClientApp: React.FC = () => {
     setSelectedService(null);
   };
 
-  const handleAcceptOffer = () => {
-    setShowPriceOfferModal(false);
-    showSuccess('Oferta aceita! O prestador está a caminho.');
-    // Aqui você chamaria a API para aceitar a oferta
+  const handleServiceCompleted = async () => {
+    try {
+      setServiceCompleted(true);
+      setAppState('completed');
+
+      await feedbackService.success();
+      showSuccess('Serviço concluído com sucesso!');
+
+      // Mostrar modal de avaliação após 1 segundo
+      setTimeout(() => {
+        setShowFeedbackModal(true);
+      }, 1000);
+    } catch (error) {
+      console.error('Erro ao finalizar serviço:', error);
+      await feedbackService.error();
+      showError('Erro ao finalizar serviço. Tente novamente.');
+    }
   };
 
-  const handleDeclineOffer = () => {
-    setShowPriceOfferModal(false);
-    setAppState('searching');
-    showInfo('Procurando outro prestador...');
-    // Aqui você chamaria a API para recusar e buscar outro prestador
+  const handlePaymentSuccess = async (paymentData: any) => {
+    try {
+      setShowPaymentModal(false);
+      setAppState('paymentSuccess');
+
+      await feedbackService.success();
+      showSuccess('Pagamento realizado com sucesso!');
+
+      // Aguardar 2 segundos e iniciar o serviço
+      setTimeout(() => {
+        setAppState('inService');
+        showInfo('Prestador a caminho! Serviço iniciado.');
+      }, 2000);
+    } catch (error) {
+      console.error('Erro após pagamento:', error);
+      await feedbackService.error();
+    }
+  };
+
+  const handlePaymentError = async (error: any) => {
+    console.error('Erro no pagamento:', error);
+    await feedbackService.error();
+    showError('Erro no pagamento. Tente novamente.');
+    setShowPaymentModal(false);
+    setAppState('inService');
+  };
+
+  const handleAcceptOffer = async () => {
+    if (!currentRequest) return;
+
+    try {
+      setShowPriceOfferModal(false);
+      await feedbackService.serviceAccepted();
+      showSuccess('Oferta aceita! O prestador está a caminho.');
+
+      // Obter token do AsyncStorage
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('Token não encontrado');
+      }
+
+      // Atualizar status da solicitação para 'accepted'
+      const response = await fetch(`${API_BASE_URL}/requests/${currentRequest.id}/client-accept`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': '1',
+        },
+      });
+
+      if (response.ok) {
+        setAppState('matched');
+        analyticsService.track('offer_accepted', {
+          request_id: currentRequest.id,
+          provider_id: assignedProvider?.id,
+          service_category: selectedService?.name,
+        });
+      } else {
+        throw new Error('Falha ao aceitar oferta');
+      }
+    } catch (error) {
+      console.error('❌ [CLIENT] Erro ao aceitar oferta:', error);
+      showError('Erro ao aceitar oferta. Tente novamente.');
+      setShowPriceOfferModal(true); // Mostrar modal novamente
+    }
+  };
+
+  const handleDeclineOffer = async () => {
+    if (!currentRequest) return;
+
+    try {
+      setShowPriceOfferModal(false);
+      await feedbackService.serviceRejected();
+
+      // Obter token do AsyncStorage
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('Token não encontrado');
+      }
+
+      // Recusar a oferta atual e buscar outro prestador
+      const response = await fetch(`${API_BASE_URL}/requests/${currentRequest.id}/client-decline`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': '1',
+        },
+      });
+
+      if (response.ok) {
+        setAppState('searching');
+        showInfo('Procurando outro prestador...');
+
+        analyticsService.track('offer_declined', {
+          request_id: currentRequest.id,
+          provider_id: assignedProvider?.id,
+          service_category: selectedService?.name,
+        });
+      } else {
+        throw new Error('Falha ao recusar oferta');
+      }
+    } catch (error) {
+      console.error('❌ [CLIENT] Erro ao recusar oferta:', error);
+      showError('Erro ao recusar oferta. Tente novamente.');
+      setShowPriceOfferModal(true); // Mostrar modal novamente
+    }
   };
 
   const renderHeader = () => (
@@ -208,12 +363,23 @@ export const ModernClientApp: React.FC = () => {
             </Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.profileButton}
-          onPress={() => setShowProfileModal(true)}
-        >
-          <Ionicons name="person-circle" size={40} color="#007AFF" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {currentRequest && currentRequest.status === 'completed' && !hasRated && (
+            <TouchableOpacity
+              style={styles.feedbackButton}
+              onPress={() => setShowFeedbackModal(true)}
+            >
+              <Ionicons name="star" size={20} color="#FFD700" />
+              <Text style={styles.feedbackButtonText}>Avaliar</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => setShowProfileModal(true)}
+          >
+            <Ionicons name="person-circle" size={40} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
       </View>
     </Animated.View>
   );
@@ -264,30 +430,7 @@ export const ModernClientApp: React.FC = () => {
                 ))}
               </View>
 
-              {/* Seção de Informações Adicionais */}
-              <View style={styles.additionalInfo}>
-                <Text style={styles.additionalInfoTitle}>Por que escolher nossos profissionais?</Text>
-
-                <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-                  <Text style={styles.benefitText}>Profissionais verificados e avaliados</Text>
-                </View>
-
-                <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-                  <Text style={styles.benefitText}>Atendimento rápido e eficiente</Text>
-                </View>
-
-                <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-                  <Text style={styles.benefitText}>Preços justos e transparentes</Text>
-                </View>
-
-                <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-                  <Text style={styles.benefitText}>Suporte 24/7 disponível</Text>
-                </View>
-              </View>
+              {/* Informações removidas para layout mais compacto */}
             </ScrollView>
           </BottomSheetContent>
         );
@@ -300,70 +443,50 @@ export const ModernClientApp: React.FC = () => {
             actions={[
               {
                 title: 'Voltar',
-                onPress: handleBackToHome,
+                onPress: () => setAppState('services'),
                 style: 'secondary',
                 icon: 'arrow-back',
               },
               {
-                title: 'Confirmar',
+                title: 'Solicitar Serviço',
                 onPress: handleConfirmService,
                 style: 'primary',
                 icon: 'checkmark-circle',
               },
             ]}
           >
-            <View style={styles.serviceDetailsContent}>
-              <View style={styles.serviceHeader}>
-                <View style={[styles.serviceIconLarge, { backgroundColor: selectedService?.color }]}>
-                  <Text style={styles.serviceEmojiLarge}>{selectedService?.icon}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+              <View style={styles.serviceDetailsContent}>
+                <View style={styles.serviceHeader}>
+                  <View style={[styles.serviceIconLarge, { backgroundColor: selectedService?.color }]}>
+                    <Text style={styles.serviceEmojiLarge}>{selectedService?.icon}</Text>
+                  </View>
+                  <View style={styles.serviceInfo}>
+                    <Text style={styles.serviceTitle}>{selectedService?.name}</Text>
+                    <Text style={styles.serviceDescription}>
+                      Profissionais qualificados próximos a você
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.serviceInfo}>
-                  <Text style={styles.serviceTitle}>{selectedService?.name}</Text>
-                  <Text style={styles.serviceDescription}>
-                    Profissionais qualificados próximos a você
+
+                <View style={styles.locationInfo}>
+                  <Ionicons name="location" size={20} color="#007AFF" />
+                  <Text style={styles.locationText}>
+                    {userLocation?.address || 'Sua localização atual'}
                   </Text>
                 </View>
-              </View>
 
-              <View style={styles.locationInfo}>
-                <Ionicons name="location" size={20} color="#007AFF" />
-                <Text style={styles.locationText}>
-                  {userLocation?.address || 'Sua localização atual'}
-                </Text>
-              </View>
-
-              {/* Informações do Serviço */}
-              <View style={styles.serviceInfoSection}>
-                <Text style={styles.serviceInfoTitle}>O que esperar:</Text>
-
-                <View style={styles.expectationItem}>
-                  <Ionicons name="time" size={16} color="#007AFF" />
-                  <Text style={styles.expectationText}>Atendimento rápido</Text>
-                </View>
-
-                <View style={styles.expectationItem}>
-                  <Ionicons name="shield-checkmark" size={16} color="#34C759" />
-                  <Text style={styles.expectationText}>Profissional verificado</Text>
-                </View>
-
-                <View style={styles.expectationItem}>
-                  <Ionicons name="star" size={16} color="#FFD700" />
-                  <Text style={styles.expectationText}>Avaliação dos clientes</Text>
-                </View>
-              </View>
-
-              {/* Nota sobre Preço */}
-              <View style={styles.priceInfoCard}>
-                <Ionicons name="information-circle" size={20} color="#007AFF" />
-                <View style={styles.priceInfoContent}>
-                  <Text style={styles.priceInfoTitle}>Como funciona o preço?</Text>
+                {/* Informação compacta sobre preço */}
+                <View style={styles.priceInfoCard}>
+                  <Ionicons name="information-circle" size={16} color="#007AFF" />
                   <Text style={styles.priceInfoText}>
-                    O prestador definirá o valor baseado na complexidade do serviço.
-                    Você poderá aceitar ou recusar a proposta.
+                    O prestador definirá o valor baseado na complexidade do serviço
                   </Text>
                 </View>
+
+
               </View>
-            </View>
+            </ScrollView>
           </BottomSheetContent>
         );
 
@@ -458,9 +581,15 @@ export const ModernClientApp: React.FC = () => {
             subtitle={`${assignedProvider?.name} está realizando o serviço`}
             actions={[
               {
+                title: 'Finalizar Serviço',
+                onPress: handleServiceCompleted,
+                style: 'primary',
+                icon: 'checkmark-circle',
+              },
+              {
                 title: 'Ligar para o prestador',
                 onPress: () => {},
-                style: 'primary',
+                style: 'secondary',
                 icon: 'call',
               },
               {
@@ -471,16 +600,10 @@ export const ModernClientApp: React.FC = () => {
               },
             ]}
           >
-            {userLocation && assignedProvider && (
-              <TripInfoCard
-                clientLocation={userLocation}
-                providerLocation={assignedProvider.location}
-                status="inProgress"
-                providerName={assignedProvider.name}
-                category={currentRequest?.category}
-                price={currentRequest?.price}
-              />
-            )}
+            <ClientProgressTracker
+              userLocation={userLocation}
+              providerLocation={assignedProvider?.location}
+            />
             <View style={styles.serviceInProgressInfo}>
               <Ionicons name="construct" size={48} color="#FF9500" />
               <Text style={styles.serviceInProgressTitle}>Serviço em andamento</Text>
@@ -499,10 +622,7 @@ export const ModernClientApp: React.FC = () => {
             actions={[
               {
                 title: 'Avaliar prestador',
-                onPress: () => {
-                  // TODO: Abrir modal de avaliação
-                  Alert.alert('Avaliação', 'Funcionalidade em desenvolvimento');
-                },
+                onPress: () => setShowFeedbackModal(true),
                 style: 'primary',
                 icon: 'star',
               },
@@ -536,6 +656,64 @@ export const ModernClientApp: React.FC = () => {
                   </Text>
                 </View>
               )}
+            </View>
+          </BottomSheetContent>
+        );
+
+      case 'payment':
+        return (
+          <BottomSheetContent
+            title="Pagamento Necessário"
+            subtitle="Pague antes do serviço iniciar"
+            actions={[
+              {
+                title: 'Cancelar Solicitação',
+                onPress: () => setAppState('home'),
+                style: 'secondary',
+                icon: 'close',
+              },
+            ]}
+          >
+            <View style={styles.paymentContainer}>
+              <View style={styles.paymentIcon}>
+                <Ionicons name="card" size={64} color="#007AFF" />
+              </View>
+              <Text style={styles.paymentTitle}>Prestador encontrado!</Text>
+              <Text style={styles.paymentSubtitle}>
+                Pague R$ {paymentAmount.toFixed(2)} para confirmar o serviço
+              </Text>
+              <Text style={styles.paymentDescription}>
+                O pagamento será processado de forma segura. Após a confirmação, o prestador iniciará o serviço.
+              </Text>
+            </View>
+          </BottomSheetContent>
+        );
+
+      case 'paymentSuccess':
+        return (
+          <BottomSheetContent
+            title="Pagamento Realizado!"
+            subtitle="Seu pagamento foi processado com sucesso"
+            actions={[
+              {
+                title: 'Continuar',
+                onPress: () => setAppState('completed'),
+                style: 'primary',
+                icon: 'checkmark-circle',
+              },
+            ]}
+          >
+            <View style={styles.paymentSuccessContainer}>
+              <View style={styles.paymentSuccessIcon}>
+                <Ionicons name="checkmark-circle" size={64} color="#34C759" />
+              </View>
+              <Text style={styles.paymentSuccessTitle}>Pagamento confirmado!</Text>
+              <Text style={styles.paymentSuccessSubtitle}>
+                R$ {paymentAmount.toFixed(2)} foi debitado com sucesso
+              </Text>
+              <Text style={styles.paymentSuccessDescription}>
+                Obrigado por usar nossos serviços!
+              </Text>
             </View>
           </BottomSheetContent>
         );
@@ -669,16 +847,23 @@ export const ModernClientApp: React.FC = () => {
       {/* Header */}
       {renderHeader()}
 
-      {/* Bottom Sheet */}
-      <BottomSheet
-        snapPoints={[0.4, 0.7, 0.9]}
-        initialSnap={0}
-      >
+      {/* Simple Bottom Panel */}
+      <View style={[styles.bottomPanel, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {renderBottomSheetContent()}
-      </BottomSheet>
+      </View>
 
       {/* Toast Notifications */}
       <ToastComponent />
+
+      {/* Floating Action Button - Feedback (apenas quando serviço concluído e não avaliado) */}
+      {currentRequest && currentRequest.status === 'completed' && !hasRated && (
+        <TouchableOpacity
+          style={[styles.floatingButton, { backgroundColor: '#FFD700' }]}
+          onPress={() => setShowFeedbackModal(true)}
+        >
+          <Ionicons name="star" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      )}
 
       {/* Modals */}
       <UserProfileModal
@@ -705,6 +890,35 @@ export const ModernClientApp: React.FC = () => {
         onAccept={handleAcceptOffer}
         onDecline={handleDeclineOffer}
         onClose={() => setShowPriceOfferModal(false)}
+      />
+
+      <InteractiveFeedback
+        visible={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        requestId={currentRequest?.id || ''}
+        providerName={assignedProvider?.name}
+        onSubmit={async (rating: number, comment?: string) => {
+          try {
+            await completeService(rating, comment);
+            setHasRated(true);
+            setShowFeedbackModal(false);
+            console.log('✅ [FEEDBACK] Avaliação enviada com sucesso');
+          } catch (error) {
+            console.error('❌ [FEEDBACK] Erro ao enviar avaliação:', error);
+          }
+        }}
+        type="service_completed"
+      />
+
+      <PaymentCheckoutModal
+        visible={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        requestId={currentRequest?.id || ''}
+        amount={paymentAmount}
+        description={`Pagamento do serviço: ${selectedService?.name}`}
+        providerName={assignedProvider?.name || 'Prestador'}
+        onPaymentSuccess={handlePaymentSuccess}
+        onPaymentError={handlePaymentError}
       />
 
       {/* Bottom Tab Navigation */}
@@ -805,6 +1019,40 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     marginLeft: 4,
     flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E5F3FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  testButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  feedbackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+    marginRight: 12,
+  },
+  feedbackButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF8F00',
   },
   profileButton: {
     padding: 4,
@@ -1229,5 +1477,95 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  bottomPanel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+   // paddingBottom: 34, // Safe area para tab bar
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    maxHeight: '70%', // Altura máxima reduzida para garantir botões visíveis
+  },
+  // Payment Styles
+  paymentContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  paymentIcon: {
+    marginBottom: 16,
+  },
+  paymentTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1D1D1F',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  paymentSubtitle: {
+    fontSize: 18,
+    color: '#007AFF',
+    marginBottom: 12,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  paymentDescription: {
+    fontSize: 16,
+    color: '#8E8E93',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  // Payment Success Styles
+  paymentSuccessContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  paymentSuccessIcon: {
+    marginBottom: 16,
+  },
+  paymentSuccessTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#34C759',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  paymentSuccessSubtitle: {
+    fontSize: 18,
+    color: '#1D1D1F',
+    marginBottom: 12,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  paymentSuccessDescription: {
+    fontSize: 16,
+    color: '#8E8E93',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

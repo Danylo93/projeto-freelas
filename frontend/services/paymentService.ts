@@ -53,12 +53,21 @@ export interface ConfirmPaymentRequest {
 }
 
 class PaymentService {
-  private getAuthHeaders() {
-    const token = localStorage.getItem('token') || '';
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
+  private async getAuthHeaders() {
+    try {
+      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      const token = await AsyncStorage.default.getItem('token') || '';
+      return {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+    } catch (error) {
+      console.error('❌ [PAYMENT] Erro ao obter token:', error);
+      return {
+        'Authorization': `Bearer `,
+        'Content-Type': 'application/json',
+      };
+    }
   }
 
   private getPaymentApiUrl() {
@@ -71,7 +80,8 @@ class PaymentService {
   async createPaymentIntent(data: CreatePaymentIntentRequest): Promise<PaymentIntent> {
     try {
       console.log('💳 [PAYMENT] Criando Payment Intent:', data);
-      
+
+      const headers = await this.getAuthHeaders();
       const response = await axios.post(
         `${this.getPaymentApiUrl()}/payment-intents`,
         {
@@ -79,7 +89,7 @@ class PaymentService {
           currency: data.currency || 'brl',
           payment_method_types: data.payment_method_types || ['card', 'pix'],
         },
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       console.log('✅ [PAYMENT] Payment Intent criado:', response.data);
@@ -96,14 +106,15 @@ class PaymentService {
   async confirmPayment(data: ConfirmPaymentRequest): Promise<PaymentIntent> {
     try {
       console.log('💳 [PAYMENT] Confirmando pagamento:', data);
-      
+
+      const headers = await this.getAuthHeaders();
       const response = await axios.post(
         `${this.getPaymentApiUrl()}/payment-intents/${data.payment_intent_id}/confirm`,
         {
           payment_method: data.payment_method_id,
           return_url: data.return_url,
         },
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       console.log('✅ [PAYMENT] Pagamento confirmado:', response.data);
@@ -119,9 +130,10 @@ class PaymentService {
    */
   async getPaymentMethods(): Promise<PaymentMethod[]> {
     try {
+      const headers = await this.getAuthHeaders();
       const response = await axios.get(
         `${this.getPaymentApiUrl()}/payment-methods`,
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       return response.data;
@@ -137,11 +149,12 @@ class PaymentService {
   async addPaymentMethod(paymentMethodId: string): Promise<PaymentMethod> {
     try {
       console.log('💳 [PAYMENT] Adicionando método de pagamento:', paymentMethodId);
-      
+
+      const headers = await this.getAuthHeaders();
       const response = await axios.post(
         `${this.getPaymentApiUrl()}/payment-methods`,
         { payment_method_id: paymentMethodId },
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       console.log('✅ [PAYMENT] Método de pagamento adicionado:', response.data);
@@ -158,10 +171,11 @@ class PaymentService {
   async removePaymentMethod(paymentMethodId: string): Promise<void> {
     try {
       console.log('💳 [PAYMENT] Removendo método de pagamento:', paymentMethodId);
-      
+
+      const headers = await this.getAuthHeaders();
       await axios.delete(
         `${this.getPaymentApiUrl()}/payment-methods/${paymentMethodId}`,
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       console.log('✅ [PAYMENT] Método de pagamento removido');
@@ -177,11 +191,12 @@ class PaymentService {
   async setDefaultPaymentMethod(paymentMethodId: string): Promise<void> {
     try {
       console.log('💳 [PAYMENT] Definindo método padrão:', paymentMethodId);
-      
+
+      const headers = await this.getAuthHeaders();
       await axios.patch(
         `${this.getPaymentApiUrl()}/payment-methods/${paymentMethodId}/default`,
         {},
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       console.log('✅ [PAYMENT] Método padrão definido');
@@ -196,9 +211,10 @@ class PaymentService {
    */
   async getTransactions(limit: number = 20, offset: number = 0): Promise<Transaction[]> {
     try {
+      const headers = await this.getAuthHeaders();
       const response = await axios.get(
         `${this.getPaymentApiUrl()}/transactions?limit=${limit}&offset=${offset}`,
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       return response.data;
@@ -213,9 +229,10 @@ class PaymentService {
    */
   async getTransaction(transactionId: string): Promise<Transaction | null> {
     try {
+      const headers = await this.getAuthHeaders();
       const response = await axios.get(
         `${this.getPaymentApiUrl()}/transactions/${transactionId}`,
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       return response.data;
@@ -231,11 +248,12 @@ class PaymentService {
   async cancelPayment(paymentIntentId: string): Promise<PaymentIntent> {
     try {
       console.log('💳 [PAYMENT] Cancelando pagamento:', paymentIntentId);
-      
+
+      const headers = await this.getAuthHeaders();
       const response = await axios.post(
         `${this.getPaymentApiUrl()}/payment-intents/${paymentIntentId}/cancel`,
         {},
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       console.log('✅ [PAYMENT] Pagamento cancelado:', response.data);
@@ -253,6 +271,7 @@ class PaymentService {
     try {
       console.log('💳 [PAYMENT] Solicitando reembolso:', { paymentIntentId, amount, reason });
       
+      const headers = await this.getAuthHeaders();
       const response = await axios.post(
         `${this.getPaymentApiUrl()}/refunds`,
         {
@@ -260,7 +279,7 @@ class PaymentService {
           amount,
           reason,
         },
-        { headers: this.getAuthHeaders() }
+        { headers }
       );
 
       console.log('✅ [PAYMENT] Reembolso solicitado:', response.data);

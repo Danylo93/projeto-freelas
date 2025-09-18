@@ -1,0 +1,566 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-01-18T15:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "wrk_payment_flow",
+      "parentId": null,
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "name": "🚀 Freelas - Payment Flow API v2",
+      "description": "Coleção completa para testar o fluxo de pagamento do app Freelas seguindo padrão API v2",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "fld_auth",
+      "parentId": "wrk_payment_flow",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "name": "🔐 Authentication",
+      "description": "Endpoints de autenticação",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1705590000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_requests",
+      "parentId": "wrk_payment_flow",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "name": "📋 Requests",
+      "description": "Endpoints de solicitações de serviço",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1705580000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_payments",
+      "parentId": "wrk_payment_flow",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "name": "💳 Payments",
+      "description": "Endpoints de pagamento com Stripe",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1705570000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_providers",
+      "parentId": "wrk_payment_flow",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "name": "👷 Providers",
+      "description": "Endpoints de prestadores",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1705560000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_auth_register_client",
+      "parentId": "fld_auth",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/auth/register",
+      "name": "1️⃣ Register Client",
+      "description": "Registra um novo cliente",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"João Cliente\",\n  \"email\": \"joao.cliente@exemplo.com\",\n  \"phone\": \"11999888777\",\n  \"password\": \"123456\",\n  \"user_type\": 2\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705590000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_login_client",
+      "parentId": "fld_auth",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/auth/login",
+      "name": "2️⃣ Login Client",
+      "description": "Faz login do cliente e obtém token",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.client_email }}\",\n  \"password\": \"{{ _.client_password }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705580000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_register_provider",
+      "parentId": "fld_auth",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/auth/register",
+      "name": "3️⃣ Register Provider",
+      "description": "Registra um novo prestador",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"João Eletricista\",\n  \"email\": \"joao.eletricista@exemplo.com\",\n  \"phone\": \"11888777666\",\n  \"password\": \"123456\",\n  \"user_type\": 1\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705570000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_login_provider",
+      "parentId": "fld_auth",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/auth/login",
+      "name": "4️⃣ Login Provider",
+      "description": "Faz login do prestador",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.provider_email }}\",\n  \"password\": \"{{ _.provider_password }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705560000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_create_provider_profile",
+      "parentId": "fld_providers",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/providers",
+      "name": "5️⃣ Create Provider Profile",
+      "description": "Cria perfil do prestador",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"user_id\": \"{{ _.provider_user_id }}\",\n  \"category\": \"Eletricista\",\n  \"latitude\": -23.5505,\n  \"longitude\": -46.6333,\n  \"is_available\": true,\n  \"rating\": 4.8,\n  \"completed_jobs\": 25\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.provider_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705590000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_create_service_request",
+      "parentId": "fld_requests",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/requests",
+      "name": "6️⃣ Create Service Request",
+      "description": "Cliente cria solicitação de serviço",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"category\": \"Eletricista\",\n  \"description\": \"Preciso de um eletricista para trocar tomadas\",\n  \"client_latitude\": -23.5505,\n  \"client_longitude\": -46.6333,\n  \"address\": \"Rua das Flores, 123 - São Paulo, SP\",\n  \"price\": 150.00\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.client_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705590000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_accept_request",
+      "parentId": "fld_requests",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/requests/{{ _.request_id }}/accept",
+      "name": "7️⃣ Accept Request (Provider)",
+      "description": "Prestador aceita a solicitação",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"provider_id\": \"{{ _.provider_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.provider_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705580000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_create_payment_intent",
+      "parentId": "fld_payments",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/payments/create-intent",
+      "name": "8️⃣ Create Payment Intent",
+      "description": "Cria intenção de pagamento no Stripe",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"amount\": 15000,\n  \"currency\": \"brl\",\n  \"customer_id\": \"{{ _.client_user_id }}\",\n  \"metadata\": {\n    \"request_id\": \"{{ _.request_id }}\",\n    \"service_type\": \"Eletricista\",\n    \"provider_name\": \"João Eletricista\"\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.client_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705590000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_list_payment_methods",
+      "parentId": "fld_payments",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/payments/payment-methods",
+      "name": "9️⃣ List Payment Methods",
+      "description": "Lista métodos de pagamento do cliente",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.client_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705580000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_confirm_payment",
+      "parentId": "fld_payments",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/payments/payment-intents/{{ _.payment_intent_id }}/confirm",
+      "name": "🔟 Confirm Payment",
+      "description": "Confirma o pagamento",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"payment_method\": \"pm_card_visa\",\n  \"return_url\": \"https://app.freelas.com/payment/return\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.client_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705570000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_update_request_status",
+      "parentId": "fld_requests",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/requests/{{ _.request_id }}/status",
+      "name": "1️⃣1️⃣ Update Request Status",
+      "description": "Atualiza status da solicitação (in_progress, completed, etc)",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"in_progress\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.provider_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705570000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_complete_service",
+      "parentId": "fld_requests",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/requests/{{ _.request_id }}/status",
+      "name": "1️⃣2️⃣ Complete Service",
+      "description": "Marca serviço como concluído",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"completed\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.provider_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705560000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_get_request_details",
+      "parentId": "fld_requests",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/requests/{{ _.request_id }}",
+      "name": "🔍 Get Request Details",
+      "description": "Obtém detalhes da solicitação",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.client_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705550000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "req_get_payment_status",
+      "parentId": "fld_payments",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "url": "{{ _.base_url }}/api/payments/payment-intents/{{ _.payment_intent_id }}",
+      "name": "💰 Get Payment Status",
+      "description": "Verifica status do pagamento",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.client_token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1705560000000,
+      "isPrivate": false,
+      "_type": "request"
+    },
+    {
+      "_id": "env_base",
+      "parentId": "wrk_payment_flow",
+      "modified": 1705590000000,
+      "created": 1705590000000,
+      "name": "🌍 Base Environment",
+      "data": {
+        "services": {
+          "gateway": {
+            "http": "{{ _.base_url }}",
+            "api": "{{ _.services.gateway.http }}/api"
+          },
+          "auth": {
+            "http": "{{ _.services.gateway.http }}/api/auth"
+          },
+          "providers": {
+            "http": "{{ _.services.gateway.http }}/api/providers"
+          },
+          "requests": {
+            "http": "{{ _.services.gateway.http }}/api/requests"
+          },
+          "payments": {
+            "http": "{{ _.services.gateway.http }}/api/payments"
+          },
+          "matching": {
+            "http": "{{ _.services.gateway.http }}/api/matching"
+          }
+        },
+        "base_url": "http://localhost:8000",
+        "auth": {
+          "client_token": "",
+          "provider_token": "",
+          "credentials": {
+            "client": {
+              "email": "joao.cliente@exemplo.com",
+              "password": "123456"
+            },
+            "provider": {
+              "email": "joao.eletricista@exemplo.com",
+              "password": "123456"
+            }
+          }
+        },
+        "samples": {
+          "client": {
+            "user_id": "",
+            "email": "joao.cliente@exemplo.com"
+          },
+          "provider": {
+            "user_id": "",
+            "provider_id": "",
+            "email": "joao.eletricista@exemplo.com"
+          },
+          "request": {
+            "id": ""
+          },
+          "payment": {
+            "intent_id": ""
+          }
+        }
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "services",
+          "base_url",
+          "auth",
+          "samples"
+        ],
+        "services": [
+          "gateway",
+          "auth",
+          "providers",
+          "requests",
+          "payments",
+          "matching"
+        ],
+        "auth": [
+          "client_token",
+          "provider_token",
+          "credentials"
+        ],
+        "samples": [
+          "client",
+          "provider",
+          "request",
+          "payment"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1705590000000,
+      "_type": "environment"
+    },
+    {
+      "_id": "env_local",
+      "parentId": "wrk_payment_flow",
+      "modified": 1705590001000,
+      "created": 1705590001000,
+      "name": "🐳 Local (Docker)",
+      "data": {
+        "base_url": "http://localhost:8000"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url"
+        ]
+      },
+      "color": "#4CAF50",
+      "isPrivate": false,
+      "metaSortKey": 1705590001000,
+      "_type": "environment"
+    },
+    {
+      "_id": "env_prod",
+      "parentId": "wrk_payment_flow",
+      "modified": 1705590002000,
+      "created": 1705590002000,
+      "name": "🌐 Produção (Ngrok)",
+      "data": {
+        "base_url": "https://a09f89583882.ngrok-free.app"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url"
+        ]
+      },
+      "color": "#FF9800",
+      "isPrivate": false,
+      "metaSortKey": 1705590002000,
+      "_type": "environment"
+    }
+  ]
+}

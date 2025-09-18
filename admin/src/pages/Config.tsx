@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 
-const gateway =  'https://eedfd16e8f89.ngrok-free.app'
+const gateway =  'https://a3c6786f0738.ngrok-free.app'
 
 interface Config {
   platform_fee_percent: number

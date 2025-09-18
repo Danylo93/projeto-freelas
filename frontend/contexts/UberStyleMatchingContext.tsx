@@ -381,16 +381,16 @@ export const MatchingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Marcar chegada (Prestador)
   const markArrived = useCallback(async () => {
     if (!currentRequest) return;
-    
+
     try {
-      await axios.patch(`${API_BASE_URL}/requests/${currentRequest.id}`, {
+      await axios.put(`${API_BASE_URL}/requests/${currentRequest.id}/status`, {
         status: 'arrived',
       }, {
         headers: getAuthHeaders(),
       });
-      
+
       setCurrentRequest(prev => prev ? { ...prev, status: 'arrived' } : null);
-      
+
     } catch (error) {
       console.error('❌ [MATCHING] Erro ao marcar chegada:', error);
     }
@@ -399,16 +399,16 @@ export const MatchingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Iniciar serviço (Prestador)
   const startService = useCallback(async () => {
     if (!currentRequest) return;
-    
+
     try {
-      await axios.patch(`${API_BASE_URL}/requests/${currentRequest.id}`, {
+      await axios.put(`${API_BASE_URL}/requests/${currentRequest.id}/status`, {
         status: 'in_progress',
       }, {
         headers: getAuthHeaders(),
       });
-      
+
       setCurrentRequest(prev => prev ? { ...prev, status: 'in_progress' } : null);
-      
+
     } catch (error) {
       console.error('❌ [MATCHING] Erro ao iniciar serviço:', error);
     }
@@ -417,16 +417,16 @@ export const MatchingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Finalizar serviço (Prestador)
   const finishService = useCallback(async () => {
     if (!currentRequest) return;
-    
+
     try {
-      await axios.patch(`${API_BASE_URL}/requests/${currentRequest.id}`, {
+      await axios.put(`${API_BASE_URL}/requests/${currentRequest.id}/status`, {
         status: 'completed',
       }, {
         headers: getAuthHeaders(),
       });
-      
+
       setCurrentRequest(prev => prev ? { ...prev, status: 'completed' } : null);
-      
+
     } catch (error) {
       console.error('❌ [MATCHING] Erro ao finalizar serviço:', error);
     }

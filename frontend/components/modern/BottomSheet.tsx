@@ -48,15 +48,25 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     onSnapChange?.(snapIndex);
   };
 
-  // Simplificado sem PanGestureHandler por enquanto
+  // Controles melhorados
+  const handleToggle = () => {
+    // Se está no snap inicial (menor), expande para o próximo
+    // Se está expandido, volta para o inicial
+    if (currentSnap === 0) {
+      const nextSnap = Math.min(1, snapPoints.length - 1);
+      snapToPoint(nextSnap);
+    } else {
+      snapToPoint(0); // Sempre volta para o inicial
+    }
+  };
+
   const handleExpand = () => {
     const nextSnap = Math.min(currentSnap + 1, snapPoints.length - 1);
     snapToPoint(nextSnap);
   };
 
   const handleCollapse = () => {
-    const nextSnap = Math.max(currentSnap - 1, 0);
-    snapToPoint(nextSnap);
+    snapToPoint(0); // Sempre volta para o inicial
   };
 
   useEffect(() => {
@@ -64,18 +74,24 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   }, []);
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          backgroundColor,
-          transform: [{ translateY }],
-        },
-      ]}
-    >
-      <TouchableOpacity style={styles.header} onPress={handleExpand}>
+    <View style={styles.overlay}>
+      <Animated.View
+        style={[
+          styles.container,
+          {
+            backgroundColor,
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+      <TouchableOpacity style={styles.header} onPress={handleToggle}>
         {showHandle && (
           <View style={[styles.handle, { backgroundColor: handleColor }]} />
+        )}
+        {currentSnap > 0 && (
+          <TouchableOpacity style={styles.collapseButton} onPress={handleCollapse}>
+            <Ionicons name="chevron-down" size={20} color="#8E8E93" />
+          </TouchableOpacity>
         )}
       </TouchableOpacity>
       
@@ -83,6 +99,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         {children}
       </View>
     </Animated.View>
+    </View>
   );
 };
 
@@ -105,21 +122,24 @@ export const BottomSheetContent: React.FC<BottomSheetContentProps> = ({
   children,
   actions = [],
 }) => {
+
   return (
     <View style={styles.sheetContent}>
-      {(title || subtitle) && (
-        <View style={styles.titleContainer}>
-          {title && <Text style={styles.title}>{title}</Text>}
-          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-        </View>
-      )}
-      
-      {children && (
-        <View style={styles.childrenContainer}>
-          {children}
-        </View>
-      )}
-      
+      <View style={styles.contentWrapper}>
+        {(title || subtitle) && (
+          <View style={styles.titleContainer}>
+            {title && <Text style={styles.title}>{title}</Text>}
+            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          </View>
+        )}
+
+        {children && (
+          <View style={styles.childrenContainer}>
+            {children}
+          </View>
+        )}
+      </View>
+
       {actions.length > 0 && (
         <View style={styles.actionsContainer}>
           {actions.map((action, index) => (
@@ -129,6 +149,7 @@ export const BottomSheetContent: React.FC<BottomSheetContentProps> = ({
                 styles.actionButton,
                 action.style === 'primary' && styles.primaryButton,
                 action.style === 'danger' && styles.dangerButton,
+
               ]}
               onPress={action.onPress}
             >
@@ -161,12 +182,17 @@ export const BottomSheetContent: React.FC<BottomSheetContentProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
+  overlay: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     height: screenHeight,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  container: {
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     shadowColor: '#000',
@@ -174,22 +200,37 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+    maxHeight: '80%',
   },
   header: {
     alignItems: 'center',
     paddingVertical: 12,
+    position: 'relative',
   },
   handle: {
     width: 36,
     height: 4,
     borderRadius: 2,
   },
+  collapseButton: {
+    position: 'absolute',
+    right: 20,
+    top: 8,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(142, 142, 147, 0.1)',
+  },
   content: {
     flex: 1,
     paddingHorizontal: 20,
   },
   sheetContent: {
+    flexShrink: 1, // Permite encolher
+    justifyContent: 'flex-start', // Alinha no topo
+  },
+  contentWrapper: {
     flex: 1,
+    minHeight: 0, // Permite que o conteúdo seja comprimido
   },
   titleContainer: {
     marginBottom: 20,
@@ -207,11 +248,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   childrenContainer: {
-    flex: 1,
+    flexShrink: 1,
+    // Removido maxHeight para permitir mais flexibilidade
   },
   actionsContainer: {
+    paddingTop: 16,
     paddingBottom: 34, // Safe area
+    paddingHorizontal: 16,
     gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
   },
   actionButton: {
     flexDirection: 'row',

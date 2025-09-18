@@ -19,11 +19,18 @@ import { BottomSheet, BottomSheetContent } from './BottomSheet';
 import { distanceService } from '../../services/distanceService';
 import { useToast, InAppNotification } from './Toast';
 import { LoadingAnimation } from './LoadingAnimation';
+import { SmartLoadingAnimation } from './SmartLoadingAnimation';
+import { analyticsService } from '../../services/analyticsService';
+import { feedbackService } from '../../services/feedbackService';
+import { cacheService } from '../../services/cacheService';
+import { retryService } from '../../services/retryService';
+import { useOptimizedLocation } from '../../hooks/useOptimizedLocation';
 import { UserProfileModal } from '../UserProfileModal';
 import { ServiceHistoryModal } from '../ServiceHistoryModal';
 import { BottomTabNavigation } from '../BottomTabNavigation';
 import { ProviderServicesModal } from './ProviderServicesModal';
 import { ProviderStatusToggle } from '../provider/ProviderStatusToggle';
+import { ProviderStatusUpdater } from './ProviderStatusUpdater';
 import { TripInfoCard } from './TripInfoCard';
 import * as Location from 'expo-location';
 import axios from 'axios';
@@ -54,6 +61,7 @@ export const ModernProviderApp: React.FC = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showServicesModal, setShowServicesModal] = useState(false);
+  const [showStatusUpdater, setShowStatusUpdater] = useState(false);
   const [providerServices, setProviderServices] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('home');
   const [newRequestData, setNewRequestData] = useState<any>(null);
@@ -87,7 +95,7 @@ export const ModernProviderApp: React.FC = () => {
 
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/history/services?status=completed`,
+        `${process.env.EXPO_PUBLIC_API_URL}/api/requests?status=completed`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -168,25 +176,43 @@ export const ModernProviderApp: React.FC = () => {
 
   const getCurrentLocation = async () => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permissão negada', 'Precisamos da sua localização para receber solicitações.');
-        return;
-      }
+      await analyticsService.trackPerformance('get_location', async () => {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          await feedbackService.error();
+          Alert.alert('Permissão negada', 'Precisamos da sua localização para receber solicitações.');
+          return;
+        }
 
-      const location = await Location.getCurrentPositionAsync({});
-      const address = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
+        const location = await Location.getCurrentPositionAsync({});
+        const address = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
 
-      setUserLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        address: address[0]?.street || 'Localização atual',
+        const locationData = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          address: address[0]?.street || 'Localização atual',
+        };
+
+        setUserLocation(locationData);
+
+        // Cache da localização
+        await cacheService.cacheUserLocation(locationData);
+
+        // Feedback de sucesso
+        await feedbackService.locationFound();
+
+        analyticsService.track('location_obtained', {
+          method: 'provider_app',
+          accuracy: location.coords.accuracy,
+        });
       });
     } catch (error) {
       console.error('Erro ao obter localização:', error);
+      await feedbackService.error();
+      analyticsService.trackError(error, 'get_location_provider');
     }
   };
 
@@ -365,61 +391,7 @@ export const ModernProviderApp: React.FC = () => {
     </Animated.View>
   );
 
-  const renderStatusCard = () => (
-    <Animated.View
-      style={[
-        styles.statusCard,
-        {
-          opacity: statusAnimation,
-          transform: [
-            {
-              translateY: statusAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [30, 0],
-              }),
-            },
-          ],
-        },
-      ]}
-    >
-      <View style={styles.statusContent}>
-        <View style={styles.statusInfo}>
-          <Ionicons
-            name={isOnline ? "checkmark-circle" : "pause-circle"}
-            size={24}
-            color={isOnline ? "#34C759" : "#FF3B30"}
-          />
-          <Text style={styles.statusMessage}>
-            {isOnline
-              ? 'Você está online e pode receber solicitações'
-              : 'Você está offline. Ative o status no header para receber solicitações'
-            }
-          </Text>
-        </View>
-
-        {!isOnline && providerServices.length === 0 && (
-          <TouchableOpacity
-            style={styles.configureButton}
-            onPress={() => setShowServicesModal(true)}
-          >
-            <Ionicons name="settings" size={16} color="#007AFF" />
-            <Text style={styles.configureButtonText}>Configurar serviços</Text>
-          </TouchableOpacity>
-        )}
-
-        {providerServices.length > 0 && (
-          <View style={styles.servicesInfo}>
-            <Text style={styles.servicesCount}>
-              {providerServices.length} serviço(s) configurado(s)
-            </Text>
-            <TouchableOpacity onPress={() => setShowServicesModal(true)}>
-              <Text style={styles.editServicesText}>Editar</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    </Animated.View>
-  );
+  // Status card removido - layout simplificado
 
   const renderBottomSheetContent = () => {
     switch (appState) {
@@ -502,10 +474,10 @@ export const ModernProviderApp: React.FC = () => {
             subtitle="Navegue até o local do serviço"
             actions={[
               {
-                title: 'Cheguei no local',
-                onPress: () => markArrived(),
+                title: 'Atualizar Status',
+                onPress: () => setShowStatusUpdater(true),
                 style: 'primary',
-                icon: 'location',
+                icon: 'refresh',
               },
               {
                 title: 'Ligar para o cliente',
@@ -547,10 +519,10 @@ export const ModernProviderApp: React.FC = () => {
             subtitle="Inicie o serviço quando estiver pronto"
             actions={[
               {
-                title: 'Iniciar serviço',
-                onPress: () => startService(),
+                title: 'Atualizar Status',
+                onPress: () => setShowStatusUpdater(true),
                 style: 'primary',
-                icon: 'play-circle',
+                icon: 'refresh',
               },
             ]}
           />
@@ -563,10 +535,10 @@ export const ModernProviderApp: React.FC = () => {
             subtitle="Finalize quando o trabalho estiver concluído"
             actions={[
               {
-                title: 'Finalizar serviço',
-                onPress: () => finishService(),
+                title: 'Atualizar Status',
+                onPress: () => setShowStatusUpdater(true),
                 style: 'primary',
-                icon: 'checkmark-circle',
+                icon: 'refresh',
               },
             ]}
           />
@@ -690,19 +662,29 @@ export const ModernProviderApp: React.FC = () => {
       {/* Header */}
       {renderHeader()}
 
-      {/* Status Card */}
-      {(appState === 'offline' || appState === 'online') && renderStatusCard()}
+      {/* Status Card removido - agora está no BottomSheet */}
 
       {/* Bottom Sheet */}
       <BottomSheet
-        snapPoints={[0.3, 0.6, 0.9]}
+        snapPoints={[0.2, 0.45, 0.85]}
         initialSnap={0}
+        showHandle={true}
       >
         {renderBottomSheetContent()}
       </BottomSheet>
 
       {/* Toast Notifications */}
       <ToastComponent />
+
+      {/* Floating Action Button - Status Updater */}
+      {currentRequest && ['accepted', 'arrived', 'in_progress'].includes(currentRequest.status) && (
+        <TouchableOpacity
+          style={styles.floatingButton}
+          onPress={() => setShowStatusUpdater(true)}
+        >
+          <Ionicons name="refresh" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      )}
 
       {/* New Request Modal */}
       <InAppNotification
@@ -732,6 +714,11 @@ export const ModernProviderApp: React.FC = () => {
         onClose={() => setShowServicesModal(false)}
         onSave={handleSaveServices}
         initialServices={providerServices}
+      />
+
+      <ProviderStatusUpdater
+        visible={showStatusUpdater}
+        onClose={() => setShowStatusUpdater(false)}
       />
 
       {/* Bottom Tab Navigation */}
@@ -802,12 +789,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
     paddingTop: 50,
-    paddingBottom: 16,
+    paddingBottom: 12,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
   },
   headerContent: {
     flexDirection: 'row',
@@ -840,7 +827,7 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
   earningsContainer: {
     alignItems: 'flex-end',
@@ -854,39 +841,54 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#34C759',
   },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E5F3FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  testButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
   profileButton: {
     padding: 4,
   },
   statusCard: {
     position: 'absolute',
-    top: 140,
+    top: 120,
     left: 20,
     right: 20,
     zIndex: 5,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
+    padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   statusContent: {
     alignItems: 'center',
   },
   statusInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 16,
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    paddingHorizontal: 8,
   },
   statusMessage: {
     fontSize: 14,
     color: '#8E8E93',
     marginLeft: 12,
-    textAlign: 'center',
+    textAlign: 'left',
     flex: 1,
+    lineHeight: 20,
   },
   onlineToggle: {
     flexDirection: 'row',
@@ -1109,6 +1111,22 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     marginBottom: 4,
   },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 90,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
   earningsUpdate: {
     backgroundColor: '#E8F5E8',
     borderRadius: 12,
@@ -1122,7 +1140,7 @@ const styles = StyleSheet.create({
     color: '#34C759',
     marginBottom: 4,
   },
-  earningsLabel: {
+  earningsLabelBottom: {
     fontSize: 12,
     color: '#8E8E93',
   },

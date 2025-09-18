@@ -82,7 +82,7 @@ async def accept_request(
     """Prestador aceita uma solicitação"""
     try:
         provider_id = provider_data.get('provider_id')
-        user_id = user.get('id')
+        user_id = user.get('sub')  # ID está no campo 'sub' do token
 
         print(f"✅ [REQUEST] Prestador {user_id} aceitando solicitação {request_id}")
 
@@ -105,6 +105,12 @@ async def accept_request(
                     "updated_at": datetime.utcnow()
                 }
             }
+        )
+
+        # Marcar prestador como ocupado
+        await db.providers.update_many(
+            {"user_id": user_id},
+            {"$set": {"status": "busy"}}
         )
 
         # Salvar decisão do prestador
@@ -141,7 +147,7 @@ async def decline_request(
     """Prestador recusa uma solicitação"""
     try:
         provider_id = provider_data.get('provider_id')
-        user_id = user.get('id')
+        user_id = user.get('sub')  # ID está no campo 'sub' do token
         reason = provider_data.get('reason', 'Não especificado')
 
         print(f"❌ [REQUEST] Prestador {user_id} recusando solicitação {request_id}")
@@ -150,6 +156,12 @@ async def decline_request(
         request_doc = await db.requests.find_one({"id": request_id})
         if not request_doc:
             raise HTTPException(status_code=404, detail="Solicitação não encontrada")
+
+        # Liberar prestador (voltar para available se estava online)
+        await db.providers.update_many(
+            {"user_id": user_id, "is_online": True},
+            {"$set": {"status": "available"}}
+        )
 
         # Salvar decisão do prestador
         decision_doc = {
@@ -312,3 +324,106 @@ async def update_request_status(
     result = {"status": data.status}
     store_idempotent_result(idempotency_key, result)
     return result
+
+@app.post("/requests/{request_id}/client-accept")
+async def client_accept_offer(
+    request_id: str,
+    user=Depends(require_roles([2]))  # Apenas clientes
+):
+    """Cliente aceita uma oferta de prestador"""
+    try:
+        user_id = user.get('sub')  # ID está no campo 'sub' do token
+        print(f"✅ [REQUEST] Cliente {user_id} aceitando oferta para solicitação {request_id}")
+        print(f"🔍 [DEBUG] User payload: {user}")
+
+        # Verificar se a solicitação existe e pertence ao cliente
+        request_doc = await db.requests.find_one({"id": request_id, "client_id": user_id})
+        print(f"🔍 [DEBUG] Request doc found: {request_doc is not None}")
+        if not request_doc:
+            raise HTTPException(status_code=404, detail="Solicitação não encontrada")
+
+        if request_doc.get('status') != 'offered':
+            raise HTTPException(status_code=400, detail="Não há oferta disponível para aceitar")
+
+        # Atualizar status da solicitação para aceita
+        await db.requests.update_one(
+            {"id": request_id},
+            {
+                "$set": {
+                    "status": "accepted",
+                    "client_accepted_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
+        print(f"✅ [REQUEST] Oferta aceita pelo cliente {user_id} para solicitação {request_id}")
+
+        return {
+            "status": "success",
+            "request_id": request_id,
+            "message": "Oferta aceita com sucesso"
+        }
+
+    except Exception as e:
+        print(f"❌ [REQUEST] Erro ao aceitar oferta: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/requests/{request_id}/client-decline")
+async def client_decline_offer(
+    request_id: str,
+    user=Depends(require_roles([2]))  # Apenas clientes
+):
+    """Cliente recusa uma oferta e busca outro prestador"""
+    try:
+        user_id = user.get('sub')  # ID está no campo 'sub' do token
+        print(f"🔄 [REQUEST] Cliente {user_id} recusando oferta para solicitação {request_id}")
+
+        # Verificar se a solicitação existe e pertence ao cliente
+        request_doc = await db.requests.find_one({"id": request_id, "client_id": user_id})
+        if not request_doc:
+            raise HTTPException(status_code=404, detail="Solicitação não encontrada")
+
+        if request_doc.get('status') != 'offered':
+            raise HTTPException(status_code=400, detail="Não há oferta disponível para recusar")
+
+        # Resetar a solicitação para buscar outro prestador
+        await db.requests.update_one(
+            {"id": request_id},
+            {
+                "$set": {
+                    "status": "searching",
+                    "provider_id": None,
+                    "client_declined_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                },
+                "$unset": {
+                    "offered_at": "",
+                    "price": ""
+                }
+            }
+        )
+
+        # Adicionar o prestador recusado à lista de excluídos
+        declined_provider = request_doc.get('provider_id')
+        if declined_provider:
+            await db.requests.update_one(
+                {"id": request_id},
+                {
+                    "$addToSet": {
+                        "declined_providers": declined_provider
+                    }
+                }
+            )
+
+        print(f"🔄 [REQUEST] Solicitação {request_id} resetada para buscar outro prestador")
+
+        return {
+            "status": "success",
+            "request_id": request_id,
+            "message": "Oferta recusada, buscando outro prestador"
+        }
+
+    except Exception as e:
+        print(f"❌ [REQUEST] Erro ao recusar oferta: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

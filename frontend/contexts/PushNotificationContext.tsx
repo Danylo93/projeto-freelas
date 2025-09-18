@@ -58,12 +58,15 @@ export const PushNotificationProvider: React.FC<{ children: React.ReactNode }> =
         return null;
       }
 
-      const token = await Notifications.getExpoPushTokenAsync({
-        projectId: 'your-project-id', // Substitua pelo seu project ID
-      });
-      
-      console.log('✅ [PUSH] Token registrado:', token.data);
-      return token.data;
+      // Desabilitado temporariamente - configure um projectId válido
+      console.warn('⚠️ [PUSH] Push notifications desabilitadas - configure projectId válido');
+      return null;
+
+      // const token = await Notifications.getExpoPushTokenAsync({
+      //   projectId: 'your-project-id', // Substitua pelo seu project ID
+      // });
+      // console.log('✅ [PUSH] Token registrado:', token.data);
+      // return token.data;
     } catch (error) {
       console.error('❌ [PUSH] Erro ao registrar notificações:', error);
       return null;

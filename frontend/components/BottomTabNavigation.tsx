@@ -59,6 +59,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 5,
+      
   },
   tab: {
     flex: 1,

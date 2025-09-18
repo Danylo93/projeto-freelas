@@ -336,6 +336,16 @@ async def decline_request(request_id: str, request: Request):
     """Recusar solicitação - proxy para request-service"""
     return await proxy_request("requests", f"requests/{request_id}/decline", request)
 
+@app.post("/requests/{request_id}/client-accept")
+async def client_accept_offer(request_id: str, request: Request):
+    """Cliente aceita oferta - proxy para request-service"""
+    return await proxy_request("requests", f"requests/{request_id}/client-accept", request)
+
+@app.post("/requests/{request_id}/client-decline")
+async def client_decline_offer(request_id: str, request: Request):
+    """Cliente recusa oferta - proxy para request-service"""
+    return await proxy_request("requests", f"requests/{request_id}/client-decline", request)
+
 # Histórico de serviços - deve vir antes das rotas genéricas
 @app.get("/history/services")
 async def get_service_history(request: Request):

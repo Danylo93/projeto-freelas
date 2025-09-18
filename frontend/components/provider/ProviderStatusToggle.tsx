@@ -156,36 +156,26 @@ export const ProviderStatusToggle: React.FC<ProviderStatusToggleProps> = ({ onSt
   return (
     <View style={styles.container}>
       <View style={styles.statusRow}>
-        <View style={styles.statusInfo}>
-          <Text style={styles.statusLabel}>Status do Prestador</Text>
-          <Text style={[styles.statusText, { color: isOnline ? '#4CAF50' : '#FF5722' }]}>
-            {isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}
-          </Text>
-          <Text style={styles.statusDescription}>
-            {isOnline 
-              ? 'Você receberá notificações de novas solicitações'
-              : 'Você não receberá notificações até ficar online'
-            }
-          </Text>
-        </View>
-        
-        <View style={styles.switchContainer}>
-          <Switch
-            value={isOnline}
-            onValueChange={handleToggle}
-            disabled={isUpdating}
-            trackColor={{ false: '#FF5722', true: '#4CAF50' }}
-            thumbColor={isOnline ? '#ffffff' : '#ffffff'}
-            ios_backgroundColor="#FF5722"
+        <Text style={[styles.statusText, { color: isOnline ? '#4CAF50' : '#FF5722' }]}>
+          {isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}
+        </Text>
+
+        <Switch
+          value={isOnline}
+          onValueChange={handleToggle}
+          disabled={isUpdating}
+          trackColor={{ false: '#FF5722', true: '#4CAF50' }}
+          thumbColor={isOnline ? '#ffffff' : '#ffffff'}
+          ios_backgroundColor="#FF5722"
+          style={styles.switch}
+        />
+        {isUpdating && (
+          <ActivityIndicator
+            size="small"
+            color="#007AFF"
+            style={styles.updatingIndicator}
           />
-          {isUpdating && (
-            <ActivityIndicator 
-              size="small" 
-              color="#007AFF" 
-              style={styles.updatingIndicator}
-            />
-          )}
-        </View>
+        )}
       </View>
     </View>
   );
@@ -193,51 +183,26 @@ export const ProviderStatusToggle: React.FC<ProviderStatusToggleProps> = ({ onSt
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    // Sem background, sem padding - apenas o conteúdo
   },
   statusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  statusInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  statusLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 4,
+    gap: 8,
   },
   statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  statusDescription: {
     fontSize: 12,
-    color: '#666666',
-    lineHeight: 16,
+    fontWeight: '600',
   },
-  switchContainer: {
-    alignItems: 'center',
-    position: 'relative',
+  switch: {
+    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
   },
   updatingIndicator: {
     position: 'absolute',
-    top: -25,
+    right: -20,
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666666',
     marginLeft: 8,
   },

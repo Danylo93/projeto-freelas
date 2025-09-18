@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 import { AuthProvider } from '../contexts/AuthContext';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 import { RealtimeProvider } from '../contexts/SimpleSocketIOContext';
 import { LocationProvider } from '../contexts/LocationContext';
 import { PushNotificationProvider } from '../contexts/PushNotificationContext';
@@ -9,6 +11,7 @@ import { NotificationsProvider } from '../contexts/NotificationsContext';
 
 export default function RootLayout() {
   return (
+     <SafeAreaProvider>
     <AuthProvider>
       <LocationProvider>
         <RealtimeProvider>
@@ -23,9 +26,7 @@ export default function RootLayout() {
                 >
                   <Stack.Screen name="index" />
                   <Stack.Screen name="auth/index" />
-                  <Stack.Screen name="client/index" />
-                  <Stack.Screen name="provider/index" />
-                  <Stack.Screen name="profile/index" />
+                  <Stack.Screen name="uber-style/index" />
                 </Stack>
               </NotificationsProvider>
             </PaymentProvider>
@@ -33,5 +34,6 @@ export default function RootLayout() {
         </RealtimeProvider>
       </LocationProvider>
     </AuthProvider>
+    </SafeAreaProvider>
   );
 }

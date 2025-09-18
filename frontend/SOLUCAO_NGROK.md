@@ -57,8 +57,8 @@ EXPO_PUBLIC_SOCKET_URL=http://localhost:8000
 
 O arquivo `.env` está configurado com:
 ```env
-EXPO_PUBLIC_API_URL=https://eedfd16e8f89.ngrok-free.app
-EXPO_PUBLIC_SOCKET_URL=https://eedfd16e8f89.ngrok-free.app
+EXPO_PUBLIC_API_URL=https://a3c6786f0738.ngrok-free.app
+EXPO_PUBLIC_SOCKET_URL=https://a3c6786f0738.ngrok-free.app
 ```
 
 ## Como Testar

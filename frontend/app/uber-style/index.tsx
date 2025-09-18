@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import { View, StyleSheet, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { MatchingProvider } from '@/contexts/UberStyleMatchingContext';
 import { RealtimeProvider } from '@/contexts/SimpleSocketIOContext';

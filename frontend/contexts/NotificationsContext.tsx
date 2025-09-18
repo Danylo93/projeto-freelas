@@ -38,7 +38,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         const projectId = Constants.expoConfig?.extra?.eas?.projectId;
 
         // Verificar se o projectId é válido antes de tentar obter o token
-        if (!projectId || projectId === 'ab536686-5f95-4eaf-bdfb-a80e4d7d9dec') {
+        if (!projectId || projectId === 'ab536686-5f95-4eaf-bdfb-a80e4d7d9dec' || projectId.length < 10) {
           console.warn('⚠️ [PUSH] ProjectId não configurado ou inválido, pulando registro de push token');
           return;
         }

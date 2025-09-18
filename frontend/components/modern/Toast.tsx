@@ -8,6 +8,8 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { feedbackService } from '../../services/feedbackService';
+import { analyticsService } from '../../services/analyticsService';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +35,33 @@ export const Toast: React.FC<ToastProps> = ({
 
   useEffect(() => {
     if (visible) {
+      // Feedback háptico baseado no tipo
+      const provideFeedback = async () => {
+        switch (type) {
+          case 'success':
+            await feedbackService.success();
+            break;
+          case 'error':
+            await feedbackService.error();
+            break;
+          case 'warning':
+            await feedbackService.warning();
+            break;
+          default:
+            await feedbackService.selection();
+        }
+      };
+
+      provideFeedback();
+
+      // Analytics
+      analyticsService.track('toast_shown', {
+        type,
+        message: message.substring(0, 50), // Primeiros 50 caracteres
+        duration,
+        position,
+      });
+
       // Mostrar toast
       Animated.parallel([
         Animated.spring(translateY, {
@@ -57,7 +86,7 @@ export const Toast: React.FC<ToastProps> = ({
         return () => clearTimeout(timer);
       }
     }
-  }, [visible, duration, onHide]);
+  }, [visible, duration, onHide, type, message, position]);
 
   const hideToast = () => {
     Animated.parallel([
