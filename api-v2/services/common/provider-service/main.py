@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 from aiokafka import AIOKafkaProducer
 
@@ -56,6 +57,17 @@ class LocationUpdate(BaseModel):
 class StatusUpdate(BaseModel):
     status: str
 
+class ProviderService(BaseModel):
+    category: str
+    basePrice: float
+    enabled: bool
+
+class ProviderServicesConfig(BaseModel):
+    user_id: str
+    services: List[ProviderService]
+    location: dict
+    is_available: bool = True
+
 @app.get("/healthz")
 async def health():
     return {"status":"ok","service":"provider"}
@@ -98,6 +110,14 @@ async def list_providers(
     cur = apply_sort(cur, sorting)
     cur = apply_pagination(cur, pagination)
     return [doc async for doc in cur]
+
+@app.get("/providers/{provider_id}", response_model=Provider)
+async def get_provider(provider_id: str):
+    """Buscar um prestador específico por ID"""
+    provider = await db.providers.find_one({"id": provider_id}, {"_id": 0})
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return Provider(**provider)
 
 @app.post("/providers", response_model=Provider)
 async def create_provider(
@@ -169,3 +189,112 @@ async def update_status(provider_id: str, data: StatusUpdate):
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="provider not found")
     return {"status": data.status}
+
+@app.post("/providers/services")
+async def configure_provider_services(
+    config: ProviderServicesConfig,
+    user=Depends(require_roles([1])),
+):
+    """Configura os serviços oferecidos por um prestador"""
+    user_id = config.user_id
+
+    # Remover serviços existentes do usuário
+    await db.providers.delete_many({"user_id": user_id})
+
+    # Criar um provider para cada serviço habilitado
+    providers_to_insert = []
+    for service in config.services:
+        if service.enabled:
+            provider_data = {
+                "id": f"{user_id}_{service.category}",
+                "name": service.category,
+                "category": service.category,
+                "price": service.basePrice,
+                "description": f"Serviço de {service.category}",
+                "latitude": config.location.get("latitude", 0),
+                "longitude": config.location.get("longitude", 0),
+                "status": "available" if config.is_available else "offline",
+                "is_online": config.is_available,  # Adicionar campo is_online
+                "rating": 5.0,
+                "user_id": user_id,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+            providers_to_insert.append(provider_data)
+
+    if providers_to_insert:
+        await db.providers.insert_many(providers_to_insert)
+
+    return {
+        "status": "success",
+        "services_configured": len(providers_to_insert),
+        "services": [p["category"] for p in providers_to_insert]
+    }
+
+@app.post("/providers/{user_id}/status")
+async def update_provider_status(
+    user_id: str,
+    status_data: dict,
+    user=Depends(require_roles([1]))
+):
+    """Atualizar status online/offline do prestador"""
+    try:
+        is_online = status_data.get('is_online', True)
+
+        print(f"🔄 [PROVIDER] Atualizando status para {user_id}: {'ONLINE' if is_online else 'OFFLINE'}")
+
+        # Atualizar todos os serviços do prestador
+        result = await db.providers.update_many(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "is_online": is_online,
+                    "status": "available" if is_online else "offline",
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
+        print(f"✅ [PROVIDER] {result.modified_count} serviços atualizados")
+
+        return {
+            "status": "success",
+            "is_online": is_online,
+            "services_updated": result.modified_count
+        }
+
+    except Exception as e:
+        print(f"❌ [PROVIDER] Erro ao atualizar status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/providers/{user_id}/status")
+async def get_provider_status(
+    user_id: str,
+    user=Depends(require_roles([1, 2, 3]))
+):
+    """Obter status atual do prestador"""
+    try:
+        # Buscar um serviço do prestador para verificar status
+        provider = await db.providers.find_one({"user_id": user_id})
+
+        if not provider:
+            return {
+                "status": "not_found",
+                "is_online": False,
+                "services_count": 0
+            }
+
+        # Contar total de serviços
+        services_count = await db.providers.count_documents({"user_id": user_id})
+
+        return {
+            "status": "success",
+            "is_online": provider.get('is_online', False),
+            "provider_status": provider.get('status', 'offline'),
+            "services_count": services_count,
+            "last_updated": provider.get('updated_at')
+        }
+
+    except Exception as e:
+        print(f"❌ [PROVIDER] Erro ao obter status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

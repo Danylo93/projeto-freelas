@@ -1,0 +1,16 @@
+{
+  "provider_user_id": "5b2d9997-e1dc-4242-af34-d3477cb916df",
+  "notification_data": {
+    "request_id": "req_test_manual_456",
+    "client_id": "9ae70d35-9b6b-40c6-9aaa-7019cf0a5a0b",
+    "category": "Eletricista",
+    "description": "🧪 TESTE MANUAL - Preciso de um eletricista urgente!",
+    "client_latitude": -23.5505,
+    "client_longitude": -46.6333,
+    "price": 75,
+    "client_address": "São Paulo, SP - TESTE MANUAL",
+    "urgency": "high",
+    "client_name": "Cliente Teste",
+    "client_phone": "11888888888"
+  }
+}

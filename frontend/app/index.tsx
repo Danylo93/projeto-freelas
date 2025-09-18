@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import AuthScreen from './auth/index';
-import ClientHome from './client/index';
-import ProviderHome from './provider/index';
+import UberStyleApp from './uber-style/index';
+
 
 export default function Index() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -77,20 +77,9 @@ export default function Index() {
 
   console.log('✅ [INDEX] Usuário autenticado:', user.name, 'Tipo:', user.user_type);
 
-  // Redirect based on user type
-  if (user.user_type === 1) {
-    console.log('👷 [INDEX] Redirecionando para ProviderHome');
-    return <ProviderHome />;
-  } else if (user.user_type === 2) {
-    console.log('👤 [INDEX] Redirecionando para ClientHome');
-    return <ClientHome />;
-  }
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.errorText}>Erro: Tipo de usuário inválido</Text>
-    </View>
-  );
+  // Redirect to UberStyleApp for both user types
+  console.log('� [INDEX] Redirecionando para UberStyleApp');
+  return <UberStyleApp />;
 }
 
 const styles = StyleSheet.create({

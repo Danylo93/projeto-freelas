@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { AuthProvider } from '../contexts/AuthContext';
-import { RealtimeProvider } from '../contexts/RealtimeContext';
+import { RealtimeProvider } from '../contexts/SimpleSocketIOContext';
 import { LocationProvider } from '../contexts/LocationContext';
 import { PushNotificationProvider } from '../contexts/PushNotificationContext';
 import { StatusBar } from 'expo-status-bar';

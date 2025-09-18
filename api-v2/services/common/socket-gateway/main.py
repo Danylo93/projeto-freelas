@@ -172,16 +172,37 @@ async def update_request_status(request_id: str, data: dict, idempotency_key: st
 
 @sio.event
 async def connect(sid, environ, auth):
+    user_id = auth.get("user_id") if auth else None
+    user_type = auth.get("user_type") if auth else None
+
     await sio.save_session(sid, {
-        "user_id": auth.get("user_id"),
-        "user_type": auth.get("user_type"),
+        "user_id": user_id,
+        "user_type": user_type,
     })
+
+    # Entrar na sala específica baseada no tipo de usuário
+    if user_id and user_type:
+        if user_type == 1:  # Prestador
+            room_name = f"provider_{user_id}"
+            await sio.enter_room(sid, room_name)
+            print(f"🔌 [SOCKET-GATEWAY] Prestador {user_id} entrou na sala {room_name}")
+        elif user_type == 2:  # Cliente
+            room_name = f"client_{user_id}"
+            await sio.enter_room(sid, room_name)
+            print(f"🔌 [SOCKET-GATEWAY] Cliente {user_id} entrou na sala {room_name}")
+
     await sio.emit('presence', {"sid": sid, "status": "online"}, to=sid)
+    print(f"🔌 [SOCKET-GATEWAY] Cliente conectado: {sid} (user_id: {user_id}, user_type: {user_type})")
 
 @sio.event
 async def disconnect(sid):
     sess = await sio.get_session(sid)
-    await sio.emit('presence', {"sid": sid, "status": "offline", "user_id": sess.get("user_id")})
+    user_id = sess.get("user_id")
+    user_type = sess.get("user_type")
+
+    print(f"🔌 [SOCKET-GATEWAY] Cliente desconectado: {sid} (user_id: {user_id})")
+
+    await sio.emit('presence', {"sid": sid, "status": "offline", "user_id": user_id})
 
 @sio.event
 async def chat_message(sid, data):
@@ -218,22 +239,170 @@ consumer_lifecycle = None
 
 async def consume_and_emit(consumer, event_name):
     async for msg in consumer:
-        await sio.emit(event_name, msg.value)
+        print(f"🔔 [SOCKET-GATEWAY] Evento recebido: {event_name} - {msg.value}")
+
+        # Se for um evento de lifecycle, processar especificamente
+        if event_name == 'lifecycle':
+            await handle_lifecycle_event(msg.value)
+        else:
+            await sio.emit(event_name, msg.value)
+
+async def handle_lifecycle_event(data):
+    """Processa eventos de lifecycle e emite eventos específicos"""
+    event_type = data.get('type')
+
+    if event_type == 'request.created':
+        # Quando uma solicitação é criada, notificar prestadores próximos
+        await notify_providers_for_request(data)
+    elif event_type == 'request.accepted':
+        # Quando uma solicitação é aceita, notificar o cliente
+        await notify_client_request_accepted(data)
+    elif event_type == 'request.offered':
+        # Quando uma oferta é feita, notificar o cliente
+        await notify_client_offer_received(data)
+
+    # Emitir o evento original também
+    await sio.emit('lifecycle', data)
+
+async def notify_providers_for_request(data):
+    """Notifica prestadores próximos sobre nova solicitação"""
+    request_id = data.get('request_id')
+    client_id = data.get('client_id')
+
+    if not request_id:
+        return
+
+    try:
+        # Buscar detalhes da solicitação
+        async with httpx.AsyncClient() as client:
+            # Buscar a solicitação
+            req_response = await client.get(f"{REQUEST_URL}/requests?id={request_id}")
+            if req_response.status_code != 200:
+                print(f"❌ [SOCKET-GATEWAY] Erro ao buscar solicitação {request_id}")
+                return
+
+            requests = req_response.json()
+            if not requests:
+                print(f"❌ [SOCKET-GATEWAY] Solicitação {request_id} não encontrada")
+                return
+
+            request_data = requests[0]
+
+            # Buscar prestadores próximos da categoria
+            prov_response = await client.get(f"{PROVIDER_URL}/providers?category={request_data.get('category')}&status=available")
+            if prov_response.status_code != 200:
+                print(f"❌ [SOCKET-GATEWAY] Erro ao buscar prestadores")
+                return
+
+            providers = prov_response.json()
+
+            # Buscar dados do cliente
+            client_response = await client.get(f"{AUTH_URL}/auth/users/{client_id}")
+            client_name = "Cliente"
+            if client_response.status_code == 200:
+                client_data = client_response.json()
+                client_name = client_data.get('name', 'Cliente')
+
+            # Notificar cada prestador
+            for provider in providers:
+                provider_id = provider.get('user_id')
+                if provider_id:
+                    # Calcular distância
+                    distance = calculate_distance(
+                        request_data.get('client_latitude', 0),
+                        request_data.get('client_longitude', 0),
+                        provider.get('latitude', 0),
+                        provider.get('longitude', 0)
+                    )
+
+                    # Preparar dados da notificação
+                    notification_data = {
+                        'request_id': request_id,
+                        'client_id': client_id,
+                        'client_name': client_name,
+                        'category': request_data.get('category'),
+                        'description': request_data.get('description'),
+                        'price': request_data.get('price'),
+                        'distance': round(distance, 1),
+                        'client_latitude': request_data.get('client_latitude'),
+                        'client_longitude': request_data.get('client_longitude'),
+                    }
+
+                    # Emitir para o prestador específico
+                    await sio.emit('new_request', notification_data, room=f"provider_{provider_id}")
+                    print(f"🔔 [SOCKET-GATEWAY] Notificação enviada para prestador {provider_id}")
+
+    except Exception as e:
+        print(f"❌ [SOCKET-GATEWAY] Erro ao notificar prestadores: {e}")
+
+async def notify_client_request_accepted(data):
+    """Notifica cliente que solicitação foi aceita"""
+    client_id = data.get('client_id')
+    if client_id:
+        await sio.emit('request_accepted', data, room=f"client_{client_id}")
+
+async def notify_client_offer_received(data):
+    """Notifica cliente que recebeu uma oferta"""
+    request_id = data.get('request_id')
+    if request_id:
+        # Buscar dados da solicitação para obter client_id
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{REQUEST_URL}/requests?id={request_id}")
+                if response.status_code == 200:
+                    requests = response.json()
+                    if requests:
+                        client_id = requests[0].get('client_id')
+                        if client_id:
+                            await sio.emit('offer_received', data, room=f"client_{client_id}")
+        except Exception as e:
+            print(f"❌ [SOCKET-GATEWAY] Erro ao notificar cliente: {e}")
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    """Calcula distância entre dois pontos em km"""
+    import math
+
+    R = 6371  # Raio da Terra em km
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
 
 @app.on_event("startup")
 async def start_ws():
     global consumer_locations, consumer_lifecycle
-    consumer_locations = await make_consumer_with_retry(
-        TOPIC_PROV_LOCATION,
-        group_id="socket-gateway",
-    )
-    consumer_lifecycle = await make_consumer_with_retry(
-        TOPIC_REQ_LIFECYCLE,
-        group_id="socket-gateway",
-    )
-    asyncio.create_task(consume_and_emit(consumer_locations, 'location_updated'))
-    asyncio.create_task(consume_and_emit(consumer_lifecycle, 'lifecycle'))
+    print(f"🚀 [SOCKET-GATEWAY] Iniciando consumers...")
+    print(f"🚀 [SOCKET-GATEWAY] TOPIC_PROV_LOCATION: {TOPIC_PROV_LOCATION}")
+    print(f"🚀 [SOCKET-GATEWAY] TOPIC_REQ_LIFECYCLE: {TOPIC_REQ_LIFECYCLE}")
+
+    try:
+        consumer_locations = await make_consumer_with_retry(
+            TOPIC_PROV_LOCATION,
+            group_id="socket-gateway",
+        )
+        print(f"✅ [SOCKET-GATEWAY] Consumer de localização criado")
+    except Exception as e:
+        print(f"❌ [SOCKET-GATEWAY] Erro ao criar consumer de localização: {e}")
+
+    try:
+        consumer_lifecycle = await make_consumer_with_retry(
+            TOPIC_REQ_LIFECYCLE,
+            group_id="socket-gateway",
+        )
+        print(f"✅ [SOCKET-GATEWAY] Consumer de lifecycle criado")
+    except Exception as e:
+        print(f"❌ [SOCKET-GATEWAY] Erro ao criar consumer de lifecycle: {e}")
+
+    if consumer_locations:
+        asyncio.create_task(consume_and_emit(consumer_locations, 'location_updated'))
+        print(f"🔄 [SOCKET-GATEWAY] Task de location_updated iniciada")
+
+    if consumer_lifecycle:
+        asyncio.create_task(consume_and_emit(consumer_lifecycle, 'lifecycle'))
+        print(f"🔄 [SOCKET-GATEWAY] Task de lifecycle iniciada")
 
 
 @app.on_event("shutdown")

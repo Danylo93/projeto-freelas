@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -198,6 +198,43 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
     return R * c
 
+async def find_nearby_providers(client_lat, client_lon, category, radius_km=10.0):
+    """Find providers near the client location"""
+    print(f"🔍 [PROVIDERS] Buscando prestadores próximos: categoria={category}, raio={radius_km}km")
+
+    # Buscar todos os prestadores da categoria que estão online
+    providers_cursor = db.provider_profiles.find({
+        "category": category,
+        "is_available": True
+    })
+
+    nearby_providers = []
+    async for provider in providers_cursor:
+        if provider.get("latitude") and provider.get("longitude"):
+            distance = calculate_distance(
+                client_lat, client_lon,
+                provider["latitude"], provider["longitude"]
+            )
+
+            if distance <= radius_km:
+                # Buscar dados do usuário
+                user = await db.users.find_one({"id": provider["user_id"]}, {"_id": 0})
+                if user:
+                    nearby_providers.append({
+                        "user_id": provider["user_id"],
+                        "name": user.get("name", "Prestador"),
+                        "distance": distance,
+                        "latitude": provider["latitude"],
+                        "longitude": provider["longitude"],
+                        "category": provider["category"]
+                    })
+
+    # Ordenar por distância
+    nearby_providers.sort(key=lambda x: x["distance"])
+    print(f"✅ [PROVIDERS] Encontrados {len(nearby_providers)} prestadores próximos")
+
+    return nearby_providers
+
 async def publish_event(channel: str, message: Dict[str, Any]):
     """Publish events to Redis and Kafka"""
     if redis_client:
@@ -360,48 +397,57 @@ async def create_service_request(
 ):
     if current_user.user_type != UserType.CLIENTE:
         raise HTTPException(status_code=403, detail="Only clients can create requests")
-    
+
+    print(f"🔥 [REQUEST] Nova solicitação de {current_user.name}: {request_data}")
+
     # Get client address
     client_address = await get_address_from_coordinates(
         request_data["client_latitude"],
         request_data["client_longitude"]
     )
-    
+
+    # Criar solicitação sem provider_id (será definido quando alguém aceitar)
     service_request = ServiceRequest(
         client_id=current_user.id,
-        provider_id=request_data["provider_id"],
+        provider_id=None,  # Será definido quando um prestador aceitar
         category=request_data["category"],
-        description=request_data["description"],
+        description=request_data.get("description", ""),
         client_latitude=request_data["client_latitude"],
         client_longitude=request_data["client_longitude"],
         client_address=client_address,
-        price=request_data["price"]
+        price=request_data["price"],
+        status="pending"  # Status inicial
     )
-    
-    await db.service_requests.insert_one(service_request.dict())
 
-    # calcula distância real entre cliente e prestador (se existir perfil)
-    provider_prof = await db.provider_profiles.find_one({"user_id": request_data["provider_id"]}, {"_id": 0})
-    dist_for_notify = 0.0
-    if provider_prof:
-        dist_for_notify = calculate_distance(
-            request_data["client_latitude"],
-            request_data["client_longitude"],
-            provider_prof.get("latitude", 0.0),
-            provider_prof.get("longitude", 0.0)
-        )
-    # Emit real-time notification to provider
-    await sio.emit('new_request', {
-        'request_id': service_request.id,
-        'client_name': current_user.name,
-        'client_phone': current_user.phone,
-        'category': service_request.category,
-        'description': service_request.description,
-        'price': service_request.price,
-        'distance': round(dist_for_notify, 1),
-        'client_address': client_address
-    }, room=f"provider_{request_data['provider_id']}")
-    
+    await db.service_requests.insert_one(service_request.dict())
+    print(f"✅ [REQUEST] Solicitação salva no banco: {service_request.id}")
+
+    # Buscar prestadores próximos da categoria
+    nearby_providers = await find_nearby_providers(
+        request_data["client_latitude"],
+        request_data["client_longitude"],
+        request_data["category"],
+        radius_km=10.0  # 10km de raio
+    )
+
+    print(f"📍 [REQUEST] Encontrados {len(nearby_providers)} prestadores próximos")
+
+    # Notificar todos os prestadores próximos
+    for provider in nearby_providers:
+        print(f"📱 [REQUEST] Notificando prestador {provider['name']} (ID: {provider['user_id']})")
+        await sio.emit('new_request', {
+            'request_id': service_request.id,
+            'client_name': current_user.name,
+            'client_phone': current_user.phone,
+            'category': service_request.category,
+            'description': service_request.description,
+            'price': service_request.price,
+            'distance': round(provider['distance'], 1),
+            'client_address': client_address,
+            'client_latitude': request_data["client_latitude"],
+            'client_longitude': request_data["client_longitude"]
+        }, room=f"provider_{provider['user_id']}")
+
     return service_request
 
 @api_router.get("/requests", response_model=List[Dict[str, Any]])
@@ -673,6 +719,84 @@ async def shutdown_db_client():
         await kafka_producer.stop()
     if redis_client:
         await redis_client.close()
+
+# WebSocket endpoint for compatibility
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Endpoint WebSocket para compatibilidade com frontend"""
+    # Extrair parâmetros da query string
+    query_params = websocket.query_params
+    user_id = query_params.get("user_id")
+    user_type = query_params.get("user_type")
+    token = query_params.get("token")
+
+    if not user_id or not user_type or not token:
+        await websocket.close(code=1008, reason="Missing authentication data")
+        return
+
+    # Validar token JWT
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        token_user_id = payload.get("sub")
+        token_user_type = payload.get("user_type")
+
+        # Verificar se os dados do token batem com os parâmetros
+        if token_user_id != user_id or token_user_type != int(user_type):
+            await websocket.close(code=1008, reason="Invalid authentication data")
+            return
+
+    except jwt.ExpiredSignatureError:
+        await websocket.close(code=1008, reason="Token expired")
+        return
+    except jwt.InvalidTokenError:
+        await websocket.close(code=1008, reason="Invalid token")
+        return
+
+    await websocket.accept()
+    print(f"🔌 [WS] Usuário {user_id} (tipo {user_type}) conectado via WebSocket")
+
+    try:
+        # Enviar mensagem de boas-vindas
+        await websocket.send_text(json.dumps({
+            'type': 'connected',
+            'message': 'WebSocket conectado com sucesso',
+            'user_id': user_id,
+            'user_type': user_type
+        }))
+
+        while True:
+            # Receber mensagem do cliente
+            data = await websocket.receive_text()
+            message = json.loads(data)
+
+            # Processar tipo de mensagem
+            message_type = message.get('type', '')
+
+            if message_type == 'ping':
+                # Heartbeat
+                await websocket.send_text(json.dumps({
+                    'type': 'pong',
+                    'timestamp': message.get('timestamp')
+                }))
+            elif message_type == 'join_room':
+                # Simular entrada em sala
+                room_id = message.get('room')
+                await websocket.send_text(json.dumps({
+                    'type': 'room_joined',
+                    'room': room_id
+                }))
+            else:
+                # Echo da mensagem para teste
+                await websocket.send_text(json.dumps({
+                    'type': 'echo',
+                    'original': message
+                }))
+
+    except WebSocketDisconnect:
+        print(f"🔌 [WS] Usuário {user_id} desconectado")
+    except Exception as e:
+        print(f"❌ [WS] Erro no WebSocket: {e}")
+        await websocket.close(code=1011, reason="Internal error")
 
 # Use socket_app instead of app for the main application
 if __name__ == "__main__":

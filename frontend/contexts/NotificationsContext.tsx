@@ -23,31 +23,45 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     (async () => {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      if (finalStatus !== 'granted') {
-        return;
-      }
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-      const tokenRes = await Notifications.getExpoPushTokenAsync({ projectId });
-      const expoToken = tokenRes.data;
-      setPushToken(expoToken);
-
-      if (token && AUTH_API_URL && expoToken) {
-        try {
-          await axios.post(`${AUTH_API_URL}/push-token`, { token: expoToken }, {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'ngrok-skip-browser-warning': '1'
-            },
-          });
-        } catch (e) {
-          console.warn('Failed to register push token', e);
+      try {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
         }
+        if (finalStatus !== 'granted') {
+          console.warn('❌ [PUSH] Permissão de notificação negada');
+          return;
+        }
+
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+
+        // Verificar se o projectId é válido antes de tentar obter o token
+        if (!projectId || projectId === 'ab536686-5f95-4eaf-bdfb-a80e4d7d9dec') {
+          console.warn('⚠️ [PUSH] ProjectId não configurado ou inválido, pulando registro de push token');
+          return;
+        }
+
+        const tokenRes = await Notifications.getExpoPushTokenAsync({ projectId });
+        const expoToken = tokenRes.data;
+        setPushToken(expoToken);
+
+        if (token && AUTH_API_URL && expoToken) {
+          try {
+            await axios.post(`${AUTH_API_URL}/push-token`, { token: expoToken }, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'ngrok-skip-browser-warning': '1'
+              },
+            });
+            console.log('✅ [PUSH] Token registrado com sucesso');
+          } catch (e) {
+            console.warn('❌ [PUSH] Falha ao registrar push token:', e);
+          }
+        }
+      } catch (error) {
+        console.error('❌ [PUSH] Erro ao registrar notificações:', error);
       }
     })();
   }, [token]);

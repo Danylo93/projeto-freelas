@@ -4,6 +4,7 @@ from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from aiokafka import AIOKafkaProducer
 import os, asyncio
+from datetime import datetime
 from dotenv import load_dotenv
 
 from common.kafka import make_producer
@@ -71,6 +72,135 @@ async def stop():
 @app.get("/healthz")
 async def health():
     return {"status":"ok","service":"request"}
+
+@app.post("/requests/{request_id}/accept")
+async def accept_request(
+    request_id: str,
+    provider_data: dict,
+    user=Depends(require_roles([1]))  # Apenas prestadores
+):
+    """Prestador aceita uma solicitação"""
+    try:
+        provider_id = provider_data.get('provider_id')
+        user_id = user.get('id')
+
+        print(f"✅ [REQUEST] Prestador {user_id} aceitando solicitação {request_id}")
+
+        # Verificar se a solicitação existe e está disponível
+        request_doc = await db.requests.find_one({"id": request_id})
+        if not request_doc:
+            raise HTTPException(status_code=404, detail="Solicitação não encontrada")
+
+        if request_doc.get('status') != 'offered':
+            raise HTTPException(status_code=400, detail="Solicitação não está disponível para aceitar")
+
+        # Atualizar status da solicitação
+        await db.requests.update_one(
+            {"id": request_id},
+            {
+                "$set": {
+                    "status": "accepted",
+                    "provider_id": provider_id,
+                    "accepted_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
+        # Salvar decisão do prestador
+        decision_doc = {
+            "id": f"decision_{request_id}_{user_id}",
+            "request_id": request_id,
+            "provider_id": provider_id,
+            "user_id": user_id,
+            "decision": "accepted",
+            "decided_at": datetime.utcnow(),
+            "created_at": datetime.utcnow()
+        }
+        await db.provider_decisions.insert_one(decision_doc)
+
+        print(f"✅ [REQUEST] Solicitação {request_id} aceita por {user_id}")
+
+        return {
+            "status": "success",
+            "request_id": request_id,
+            "provider_id": provider_id,
+            "decision": "accepted"
+        }
+
+    except Exception as e:
+        print(f"❌ [REQUEST] Erro ao aceitar solicitação: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/requests/{request_id}/decline")
+async def decline_request(
+    request_id: str,
+    provider_data: dict,
+    user=Depends(require_roles([1]))  # Apenas prestadores
+):
+    """Prestador recusa uma solicitação"""
+    try:
+        provider_id = provider_data.get('provider_id')
+        user_id = user.get('id')
+        reason = provider_data.get('reason', 'Não especificado')
+
+        print(f"❌ [REQUEST] Prestador {user_id} recusando solicitação {request_id}")
+
+        # Verificar se a solicitação existe
+        request_doc = await db.requests.find_one({"id": request_id})
+        if not request_doc:
+            raise HTTPException(status_code=404, detail="Solicitação não encontrada")
+
+        # Salvar decisão do prestador
+        decision_doc = {
+            "id": f"decision_{request_id}_{user_id}",
+            "request_id": request_id,
+            "provider_id": provider_id,
+            "user_id": user_id,
+            "decision": "declined",
+            "reason": reason,
+            "decided_at": datetime.utcnow(),
+            "created_at": datetime.utcnow()
+        }
+        await db.provider_decisions.insert_one(decision_doc)
+
+        print(f"❌ [REQUEST] Solicitação {request_id} recusada por {user_id}")
+
+        return {
+            "status": "success",
+            "request_id": request_id,
+            "provider_id": provider_id,
+            "decision": "declined",
+            "reason": reason
+        }
+
+    except Exception as e:
+        print(f"❌ [REQUEST] Erro ao recusar solicitação: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/providers/{user_id}/decisions")
+async def get_provider_decisions(
+    user_id: str,
+    user=Depends(require_roles([1]))  # Apenas prestadores
+):
+    """Obter histórico de decisões do prestador"""
+    try:
+        decisions_cursor = db.provider_decisions.find(
+            {"user_id": user_id},
+            {"_id": 0}
+        ).sort("decided_at", -1).limit(50)
+
+        decisions = await decisions_cursor.to_list(length=50)
+
+        return {
+            "status": "success",
+            "decisions": decisions,
+            "total": len(decisions)
+        }
+
+    except Exception as e:
+        print(f"❌ [REQUEST] Erro ao obter decisões: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/requests", response_model=List[ServiceRequest])
 async def list_requests(

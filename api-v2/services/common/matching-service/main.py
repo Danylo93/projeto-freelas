@@ -42,9 +42,11 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 async def match_request(req: dict):
+    print(f"🔍 [MATCHING] Processando solicitação: {req.get('id')} - {req.get('category')}")
     cur = db.providers.find({
         "category": req.get("category"),
         "status": "available",
+        "is_online": True,  # Apenas prestadores online
     }, {"_id": 0})
 
     best = None
@@ -61,6 +63,7 @@ async def match_request(req: dict):
             best_dist = dist
 
     if best:
+        print(f"✅ [MATCHING] Prestador encontrado: {best['id']} para {req.get('id')}")
         await db.requests.update_one(
             {"id": req.get("id")},
             {"$set": {"provider_id": best["id"], "status": "offered"}},
@@ -70,6 +73,7 @@ async def match_request(req: dict):
             {"$set": {"status": "busy"}},
         )
         if producer:
+            print(f"📤 [MATCHING] Enviando evento request.offered para {best['id']}")
             await producer.send_and_wait(
                 LIFECYCLE_TOPIC,
                 {
@@ -78,23 +82,43 @@ async def match_request(req: dict):
                     "provider_id": best["id"],
                 },
             )
+    else:
+        print(f"❌ [MATCHING] Nenhum prestador encontrado para {req.get('category')}")
 
 
 async def consume():
     assert consumer is not None
+    print(f"🔄 [MATCHING] Iniciando consumo de mensagens do tópico: {REQ_TOPIC}")
     async for msg in consumer:
+        print(f"📨 [MATCHING] Mensagem recebida: {msg.value}")
         await match_request(msg.value)
 
 
 @app.on_event("startup")
 async def start():
     global consumer, producer
-    consumer = await make_consumer_with_retry(
-        REQ_TOPIC,
-        group_id="matching-service",
-    )
-    producer = await make_producer()
-    asyncio.create_task(consume())
+    print(f"🚀 [MATCHING] Iniciando matching-service...")
+    print(f"🚀 [MATCHING] REQ_TOPIC: {REQ_TOPIC}")
+    print(f"🚀 [MATCHING] LIFECYCLE_TOPIC: {LIFECYCLE_TOPIC}")
+
+    try:
+        consumer = await make_consumer_with_retry(
+            REQ_TOPIC,
+            group_id="matching-service",
+        )
+        print(f"✅ [MATCHING] Consumer criado para tópico: {REQ_TOPIC}")
+    except Exception as e:
+        print(f"❌ [MATCHING] Erro ao criar consumer: {e}")
+
+    try:
+        producer = await make_producer()
+        print(f"✅ [MATCHING] Producer criado")
+    except Exception as e:
+        print(f"❌ [MATCHING] Erro ao criar producer: {e}")
+
+    if consumer:
+        asyncio.create_task(consume())
+        print(f"🔄 [MATCHING] Task de consumo iniciada")
 
 
 @app.on_event("shutdown")

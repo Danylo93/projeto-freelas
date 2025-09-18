@@ -18,6 +18,12 @@ services:
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
       - ALLOW_PLAINTEXT_LISTENER=yes
     networks: [core]
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -77,7 +83,13 @@ services:
       dockerfile: provider-service/Dockerfile
     container_name: provider-service
     networks: [core]
-    depends_on: [mongo, kafka, redis]
+    depends_on:
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_healthy
     env_file:
       - ./services/common/provider-service/.env
     environment:
@@ -98,7 +110,13 @@ services:
       dockerfile: request-service/Dockerfile
     container_name: request-service
     networks: [core]
-    depends_on: [mongo, kafka, redis]
+    depends_on:
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_healthy
     env_file:
       - ./services/common/request-service/.env
     environment:
@@ -122,7 +140,7 @@ services:
       mongo:
         condition: service_started
       kafka:
-        condition: service_started
+        condition: service_healthy
     env_file:
       - ./services/common/matching-service/.env
     working_dir: /app/matching-service
@@ -154,6 +172,7 @@ services:
       context: ./services/common/socket-gateway
       dockerfile: Dockerfile
     container_name: socket-gateway
+    ports: ["8015:8015"]
     networks: [core]
     depends_on:
       provider-service:
@@ -161,6 +180,8 @@ services:
       request-service:
         condition: service_healthy
       auth-service:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     env_file:
       - ./services/common/socket-gateway/.env
@@ -170,6 +191,37 @@ services:
     working_dir: /app/socket-gateway
     volumes:
       - ./services/common:/app
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8015/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  notification-service:
+    build:
+      context: ./services/common
+      dockerfile: notification-service/Dockerfile
+    container_name: notification-service
+    ports: ["8016:8016"]
+    networks: [core]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      PYTHONPATH: /app
+      KAFKA_BOOTSTRAP: kafka:29092
+      MONGO_URL: mongodb://mongo:27017
+      DB_NAME: freelas
+    working_dir: /app/notification-service
+    volumes:
+      - ./services/common:/app
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8016/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   payment-service:
     build:

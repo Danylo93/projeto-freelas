@@ -1,8 +1,10 @@
 import json
 import asyncio
+import os
 from typing import Dict, Set, Any
 from fastapi import WebSocket, WebSocketDisconnect
 import logging
+import jwt
 
 logger = logging.getLogger(__name__)
 
@@ -113,12 +115,88 @@ class ConnectionManager:
 # Instância global do gerenciador
 manager = ConnectionManager()
 
+async def notify_providers_new_request(request_data: dict):
+    """Notifica prestadores disponíveis sobre nova solicitação"""
+    category = request_data.get('category')
+    client_latitude = request_data.get('client_latitude')
+    client_longitude = request_data.get('client_longitude')
+
+    # Encontrar prestadores online da categoria
+    online_providers = []
+    for user_id, connection in manager.active_connections.items():
+        user_data = manager.user_data.get(user_id, {})
+        if user_data.get('user_type') == 1:  # Prestador
+            # Aqui você pode adicionar lógica para verificar categoria e distância
+            online_providers.append(user_id)
+
+    # Enviar notificação para prestadores elegíveis
+    notification = {
+        'type': 'new_request',
+        'request_id': request_data.get('id'),
+        'category': category,
+        'description': request_data.get('description'),
+        'price': request_data.get('price'),
+        'client_latitude': client_latitude,
+        'client_longitude': client_longitude,
+        'client_address': request_data.get('client_address'),
+        'timestamp': request_data.get('created_at')
+    }
+
+    for provider_id in online_providers:
+        await manager.send_personal_message(notification, provider_id)
+
+async def notify_client_provider_found(request_id: str, provider_data: dict):
+    """Notifica cliente que um prestador foi encontrado"""
+    notification = {
+        'type': 'provider_found',
+        'request_id': request_id,
+        'provider_id': provider_data.get('id'),
+        'provider_name': provider_data.get('name'),
+        'provider_rating': provider_data.get('rating'),
+        'estimated_arrival': '10-15 min',
+        'timestamp': provider_data.get('updated_at')
+    }
+
+    await manager.send_room_message(notification, f"request_{request_id}")
+
+async def notify_request_accepted(request_id: str, provider_data: dict):
+    """Notifica cliente que prestador aceitou a solicitação"""
+    notification = {
+        'type': 'request_accepted',
+        'request_id': request_id,
+        'provider_id': provider_data.get('id'),
+        'provider_name': provider_data.get('name'),
+        'message': 'Prestador aceitou sua solicitação e está a caminho!',
+        'timestamp': provider_data.get('updated_at')
+    }
+
+    await manager.send_room_message(notification, f"request_{request_id}")
+
 async def websocket_endpoint(websocket: WebSocket, user_id: str = None, user_type: int = None, token: str = None):
     """Endpoint principal do WebSocket"""
     if not user_id or not user_type or not token:
         await websocket.close(code=1008, reason="Missing authentication data")
         return
-        
+
+    # Validar token JWT
+    try:
+        SECRET_KEY = os.getenv("JWT_SECRET", "your-secret-key-here-change-in-production")
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        token_user_id = payload.get("sub")
+        token_user_type = payload.get("user_type")
+
+        # Verificar se os dados do token batem com os parâmetros
+        if token_user_id != user_id or token_user_type != user_type:
+            await websocket.close(code=1008, reason="Invalid authentication data")
+            return
+
+    except jwt.ExpiredSignatureError:
+        await websocket.close(code=1008, reason="Token expired")
+        return
+    except jwt.InvalidTokenError:
+        await websocket.close(code=1008, reason="Invalid token")
+        return
+
     await manager.connect(websocket, user_id, user_type)
     
     try:
@@ -173,7 +251,37 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str = None, user_typ
                         'data': message_data,
                         'timestamp': message.get('timestamp')
                     })
-                    
+
+            elif message_type == 'location_update':
+                # Atualização de localização do prestador
+                request_id = message.get('request_id')
+                provider_id = message.get('provider_id')
+                latitude = message.get('latitude')
+                longitude = message.get('longitude')
+
+                if request_id and provider_id and latitude and longitude:
+                    await manager.send_room_message({
+                        'type': 'location_updated',
+                        'request_id': request_id,
+                        'provider_id': provider_id,
+                        'latitude': latitude,
+                        'longitude': longitude,
+                        'timestamp': message.get('timestamp')
+                    }, f"request_{request_id}")
+
+            elif message_type == 'request_status_update':
+                # Atualização de status da solicitação
+                request_id = message.get('request_id')
+                status = message.get('status')
+
+                if request_id and status:
+                    await manager.send_room_message({
+                        'type': 'request_status_updated',
+                        'request_id': request_id,
+                        'status': status,
+                        'timestamp': message.get('timestamp')
+                    }, f"request_{request_id}")
+
             else:
                 logger.warning(f"⚠️ [WS] Tipo de mensagem desconhecido: {message_type}")
                 

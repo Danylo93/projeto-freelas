@@ -153,11 +153,29 @@ export const ADMIN_API_URL = resolveServiceUrl(
   '/admin'
 );
 
-// Socket URL (usando HTTPS para ngrok)
-export const SOCKET_URL =
-  stripTrailingSlash(process.env.EXPO_PUBLIC_SOCKET_URL) ||
-  fallbackSocketHost ||
-  API_URL;
+// Socket URL - usando detecção inteligente para notification-service
+const getSocketURL = (): string => {
+  const envUrl = process.env.EXPO_PUBLIC_SOCKET_URL;
+  const fallbackUrl = process.env.EXPO_PUBLIC_SOCKET_FALLBACK_URL || `${DEV_PROTOCOL}://${fallbackHost}:8016`;
+
+  // Se URL específica foi definida (não 'auto'), usar ela
+  if (envUrl && envUrl !== 'auto') {
+    console.log('🔌 [SOCKET-CONFIG] Usando URL específica:', envUrl);
+    return envUrl;
+  }
+
+  // Auto-detecção para notification-service na porta 8016
+  if (fallbackHost) {
+    const socketUrl = `${DEV_PROTOCOL}://${fallbackHost}:8016`;
+    console.log('🔌 [SOCKET-CONFIG] Auto-detectado:', socketUrl);
+    return socketUrl;
+  }
+
+  console.log('🔌 [SOCKET-CONFIG] Usando fallback:', fallbackUrl);
+  return fallbackUrl;
+};
+
+export const SOCKET_URL = getSocketURL();
 
 // Outras configurações
 export const STRIPE_PUBLISHABLE_KEY = rawStripePk || '';

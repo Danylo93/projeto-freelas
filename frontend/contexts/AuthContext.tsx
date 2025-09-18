@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 import { API_BASE_URL, AUTH_API_URL } from '@/utils/config';
+import { notificationService } from '@/services/notificationService';
 
 interface User {
   id: string;
@@ -21,8 +22,11 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (userData: Partial<User>) => void;
   isAuthenticated: boolean;
   getAuthHeaders: () => Record<string, string>;
+  validateToken: () => Promise<boolean>;
+  refreshAuth: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -53,23 +57,82 @@ if (API_BASE_URL) {
 
 // Configuração simples do axios
 
+// Variável para controlar se já estamos tentando renovar o token
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (value?: any) => void; reject: (error?: any) => void }> = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+
+  failedQueue = [];
+};
+
 // Interceptor para tratar erros de autenticação globalmente
 axios.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+
     // Tratar erro específico do ngrok
-    if (error.response?.status === 403 && 
+    if (error.response?.status === 403 &&
         error.response?.data?.includes?.('ERR_NGROK_734')) {
       console.warn('🚫 [AUTH] Limite do ngrok excedido. Aguardando...');
       // Retry após 60 segundos
       setTimeout(() => {
         console.log('🔄 [AUTH] Tentando novamente após limite do ngrok...');
       }, 60000);
-    } else if (error.response?.status === 401 || error.response?.status === 403) {
-      console.warn('🔒 [AUTH] Token inválido ou expirado, fazendo logout...');
-      // Não fazer logout automático aqui para evitar loops
-      // O componente pode decidir quando fazer logout
+      return Promise.reject(error);
     }
+
+    // Se for erro 401 e não for uma tentativa de refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // Se já estamos renovando, adicionar à fila
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then(token => {
+          originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          return axios(originalRequest);
+        }).catch(err => {
+          return Promise.reject(err);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Tentar renovar o token
+        const storedToken = await AsyncStorage.getItem('token');
+        if (storedToken) {
+          console.log('🔄 [AUTH] Tentando renovar token...');
+
+          // Fazer uma nova requisição de login ou refresh se disponível
+          // Por enquanto, vamos limpar o token inválido
+          await AsyncStorage.removeItem('token');
+          await AsyncStorage.removeItem('user');
+          delete axios.defaults.headers.common['Authorization'];
+
+          processQueue(new Error('Token expirado'), null);
+
+          // Redirecionar para login
+          console.warn('🔒 [AUTH] Token expirado, redirecionando para login...');
+          return Promise.reject(new Error('Token expirado'));
+        }
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
     return Promise.reject(error);
   }
 );
@@ -152,6 +215,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AsyncStorage.setItem('token', access_token);
       await AsyncStorage.setItem('user', JSON.stringify(user_data));
       console.log('💾 [AUTH] Token e usuário salvos no AsyncStorage');
+
+      // Inicializar notificações após login bem-sucedido
+      try {
+        await notificationService.initialize();
+        console.log('📱 [AUTH] Serviço de notificações inicializado');
+      } catch (notificationError) {
+        console.warn('⚠️ [AUTH] Erro ao inicializar notificações:', notificationError);
+        // Não falhar o login por causa das notificações
+      }
       
     } catch (error: any) {
       console.error('❌ [AUTH] Erro no login:', error.response?.data || error.message);
@@ -243,9 +315,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Clear axios defaults
       delete axios.defaults.headers.common['Authorization'];
-      
+
+      // Limpar notificações
+      try {
+        await notificationService.clearBadge();
+        notificationService.cleanup();
+        console.log('📱 [AUTH] Notificações limpas no logout');
+      } catch (notificationError) {
+        console.warn('⚠️ [AUTH] Erro ao limpar notificações:', notificationError);
+      }
+
     } catch (error) {
       console.error('Error during logout:', error);
+    }
+  };
+
+  const updateUser = (userData: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
+
+      // Salvar no AsyncStorage
+      AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+
+      console.log('👤 [AUTH] Usuário atualizado no contexto');
+    }
+  };
+
+  const validateToken = async (): Promise<boolean> => {
+    if (!token) {
+      console.warn('⚠️ [AUTH] Nenhum token para validar');
+      return false;
+    }
+
+    try {
+      console.log('🔍 [AUTH] Validando token...');
+      const response = await axios.get(`${AUTH_API_URL}/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'ngrok-skip-browser-warning': '1',
+        },
+      });
+
+      if (response.status === 200) {
+        console.log('✅ [AUTH] Token válido');
+        return true;
+      }
+    } catch (error: any) {
+      console.warn('❌ [AUTH] Token inválido:', error.response?.status);
+      if (error.response?.status === 401) {
+        // Token expirado, fazer logout
+        await logout();
+      }
+    }
+
+    return false;
+  };
+
+  const refreshAuth = async (): Promise<void> => {
+    console.log('🔄 [AUTH] Tentando recarregar autenticação...');
+    await loadStoredAuth();
+
+    if (token) {
+      const isValid = await validateToken();
+      if (!isValid) {
+        console.warn('🔒 [AUTH] Token inválido após refresh, fazendo logout...');
+        await logout();
+      }
     }
   };
 
@@ -256,8 +392,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     register,
     logout,
+    updateUser,
     isAuthenticated: !!user && !!token,
     getAuthHeaders,
+    validateToken,
+    refreshAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

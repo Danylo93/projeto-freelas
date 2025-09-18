@@ -1,0 +1,11 @@
+{
+  "client_id": "test-client-123",
+  "service_type": 2,
+  "description": "Teste de notificação - Preciso de um eletricista",
+  "location": {
+    "latitude": -23.5505,
+    "longitude": -46.6333,
+    "address": "São Paulo, SP"
+  },
+  "urgency": "high"
+}

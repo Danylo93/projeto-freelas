@@ -22,6 +22,8 @@ export const usePushNotifications = () => {
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -29,8 +31,8 @@ Notifications.setNotificationHandler({
 
 export const PushNotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, token } = useAuth();
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.EventSubscription | undefined>();
+  const responseListener = useRef<Notifications.EventSubscription | undefined>();
 
   const registerForPushNotifications = async (): Promise<string | null> => {
     try {
@@ -106,16 +108,15 @@ export const PushNotificationProvider: React.FC<{ children: React.ReactNode }> =
 
     return () => {
       if (notificationListener.current) {
-        // Usar a API correta do Expo
         try {
-          Notifications.removeNotificationSubscription(notificationListener.current);
+          notificationListener.current.remove();
         } catch (error) {
           console.warn('⚠️ [PUSH] Erro ao remover listener de notificação:', error);
         }
       }
       if (responseListener.current) {
         try {
-          Notifications.removeNotificationSubscription(responseListener.current);
+          responseListener.current.remove();
         } catch (error) {
           console.warn('⚠️ [PUSH] Erro ao remover listener de resposta:', error);
         }

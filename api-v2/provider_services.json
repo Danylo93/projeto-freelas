@@ -1,0 +1,9 @@
+{
+  "user_id": "76c4cb00-52ae-497a-ab03-c2bb40a4f123",
+  "services": [2],
+  "location": {
+    "latitude": -23.5505,
+    "longitude": -46.6333
+  },
+  "is_available": true
+}

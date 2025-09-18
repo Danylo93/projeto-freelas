@@ -1,0 +1,11 @@
+{
+  "client_id": "0ab0c70e-5ad0-4592-bbf8-affd59265237",
+  "service_type": 2,
+  "description": "Preciso de um eletricista para trocar uma tomada",
+  "location": {
+    "latitude": -23.5505,
+    "longitude": -46.6333,
+    "address": "São Paulo, SP"
+  },
+  "urgency": "medium"
+}
