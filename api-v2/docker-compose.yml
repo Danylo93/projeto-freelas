@@ -46,6 +46,12 @@ services:
     container_name: mongo
     ports: ["27017:27017"]
     networks: [core]
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ----------------- NOSSOS SERVIÇOS -----------------
 
