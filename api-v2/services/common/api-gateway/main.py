@@ -6,11 +6,11 @@ import os
 from dotenv import load_dotenv
 import asyncio
 from typing import Optional
-import socketio
-from websocket_handler import websocket_endpoint
+from websocket_handler import websocket_endpoint, manager
 import sys
 from pathlib import Path
 import math
+import time
 
 # Adicionar o diretório comum ao path
 BASE_DIR = Path(__file__).resolve().parent
@@ -26,14 +26,16 @@ try:
 except ImportError as e:
     print(f"⚠️ [API-GATEWAY] Kafka não disponível: {e}")
     KAFKA_AVAILABLE = False
+    TOPIC_REQ_LIFECYCLE = None
+    EV_REQUEST_CREATED = None
+    EV_REQUEST_ACCEPTED = None
+    EV_REQUEST_OFFERED = None
 
 load_dotenv()
 
 app = FastAPI(title="API Gateway", version="1.0.0")
 
-# Socket.IO desabilitado - usando notification-service dedicado
-# sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
-# socket_app = socketio.ASGIApp(sio, other_asgi_app=app, socketio_path='/socket.io')
+# WebSocket nativo implementado via websocket_handler.py
 
 # Configuração dos serviços
 SERVICES = {
@@ -69,7 +71,10 @@ async def startup():
 
     print(f"🚀 [API-GATEWAY] Iniciando startup...")
     print(f"🚀 [API-GATEWAY] KAFKA_AVAILABLE: {KAFKA_AVAILABLE}")
-    print(f"🚀 [API-GATEWAY] TOPIC_REQ_LIFECYCLE: {TOPIC_REQ_LIFECYCLE}")
+    if KAFKA_AVAILABLE:
+        print(f"🚀 [API-GATEWAY] TOPIC_REQ_LIFECYCLE: {TOPIC_REQ_LIFECYCLE}")
+    else:
+        print(f"🚀 [API-GATEWAY] Kafka não disponível, pulando configuração")
 
     if KAFKA_AVAILABLE:
         try:
@@ -104,28 +109,39 @@ async def health():
     """Health check do gateway"""
     return {"status": "ok", "service": "api-gateway"}
 
+@app.get("/notifications/poll")
+async def poll_notifications():
+    """Endpoint para polling de notificações"""
+    return {"notifications": [], "message": "Polling funcionando", "timestamp": 1234567890}
+
 @app.post("/test/notification")
 async def test_notification(data: dict):
-    """Endpoint para testar notificações manualmente"""
+    """Endpoint para testar notificações manualmente via WebSocket"""
     provider_user_id = data.get("provider_user_id")
     notification_data = data.get("notification_data", {})
 
     if not provider_user_id:
         return {"error": "provider_user_id é obrigatório"}
 
-    room_name = f"provider_{provider_user_id}"
-
-    print(f"🧪 [TEST] Enviando notificação de teste para sala: {room_name}")
+    print(f"🧪 [TEST] Enviando notificação de teste para prestador: {provider_user_id}")
     print(f"🧪 [TEST] Dados: {notification_data}")
 
     try:
-        await sio.emit('new_request', notification_data, room=room_name)
-        print(f"✅ [TEST] Notificação enviada com sucesso")
-        return {
-            "status": "success",
-            "message": f"Notificação enviada para {room_name}",
-            "data": notification_data
-        }
+        # Enviar via WebSocket nativo
+        success = await manager.send_personal_message({
+            'type': 'new_request',
+            **notification_data
+        }, provider_user_id)
+        
+        if success:
+            print(f"✅ [TEST] Notificação enviada com sucesso")
+            return {
+                "status": "success",
+                "message": f"Notificação enviada para prestador {provider_user_id}",
+                "data": notification_data
+            }
+        else:
+            return {"error": "Prestador não conectado"}
     except Exception as e:
         print(f"❌ [TEST] Erro ao enviar notificação: {e}")
         return {"error": str(e)}
@@ -204,24 +220,59 @@ async def test_send_notification(data: dict):
             'timestamp': request_data.get('created_at', 'agora')
         }
 
-        # Emitir para o prestador específico
-        room_name = f"provider_{provider_user_id}"
-        await sio.emit('new_request', notification_data, room=room_name)
+        # Enviar via WebSocket nativo
+        success = await manager.send_personal_message({
+            'type': 'new_request',
+            **notification_data
+        }, provider_user_id)
 
-        print(f"🔔 [TEST] Notificação enviada para {room_name}")
-        print(f"🔔 [TEST] Dados: {notification_data}")
+        if success:
+            print(f"🔔 [TEST] Notificação enviada para prestador {provider_user_id}")
+            print(f"🔔 [TEST] Dados: {notification_data}")
 
-        return {
-            "status": "success",
-            "message": f"Notificação enviada para {room_name}",
-            "notification_data": notification_data
-        }
+            return {
+                "status": "success",
+                "message": f"Notificação enviada para prestador {provider_user_id}",
+                "notification_data": notification_data
+            }
+        else:
+            return {"error": "Prestador não conectado"}
 
     except Exception as e:
         print(f"❌ [TEST] Erro ao enviar notificação: {e}")
         import traceback
         traceback.print_exc()
         return {"error": str(e)}
+
+@app.get("/ws")
+async def websocket_info():
+    """Informações sobre o endpoint WebSocket"""
+    return {
+        "message": "Este é um endpoint WebSocket. Use ws:// ou wss:// para conectar.",
+        "endpoint": "/ws",
+        "protocol": "WebSocket",
+        "parameters": {
+            "user_id": "ID do usuário",
+            "user_type": "Tipo do usuário (1=prestador, 2=cliente)",
+            "token": "Token JWT de autenticação"
+        },
+        "example": "ws://localhost:8000/ws?user_id=123&user_type=1&token=jwt_token",
+        "ngrok_compatible": True,
+        "cors_enabled": True
+    }
+
+@app.options("/ws")
+async def websocket_options():
+    """CORS preflight para WebSocket"""
+    return JSONResponse(
+        content={"message": "WebSocket endpoint ready"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "86400"
+        }
+    )
 
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket, user_id: str = None, user_type: int = None, token: str = None):
@@ -231,6 +282,11 @@ async def websocket_route(websocket: WebSocket, user_id: str = None, user_type: 
     user_id = query_params.get("user_id") or user_id
     user_type = int(query_params.get("user_type", 0)) or user_type
     token = query_params.get("token") or token
+    
+    print(f"🔌 [WS] Tentativa de conexão WebSocket:")
+    print(f"🔌 [WS] User ID: {user_id}")
+    print(f"🔌 [WS] User Type: {user_type}")
+    print(f"🔌 [WS] Token: {'Presente' if token else 'Ausente'}")
     
     await websocket_endpoint(websocket, user_id, user_type, token)
 
@@ -416,69 +472,8 @@ async def proxy_request(service_name: str, path: str, request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error proxying to {service_name}: {str(e)}")
 
-# --- Socket.io Events ---
-
-@sio.event
-async def connect(sid, environ, auth):
-    """Evento de conexão do Socket.io"""
-    user_id = auth.get("user_id") if auth else None
-    user_type = auth.get("user_type") if auth else None
-
-    print(f"🔌 [API-GATEWAY] Cliente conectado: {sid} (user_id: {user_id}, user_type: {user_type})")
-
-    await sio.save_session(sid, {
-        "user_id": user_id,
-        "user_type": user_type,
-    })
-
-    # Entrar na sala específica baseada no tipo de usuário
-    if user_id and user_type:
-        if user_type == 1:  # Prestador
-            room_name = f"provider_{user_id}"
-            await sio.enter_room(sid, room_name)
-            print(f"🔌 [API-GATEWAY] Prestador {user_id} entrou na sala {room_name}")
-        elif user_type == 2:  # Cliente
-            room_name = f"client_{user_id}"
-            await sio.enter_room(sid, room_name)
-            print(f"🔌 [API-GATEWAY] Cliente {user_id} entrou na sala {room_name}")
-
-    await sio.emit('presence', {"sid": sid, "status": "online"}, to=sid)
-
-@sio.event
-async def disconnect(sid):
-    """Evento de desconexão do Socket.io"""
-    print(f"🔌 [SOCKET] Cliente desconectado: {sid}")
-    sess = await sio.get_session(sid)
-    await sio.emit('presence', {"sid": sid, "status": "offline", "user_id": sess.get("user_id")})
-
-@sio.event
-async def chat_message(sid, data):
-    """Evento de mensagem de chat"""
-    await sio.emit('chat_message', {"from": sid, **(data or {})})
-
-@sio.event
-async def join_request_room(sid, data):
-    """Evento para entrar em sala de solicitação"""
-    request_id = (data or {}).get('request_id') or (data or {}).get('requestId')
-    if request_id:
-        await sio.enter_room(sid, f"req:{request_id}")
-        await sio.emit('room_joined', {"room": f"req:{request_id}"}, to=sid)
-
-@sio.event
-async def leave_request_room(sid, data):
-    """Evento para sair de sala de solicitação"""
-    request_id = (data or {}).get('request_id') or (data or {}).get('requestId')
-    if request_id:
-        await sio.leave_room(sid, f"req:{request_id}")
-        await sio.emit('room_left', {"room": f"req:{request_id}"}, to=sid)
-
-@sio.event
-async def send_request_message(sid, data):
-    """Evento para enviar mensagem de solicitação"""
-    request_id = (data or {}).get('request_id') or (data or {}).get('requestId')
-    message = (data or {}).get('message')
-    if request_id and message:
-        await sio.emit('request_message', {"from": sid, "message": message}, room=f"req:{request_id}")
+# --- WebSocket Events ---
+# Eventos WebSocket são gerenciados pelo websocket_handler.py
 
 # --- Kafka Event Handlers ---
 
@@ -516,8 +511,11 @@ async def handle_lifecycle_event(data):
         # Quando uma oferta é feita, notificar o cliente
         await notify_client_offer_received(data)
 
-    # Emitir o evento original também
-    await sio.emit('lifecycle', data)
+    # Emitir o evento original também via WebSocket
+    await manager.broadcast_message({
+        'type': 'lifecycle',
+        **data
+    })
 
 async def notify_providers_for_request(data):
     """Notifica prestadores próximos sobre nova solicitação"""
@@ -581,9 +579,16 @@ async def notify_providers_for_request(data):
                     'client_longitude': request_data.get('client_longitude'),
                 }
 
-                # Emitir para o prestador específico
-                await sio.emit('new_request', notification_data, room=f"provider_{provider_id}")
-                print(f"🔔 [API-GATEWAY] Notificação enviada para prestador {provider_id}")
+                # Enviar via WebSocket nativo
+                success = await manager.send_personal_message({
+                    'type': 'new_request',
+                    **notification_data
+                }, provider_id)
+                
+                if success:
+                    print(f"🔔 [API-GATEWAY] Notificação enviada para prestador {provider_id}")
+                else:
+                    print(f"⚠️ [API-GATEWAY] Prestador {provider_id} não conectado")
 
     except Exception as e:
         print(f"❌ [API-GATEWAY] Erro ao notificar prestadores: {e}")
@@ -592,7 +597,10 @@ async def notify_client_request_accepted(data):
     """Notifica cliente que solicitação foi aceita"""
     client_id = data.get('client_id')
     if client_id:
-        await sio.emit('request_accepted', data, room=f"client_{client_id}")
+        await manager.send_personal_message({
+            'type': 'request_accepted',
+            **data
+        }, client_id)
 
 async def notify_client_offer_received(data):
     """Notifica cliente que recebeu uma oferta"""
@@ -606,7 +614,10 @@ async def notify_client_offer_received(data):
                 if requests:
                     client_id = requests[0].get('client_id')
                     if client_id:
-                        await sio.emit('offer_received', data, room=f"client_{client_id}")
+                        await manager.send_personal_message({
+                            'type': 'offer_received',
+                            **data
+                        }, client_id)
         except Exception as e:
             print(f"❌ [API-GATEWAY] Erro ao notificar cliente: {e}")
 
@@ -620,37 +631,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-# Proxy para Socket.IO - redirecionar para notification-service
-@app.api_route("/socket.io/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
-async def socket_proxy(request: Request, path: str):
-    """Proxy para notification-service Socket.IO"""
-    notification_url = SERVICES["notifications"]
-    target_url = f"{notification_url}/socket.io/{path}"
-
-    # Copiar headers
-    headers = dict(request.headers)
-    headers.pop("host", None)  # Remove host header
-
-    # Fazer proxy da requisição
-    async with httpx.AsyncClient() as client:
-        if request.method == "GET":
-            response = await client.get(target_url, headers=headers, params=request.query_params)
-        elif request.method == "POST":
-            body = await request.body()
-            response = await client.post(target_url, headers=headers, content=body, params=request.query_params)
-        else:
-            # Outros métodos HTTP
-            body = await request.body()
-            response = await client.request(
-                request.method, target_url, headers=headers, content=body, params=request.query_params
-            )
-
-    # Retornar resposta
-    return JSONResponse(
-        content=response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text,
-        status_code=response.status_code,
-        headers=dict(response.headers)
-    )
+# WebSocket nativo implementado - não há mais proxy para Socket.IO
 
 if __name__ == "__main__":
     import uvicorn

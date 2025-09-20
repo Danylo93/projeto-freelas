@@ -82,7 +82,7 @@ const resolveExpoHost = () => {
 
 const expoHost = resolveExpoHost();
 const DEV_PROTOCOL = process.env.EXPO_PUBLIC_DEV_PROTOCOL || 'http';
-const DEFAULT_GATEWAY_PORT = process.env.EXPO_PUBLIC_GATEWAY_PORT || '8015';
+const DEFAULT_GATEWAY_PORT = process.env.EXPO_PUBLIC_GATEWAY_PORT || '8000';
 const DEV_API_PORT = process.env.EXPO_PUBLIC_API_PORT || DEFAULT_GATEWAY_PORT;
 const DEV_SOCKET_PORT = process.env.EXPO_PUBLIC_SOCKET_PORT || DEV_API_PORT;
 
@@ -153,10 +153,10 @@ export const ADMIN_API_URL = resolveServiceUrl(
   '/admin'
 );
 
-// Socket URL - usando detecção inteligente para notification-service
+// Socket URL - usando detecção inteligente para API Gateway WebSocket
 const getSocketURL = (): string => {
   const envUrl = process.env.EXPO_PUBLIC_SOCKET_URL;
-  const fallbackUrl = process.env.EXPO_PUBLIC_SOCKET_FALLBACK_URL || `${DEV_PROTOCOL}://${fallbackHost}:8016`;
+  const fallbackUrl = process.env.EXPO_PUBLIC_SOCKET_FALLBACK_URL || `${DEV_PROTOCOL}://${fallbackHost}:8000`;
 
   // Se URL específica foi definida (não 'auto'), usar ela
   if (envUrl && envUrl !== 'auto') {
@@ -164,9 +164,9 @@ const getSocketURL = (): string => {
     return envUrl;
   }
 
-  // Auto-detecção para notification-service na porta 8016
+  // Auto-detecção para API Gateway na porta 8000
   if (fallbackHost) {
-    const socketUrl = `${DEV_PROTOCOL}://${fallbackHost}:8016`;
+    const socketUrl = `${DEV_PROTOCOL}://${fallbackHost}:8000`;
     console.log('🔌 [SOCKET-CONFIG] Auto-detectado:', socketUrl);
     return socketUrl;
   }

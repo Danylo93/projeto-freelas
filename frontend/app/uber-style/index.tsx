@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { MatchingProvider } from '@/contexts/UberStyleMatchingContext';
-import { RealtimeProvider } from '@/contexts/SimpleSocketIOContext';
+import { RealtimeProvider } from '@/contexts/ImprovedRealtimeContext';
 import { ModernClientApp } from '@/components/modern/ModernClientApp';
 import { ModernProviderApp } from '@/components/modern/ModernProviderApp';
 

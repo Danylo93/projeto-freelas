@@ -77,6 +77,7 @@ services:
       - PAYMENT_SERVICE_URL=http://payment-service:8016
       - ADMIN_SERVICE_URL=http://admin-service:8017
       - SOCKET_SERVICE_URL=http://socket-gateway:8015
+      - JWT_SECRET=your-secret-key-here-change-in-production
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/healthz || exit 1"]
       interval: 10s

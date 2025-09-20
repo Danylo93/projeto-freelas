@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import { Alert, Vibration } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRealtime } from '@/contexts/SimpleSocketIOContext';
+import { useRealtime } from '@/contexts/ImprovedRealtimeContext';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 
 interface NotificationData {

@@ -2,12 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useRealtime } from '@/contexts/SimpleSocketIOContext';
+import { useRealtime } from '@/contexts/ImprovedRealtimeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { SOCKET_URL } from '@/utils/config';
 
 export const ConnectionDebug: React.FC = () => {
-  const { isConnected, connectionState, connectionType, reconnect } = useRealtime();
+  const { isConnected, connectionState, reconnect } = useRealtime();
   const { user, token } = useAuth();
   const router = useRouter();
 
@@ -31,9 +31,6 @@ export const ConnectionDebug: React.FC = () => {
 
   const getStatusText = () => {
     const baseStatus = connectionState.charAt(0).toUpperCase() + connectionState.slice(1);
-    if (connectionType) {
-      return `${baseStatus} (${connectionType.toUpperCase()})`;
-    }
     return baseStatus;
   };
 
@@ -43,7 +40,6 @@ export const ConnectionDebug: React.FC = () => {
     console.log('🧪 [DEBUG] User:', user?.name, user?.id);
     console.log('🧪 [DEBUG] Token:', token ? 'Presente' : 'Ausente');
     console.log('🧪 [DEBUG] Connection State:', connectionState);
-    console.log('🧪 [DEBUG] Connection Type:', connectionType);
     console.log('🧪 [DEBUG] Is Connected:', isConnected);
   };
 

@@ -3,12 +3,20 @@ import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import AuthScreen from './auth/index';
-import UberStyleApp from './uber-style/index';
+import { useRouter } from 'expo-router';
 
 
 export default function Index() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
+  const router = useRouter();
+  
+  console.log('🔍 [INDEX] Estado atual:', { 
+    isLoading, 
+    isAuthenticated, 
+    hasUser: !!user, 
+    userType: user?.user_type 
+  });
 
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -79,7 +87,16 @@ export default function Index() {
 
   // Redirect to UberStyleApp for both user types
   console.log('� [INDEX] Redirecionando para UberStyleApp');
-  return <UberStyleApp />;
+  // Navigate to tabs (home screens) for both user types
+  console.log('🏠 [INDEX] Navegando para telas de home');
+  useEffect(() => {
+    if (isAuthenticated && user && !showSplash) {
+      router.replace('/(tabs)');
+    }
+  }, [isAuthenticated, user, showSplash, router]);
+  
+  // Show loading while navigating
+  return <SplashScreen />;
 }
 
 const styles = StyleSheet.create({

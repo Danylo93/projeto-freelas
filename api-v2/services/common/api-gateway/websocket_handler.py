@@ -21,12 +21,25 @@ class ConnectionManager:
         """Conecta um usuário"""
         await websocket.accept()
         self.active_connections[user_id] = websocket
+        
+        # Armazenar dados do usuário
+        if not hasattr(self, 'user_data'):
+            self.user_data = {}
+        self.user_data[user_id] = {
+            'user_type': user_type,
+            'connected_at': asyncio.get_event_loop().time()
+        }
+        
         logger.info(f"🔌 [WS] Usuário {user_id} (tipo {user_type}) conectado")
 
     def disconnect(self, user_id: str):
         """Desconecta um usuário"""
         if user_id in self.active_connections:
             del self.active_connections[user_id]
+            
+        # Remove dados do usuário
+        if hasattr(self, 'user_data') and user_id in self.user_data:
+            del self.user_data[user_id]
             
         # Remove de todas as salas
         if user_id in self.user_rooms:
@@ -123,11 +136,11 @@ async def notify_providers_new_request(request_data: dict):
 
     # Encontrar prestadores online da categoria
     online_providers = []
-    for user_id, connection in manager.active_connections.items():
-        user_data = manager.user_data.get(user_id, {})
-        if user_data.get('user_type') == 1:  # Prestador
-            # Aqui você pode adicionar lógica para verificar categoria e distância
-            online_providers.append(user_id)
+    if hasattr(manager, 'user_data'):
+        for user_id, user_data in manager.user_data.items():
+            if user_data.get('user_type') == 1:  # Prestador
+                # Aqui você pode adicionar lógica para verificar categoria e distância
+                online_providers.append(user_id)
 
     # Enviar notificação para prestadores elegíveis
     notification = {
@@ -174,27 +187,43 @@ async def notify_request_accepted(request_id: str, provider_data: dict):
 
 async def websocket_endpoint(websocket: WebSocket, user_id: str = None, user_type: int = None, token: str = None):
     """Endpoint principal do WebSocket"""
+    print(f"🔌 [WS] Iniciando websocket_endpoint")
+    print(f"🔌 [WS] Parâmetros recebidos: user_id={user_id}, user_type={user_type}, token={'Presente' if token else 'Ausente'}")
+    
     if not user_id or not user_type or not token:
+        print(f"❌ [WS] Dados de autenticação ausentes: user_id={user_id}, user_type={user_type}, token={'Presente' if token else 'Ausente'}")
         await websocket.close(code=1008, reason="Missing authentication data")
         return
 
     # Validar token JWT
     try:
         SECRET_KEY = os.getenv("JWT_SECRET", "your-secret-key-here-change-in-production")
+        print(f"🔌 [WS] Validando token JWT...")
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         token_user_id = payload.get("sub")
         token_user_type = payload.get("user_type")
 
+        print(f"🔌 [WS] Token decodificado: user_id={token_user_id}, user_type={token_user_type}")
+
         # Verificar se os dados do token batem com os parâmetros
         if token_user_id != user_id or token_user_type != user_type:
+            print(f"❌ [WS] Dados do token não batem: token_user_id={token_user_id} != user_id={user_id} ou token_user_type={token_user_type} != user_type={user_type}")
             await websocket.close(code=1008, reason="Invalid authentication data")
             return
 
+        print(f"✅ [WS] Autenticação válida, conectando usuário {user_id}")
+
     except jwt.ExpiredSignatureError:
+        print(f"❌ [WS] Token expirado")
         await websocket.close(code=1008, reason="Token expired")
         return
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        print(f"❌ [WS] Token inválido: {e}")
         await websocket.close(code=1008, reason="Invalid token")
+        return
+    except Exception as e:
+        print(f"❌ [WS] Erro inesperado na autenticação: {e}")
+        await websocket.close(code=1008, reason="Authentication error")
         return
 
     await manager.connect(websocket, user_id, user_type)

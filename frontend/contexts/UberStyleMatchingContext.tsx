@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { useRealtime } from './SimpleSocketIOContext';
+import { useRealtime } from './ImprovedRealtimeContext';
 import { Alert } from 'react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '@/utils/config';

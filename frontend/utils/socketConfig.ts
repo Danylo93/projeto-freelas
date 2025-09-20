@@ -2,12 +2,12 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 /**
- * Detecta automaticamente a URL correta para Socket.IO
+ * Detecta automaticamente a URL correta para WebSocket
  * baseado no ambiente (emulador, dispositivo físico, etc.)
  */
 export const getSocketURL = (): string => {
   const envUrl = process.env.EXPO_PUBLIC_SOCKET_URL;
-  const fallbackUrl = process.env.EXPO_PUBLIC_SOCKET_FALLBACK_URL || 'http://localhost:8016';
+  const fallbackUrl = process.env.EXPO_PUBLIC_SOCKET_FALLBACK_URL || 'http://localhost:8000';
   
   // Se URL específica foi definida (não 'auto'), usar ela
   if (envUrl && envUrl !== 'auto') {
@@ -31,7 +31,7 @@ export const getSocketURL = (): string => {
     if (Constants.debuggerHost) {
       // Extrair IP do debugger host
       const ip = Constants.debuggerHost.split(':')[0];
-      const socketUrl = `http://${ip}:8016`;
+      const socketUrl = `http://${ip}:8000`;
       console.log('🔌 [SOCKET-CONFIG] Expo Go - usando IP do debugger:', socketUrl);
       return socketUrl;
     }
@@ -39,14 +39,14 @@ export const getSocketURL = (): string => {
   
   // Para emulador Android
   if (Platform.OS === 'android' && !isDevice) {
-    const socketUrl = 'http://10.0.2.2:8016';
+    const socketUrl = 'http://10.0.2.2:8000';
     console.log('🔌 [SOCKET-CONFIG] Emulador Android:', socketUrl);
     return socketUrl;
   }
   
   // Para emulador iOS
   if (Platform.OS === 'ios' && !isDevice) {
-    const socketUrl = 'http://localhost:8016';
+    const socketUrl = 'http://localhost:8000';
     console.log('🔌 [SOCKET-CONFIG] Emulador iOS:', socketUrl);
     return socketUrl;
   }
@@ -56,7 +56,7 @@ export const getSocketURL = (): string => {
     // Se temos debugger host, usar o IP dele
     if (Constants.debuggerHost) {
       const ip = Constants.debuggerHost.split(':')[0];
-      const socketUrl = `http://${ip}:8016`;
+      const socketUrl = `http://${ip}:8000`;
       console.log('🔌 [SOCKET-CONFIG] Dispositivo físico - IP do debugger:', socketUrl);
       return socketUrl;
     }
@@ -72,7 +72,7 @@ export const getSocketURL = (): string => {
 };
 
 /**
- * Testa conectividade com o Socket.IO
+ * Testa conectividade com o WebSocket
  */
 export const testSocketConnection = async (url: string): Promise<boolean> => {
   try {
@@ -96,25 +96,14 @@ export const testSocketConnection = async (url: string): Promise<boolean> => {
 };
 
 /**
- * Configuração inteligente de Socket.IO com fallbacks
+ * Configuração inteligente de WebSocket com fallbacks
  */
 export const getSmartSocketConfig = () => {
   const primaryUrl = getSocketURL();
   
   return {
     url: primaryUrl,
-    options: {
-      transports: ['polling', 'websocket'], // Polling primeiro para compatibilidade
-      timeout: 20000,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
-      reconnectionDelayMax: 10000,
-      forceNew: true,
-      upgrade: true, // Permite upgrade para WebSocket
-      extraHeaders: {
-        'ngrok-skip-browser-warning': '1',
-      },
-    }
+    // WebSocket nativo não precisa de opções específicas do Socket.IO
+    // As opções de reconexão são gerenciadas pelo contexto React
   };
 };

@@ -30,7 +30,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const connectWebSocket = () => {
     if (!user || !token) return;
 
-    const wsUrl = process.env.EXPO_PUBLIC_SOCKET_URL || process.env.EXPO_PUBLIC_API_URL;
+    const wsUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
     if (!wsUrl) {
       console.warn('⚠️ [REALTIME] URL do WebSocket não configurada');
       return;
@@ -38,7 +38,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Converter URL HTTP para WebSocket
     const wsUrlConverted = wsUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-    const fullWsUrl = `${wsUrlConverted}/ws?token=${token}&user_id=${user.id}&user_type=${user.user_type}`;
+    const fullWsUrl = `${wsUrlConverted}/ws?token=${encodeURIComponent(token)}&user_id=${encodeURIComponent(user.id)}&user_type=${user.user_type}`;
 
     console.log('🔌 [REALTIME] Conectando WebSocket:', fullWsUrl);
 
