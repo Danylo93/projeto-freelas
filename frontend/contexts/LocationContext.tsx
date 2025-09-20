@@ -1,6 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import * as Location from 'expo-location';
-import { Alert } from 'react-native';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 interface LocationData {
   latitude: number;
