@@ -2,14 +2,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 
-// Importação condicional para evitar erro na web
-let MapView: any, Marker: any;
+// Importação condicional corrigida
+let MapView: any, Marker: any, MapViewDirections: any;
 if (Platform.OS !== 'web') {
-  const MapComponents = require('react-native-maps');
-  MapView = MapComponents.default;
-  Marker = MapComponents.Marker;
+  try {
+    MapView = require('react-native-maps').default;
+    Marker = require('react-native-maps').Marker;
+    // MapViewDirections removido por enquanto
+  } catch (error) {
+    console.warn('react-native-maps não disponível');
+  }
 }
-import MapViewDirections from 'react-native-maps-directions';
 import Constants from 'expo-constants';
 
 export type LatLng = { latitude: number; longitude: number };
