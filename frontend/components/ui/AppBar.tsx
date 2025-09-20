@@ -234,20 +234,24 @@ export const MainAppBar: React.FC<MainAppBarProps> = ({
   onProfilePress,
   ...props
 }) => {
-  const themeContext = useTheme();
-  
-  if (!themeContext || !themeContext.theme) {
-    return null;
-  }
-  
-  const { theme } = themeContext;
-
   const renderProfileIcon = () => {
     if (user?.avatar) {
       return (
         <View style={styles.avatarContainer}>
           <Text style={styles.avatarText}>{user.avatar}</Text>
         </View>
+      );
+    }
+    
+    return (
+      <TouchableOpacity 
+        style={styles.profileButton}
+        onPress={onProfilePress}
+      >
+        <Text style={styles.profileIcon}>👤</Text>
+      </TouchableOpacity>
+    );
+  };
       );
     }
 
