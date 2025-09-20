@@ -1,130 +1,153 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import * as Location from 'expo-location';
 import { Alert } from 'react-native';
 
-interface LocationContextType {
-  location: Location.LocationObject | null;
-  isLocationEnabled: boolean;
-  requestLocationPermission: () => Promise<boolean>;
-  startLocationTracking: () => void;
-  stopLocationTracking: () => void;
+interface LocationData {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  timestamp: number;
 }
 
-const LocationContext = createContext<LocationContextType | undefined>(undefined);
+interface LocationContextData {
+  location: LocationData | null;
+  isLoading: boolean;
+  hasPermission: boolean;
+  requestPermissions: () => Promise<boolean>;
+  getCurrentLocation: () => Promise<LocationData | null>;
+  watchLocation: boolean;
+  setWatchLocation: (watch: boolean) => void;
+  locationError: string | null;
+}
 
-export const useLocation = () => {
+const LocationContext = createContext<LocationContextData>({} as LocationContextData);
+
+export function useLocation(): LocationContextData {
   const context = useContext(LocationContext);
   if (!context) {
-    throw new Error('useLocation must be used within a LocationProvider');
+    throw new Error('useLocation deve ser usado dentro de um LocationProvider');
   }
   return context;
-};
+}
 
-export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [isLocationEnabled, setIsLocationEnabled] = useState(false);
-  const watchIdRef = useRef<Location.LocationSubscription | null>(null);
+interface LocationProviderProps {
+  children: ReactNode;
+}
 
-  const requestLocationPermission = async (): Promise<boolean> => {
+export function LocationProvider({ children }: LocationProviderProps) {
+  const [location, setLocation] = useState<LocationData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
+  const [watchLocation, setWatchLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Solicitar permissões de localização
+  const requestPermissions = async (): Promise<boolean> => {
     try {
+      setIsLoading(true);
+      
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
+      const permission = status === 'granted';
+      
+      setHasPermission(permission);
+      
+      if (!permission) {
         Alert.alert(
-          'Permissão de Localização',
-          'É necessário permitir o acesso à localização para usar o aplicativo.',
+          'Permissão Negada',
+          'A permissão de localização é necessária para encontrar prestadores próximos a você.',
           [{ text: 'OK' }]
         );
-        return false;
+        setLocationError('Permissão de localização negada');
+      } else {
+        setLocationError(null);
       }
 
-      const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
-      if (backgroundStatus.status !== 'granted') {
-        Alert.alert(
-          'Permissão de Localização em Background',
-          'Para receber notificações quando estiver fora do app, permita o acesso à localização em background.',
-          [{ text: 'OK' }]
-        );
-      }
-
-      setIsLocationEnabled(true);
-      return true;
+      return permission;
     } catch (error) {
-      console.error('❌ [LOCATION] Erro ao solicitar permissão:', error);
+      console.error('Erro ao solicitar permissões de localização:', error);
+      setLocationError('Erro ao solicitar permissões');
       return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const startLocationTracking = async () => {
-    if (!isLocationEnabled) {
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) return;
-    }
-
+  // Obter localização atual
+  const getCurrentLocation = async (): Promise<LocationData | null> => {
     try {
-      // Obter localização atual
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+      if (!hasPermission) {
+        const granted = await requestPermissions();
+        if (!granted) return null;
+      }
+
+      setIsLoading(true);
+      setLocationError(null);
+
+      const locationResult = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
       });
-      setLocation(currentLocation);
 
-      // Iniciar rastreamento contínuo
-      watchIdRef.current = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 5000, // Atualizar a cada 5 segundos
-          distanceInterval: 10, // Atualizar a cada 10 metros
-        },
-        (newLocation) => {
-          setLocation(newLocation);
-          console.log('📍 [LOCATION] Localização atualizada:', {
-            latitude: newLocation.coords.latitude,
-            longitude: newLocation.coords.longitude,
-            accuracy: newLocation.coords.accuracy,
-          });
-        }
-      );
+      const locationData: LocationData = {
+        latitude: locationResult.coords.latitude,
+        longitude: locationResult.coords.longitude,
+        accuracy: locationResult.coords.accuracy,
+        timestamp: locationResult.timestamp,
+      };
 
-      console.log('📍 [LOCATION] Rastreamento iniciado');
-    } catch (error) {
-      console.error('❌ [LOCATION] Erro ao iniciar rastreamento:', error);
+      setLocation(locationData);
+      return locationData;
+
+    } catch (error: any) {
+      console.error('Erro ao obter localização:', error);
+      setLocationError('Não foi possível obter sua localização');
+      return null;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const stopLocationTracking = () => {
-    if (watchIdRef.current) {
-      watchIdRef.current.remove();
-      watchIdRef.current = null;
-      console.log('📍 [LOCATION] Rastreamento parado');
-    }
-  };
-
-  // Verificar permissões na inicialização
+  // Efeitos
   useEffect(() => {
-    const checkPermissions = async () => {
-      const { status } = await Location.getForegroundPermissionsAsync();
-      setIsLocationEnabled(status === 'granted');
-    };
-    checkPermissions();
-  }, []);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      stopLocationTracking();
-    };
+    Location.getForegroundPermissionsAsync().then(({ status }) => {
+      setHasPermission(status === 'granted');
+    });
   }, []);
 
   return (
     <LocationContext.Provider
       value={{
         location,
-        isLocationEnabled,
-        requestLocationPermission,
-        startLocationTracking,
-        stopLocationTracking,
+        isLoading,
+        hasPermission,
+        requestPermissions,
+        getCurrentLocation,
+        watchLocation,
+        setWatchLocation,
+        locationError,
       }}
     >
       {children}
     </LocationContext.Provider>
   );
-};
+}
+
+export function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function toRadians(degrees: number): number {
+  return degrees * (Math.PI / 180);
+}
