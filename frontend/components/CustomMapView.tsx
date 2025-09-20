@@ -1,7 +1,14 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, View, Text, StyleSheet } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+
+// Importação condicional para evitar erro na web
+let MapView: any, Marker: any;
+if (Platform.OS !== 'web') {
+  const MapComponents = require('react-native-maps');
+  MapView = MapComponents.default;
+  Marker = MapComponents.Marker;
+}
 import MapViewDirections from 'react-native-maps-directions';
 import Constants from 'expo-constants';
 
