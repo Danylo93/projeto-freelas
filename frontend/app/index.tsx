@@ -31,7 +31,7 @@ export default function WelcomeScreen() {
         <View style={styles.buttons}>
           <TouchableOpacity 
             style={[styles.button, styles.loginButton]}
-            onPress={() => router.push('/home')}
+            onPress={() => router.push('/(tabs)')}
           >
             <Text style={styles.loginButtonText}>Entrar no App</Text>
           </TouchableOpacity>
