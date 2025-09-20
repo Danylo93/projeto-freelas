@@ -9,7 +9,6 @@ import {
   StatusBar,
   Platform,
 } from 'react-native';
-import { useTheme } from '../../src/providers/ThemeProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface AppBarProps {
