@@ -1,14 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 
-// Importação condicional para evitar erro na web
+// Importação condicional corrigida
 let MapView: any, Marker: any, Polyline: any, PROVIDER_GOOGLE: any;
 if (Platform.OS !== 'web') {
-  const MapComponents = require('react-native-maps');
-  MapView = MapComponents.default;
-  Marker = MapComponents.Marker;
-  Polyline = MapComponents.Polyline;
-  PROVIDER_GOOGLE = MapComponents.PROVIDER_GOOGLE;
+  try {
+    MapView = require('react-native-maps').default;
+    Marker = require('react-native-maps').Marker;
+    Polyline = require('react-native-maps').Polyline;
+    PROVIDER_GOOGLE = require('react-native-maps').PROVIDER_GOOGLE;
+  } catch (error) {
+    console.warn('react-native-maps não disponível');
+  }
 }
 import { Ionicons } from '@expo/vector-icons';
 import { distanceService, LocationCoords, DistanceInfo } from '../../services/distanceService';
