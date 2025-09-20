@@ -42,36 +42,30 @@ export const AppBar: React.FC<AppBarProps> = ({
   subtitleStyle,
   iconStyle,
 }) => {
-  const themeContext = useTheme();
   const insets = useSafeAreaInsets();
-  
-  // Verificação de segurança para o tema
-  if (!themeContext) {
-    console.error('❌ [APPBAR] Theme não disponível');
-    return null;
-  }
-  
-  const { theme } = themeContext;
 
   const getAppBarStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: '#ffffff',
       paddingTop: insets.top,
-      paddingHorizontal: theme.spacing.lg,
-      paddingBottom: theme.spacing.md,
-      ...theme.elevation.level1,
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
     };
 
-    // Variant
     switch (variant) {
       case 'small':
-        baseStyle.paddingVertical = theme.spacing.sm;
+        baseStyle.paddingVertical = 8;
         break;
       case 'medium':
-        baseStyle.paddingVertical = theme.spacing.md;
+        baseStyle.paddingVertical = 16;
         break;
       case 'large':
-        baseStyle.paddingVertical = theme.spacing.lg;
+        baseStyle.paddingVertical = 24;
         break;
     }
 
@@ -80,23 +74,25 @@ export const AppBar: React.FC<AppBarProps> = ({
 
   const getTitleStyle = (): TextStyle => {
     const baseStyle: TextStyle = {
-      ...theme.typography.headlineSmall,
-      color: theme.colors.onSurface,
+      fontSize: 20,
+      fontWeight: '600',
+      color: '#333333',
     };
 
-    // Variant
     switch (variant) {
       case 'small':
-        baseStyle.fontSize = theme.typography.titleLarge.fontSize;
-        baseStyle.lineHeight = theme.typography.titleLarge.fontWeight;
+        baseStyle.fontSize = 18;
         break;
       case 'medium':
-        baseStyle.fontSize = theme.typography.headlineSmall.fontSize;
-        baseStyle.lineHeight = theme.typography.headlineSmall.fontWeight;
+        baseStyle.fontSize = 20;
         break;
       case 'large':
-        baseStyle.fontSize = theme.typography.headlineMedium.fontSize;
-        baseStyle.lineHeight = theme.typography.headlineMedium.fontWeight;
+        baseStyle.fontSize = 24;
+        break;
+    }
+
+    return baseStyle;
+  };
         break;
     }
 
