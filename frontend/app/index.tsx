@@ -1,33 +1,12 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext';
-import { LinearGradient } from 'expo-linear-gradient';
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
-
-  useEffect(() => {
-    if (user && !isLoading) {
-      // Redirecionar para a tela principal baseado no tipo de usuário
-      router.replace('/(tabs)');
-    }
-  }, [user, isLoading]);
-
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Carregando...</Text>
-      </View>
-    );
-  }
 
   return (
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>ServiçoApp</Text>
@@ -69,23 +48,14 @@ export default function WelcomeScreen() {
           Seja cliente ou prestador, conecte-se agora!
         </Text>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#666',
+    backgroundColor: '#667eea',
   },
   content: {
     flex: 1,
@@ -103,9 +73,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 16,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   subtitle: {
     fontSize: 18,
@@ -126,7 +93,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 12,
     borderRadius: 12,
-    backdropFilter: 'blur(10px)',
   },
   featureIcon: {
     fontSize: 24,
