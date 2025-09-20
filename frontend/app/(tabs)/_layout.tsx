@@ -1,105 +1,55 @@
-import React from 'react';
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
-import { useTheme } from '../../src/providers/ThemeProvider';
+import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function TabLayout() {
-  const themeContext = useTheme();
-  const theme = themeContext.theme;
-  const { user } = useAuth();
-
-  // Determine which tabs to show based on user type
-  const isProvider = user?.user_type === 1;
-
-  if (isProvider) {
-    return (
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: theme.colors.surface,
-            borderTopColor: theme.colors.outlineVariant,
-            borderTopWidth: 1,
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 3,
-            elevation: 8,
-            zIndex: 100,
-          },
-          tabBarActiveTintColor: theme.colors.primary,
-          tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
-        }}
-      >
-        <Tabs.Screen
-          name="provider-home"
-          options={{
-            title: 'Início',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: size, color }}>🏠</Text>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="home"
-          options={{
-            title: 'Serviços',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: size, color }}>🔧</Text>
-            ),
-          }}
-        />
-      </Tabs>
-    );
-  }
+  const { isProvider } = useAuth();
 
   return (
     <Tabs
       screenOptions={{
+        tabBarActiveTintColor: '#667eea',
+        tabBarInactiveTintColor: '#999',
         headerShown: false,
         tabBarStyle: {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.outlineVariant,
+          backgroundColor: '#ffffff',
           borderTopWidth: 1,
-          paddingVertical: 8,
-          paddingHorizontal: 16,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 3,
-          elevation: 8,
-          zIndex: 100,
+          borderTopColor: '#e1e5e9',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
       }}
     >
       <Tabs.Screen
-        name="home"
+        name="index"
         options={{
-          title: 'Início',
+          title: isProvider ? 'Solicitações' : 'Início',
           tabBarIcon: ({ color, size }) => (
-            <Text style={{ fontSize: size, color }}>🏠</Text>
+            <Ionicons 
+              name={isProvider ? 'briefcase-outline' : 'home-outline'} 
+              size={size} 
+              color={color} 
+            />
           ),
         }}
       />
       <Tabs.Screen
-        name="provider-home"
+        name="history"
         options={{
-          title: 'Serviços',
+          title: 'Histórico',
           tabBarIcon: ({ color, size }) => (
-            <Text style={{ fontSize: size, color }}>🔧</Text>
+            <Ionicons name="time-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Perfil',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
       />
