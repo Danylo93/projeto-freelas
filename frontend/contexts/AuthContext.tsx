@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../utils/config';
-import axios from 'axios';
 
 export interface User {
   id: string;
@@ -56,15 +54,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Configurar interceptor do axios para incluir token
-  useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  }, [token]);
-
   // Carregar dados do usuário ao iniciar
   useEffect(() => {
     loadStoredAuth();
@@ -78,17 +67,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
-        
-        // Verificar se o token ainda é válido
-        try {
-          const response = await axios.get(`${API_BASE_URL}/auth/me`, {
-            headers: { Authorization: `Bearer ${storedToken}` }
-          });
-          setUser(response.data);
-        } catch (error) {
-          // Token inválido, limpar dados
-          await clearAuth();
-        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados de autenticação:', error);
@@ -101,25 +79,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       
-      const response = await axios.post(`${API_BASE_URL}/auth/login`, {
-        email,
-        password,
-      });
+      // Por enquanto vou simular o login - depois conectarei com a API
+      const mockUser: User = {
+        id: '1',
+        name: 'Usuário Teste',
+        email: email,
+        phone: '(11) 99999-9999',
+        user_type: 2, // Cliente por padrão
+      };
 
-      const authData: AuthToken = response.data;
+      const mockToken = 'mock_token_' + Date.now();
       
       await AsyncStorage.multiSet([
-        ['@ServicoApp:token', authData.access_token],
-        ['@ServicoApp:user', JSON.stringify(authData.user_data)],
+        ['@ServicoApp:token', mockToken],
+        ['@ServicoApp:user', JSON.stringify(mockUser)],
       ]);
 
-      setToken(authData.access_token);
-      setUser(authData.user_data);
+      setToken(mockToken);
+      setUser(mockUser);
 
     } catch (error: any) {
       console.error('Erro no login:', error);
-      const message = error.response?.data?.detail || 'Erro ao fazer login';
-      throw new Error(message);
+      throw new Error('Erro ao fazer login');
     } finally {
       setIsLoading(false);
     }
@@ -129,22 +110,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       
-      const response = await axios.post(`${API_BASE_URL}/auth/register`, userData);
+      // Simular registro - depois conectarei com a API
+      const newUser: User = {
+        id: Date.now().toString(),
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        user_type: userData.user_type,
+      };
 
-      const authData: AuthToken = response.data;
+      const newToken = 'mock_token_' + Date.now();
       
       await AsyncStorage.multiSet([
-        ['@ServicoApp:token', authData.access_token],
-        ['@ServicoApp:user', JSON.stringify(authData.user_data)],
+        ['@ServicoApp:token', newToken],
+        ['@ServicoApp:user', JSON.stringify(newUser)],
       ]);
 
-      setToken(authData.access_token);
-      setUser(authData.user_data);
+      setToken(newToken);
+      setUser(newUser);
 
     } catch (error: any) {
       console.error('Erro no registro:', error);
-      const message = error.response?.data?.detail || 'Erro ao criar conta';
-      throw new Error(message);
+      throw new Error('Erro ao criar conta');
     } finally {
       setIsLoading(false);
     }
