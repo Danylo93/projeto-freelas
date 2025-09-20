@@ -202,12 +202,12 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: 16,
   },
   backIcon: {
     fontSize: 20,
     fontWeight: '600',
-    color: theme.colors.primary,
+    color: '#667eea',
   },
   placeholder: {
     width: 40,
