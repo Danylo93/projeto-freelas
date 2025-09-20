@@ -1,6 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
+
+// Importação condicional para evitar erro na web
+let MapView: any, Marker: any, Polyline: any, PROVIDER_GOOGLE: any;
+if (Platform.OS !== 'web') {
+  const MapComponents = require('react-native-maps');
+  MapView = MapComponents.default;
+  Marker = MapComponents.Marker;
+  Polyline = MapComponents.Polyline;
+  PROVIDER_GOOGLE = MapComponents.PROVIDER_GOOGLE;
+}
 import { Ionicons } from '@expo/vector-icons';
 import { distanceService, LocationCoords, DistanceInfo } from '../../services/distanceService';
 
