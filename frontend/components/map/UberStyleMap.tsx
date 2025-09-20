@@ -144,6 +144,34 @@ export const UberStyleMap: React.FC<UberStyleMapProps> = ({
     );
   };
 
+  // Renderizar versão web (placeholder)
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[styles.container, style]}>
+        <View style={styles.webMapContainer}>
+          <View style={styles.webMapPlaceholder}>
+            <View style={styles.webMapIcon}>🗺️</View>
+            <Text style={styles.webMapText}>
+              Mapa disponível apenas no app mobile
+            </Text>
+            {showDistanceInfo && distanceInfo && (
+              <View style={styles.webDistanceInfo}>
+                <Text style={styles.webDistanceText}>
+                  Distância: {distanceInfo.formattedDistance}
+                </Text>
+                <Text style={styles.webDistanceText}>
+                  Tempo: {distanceInfo.formattedDuration}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+        {renderDistanceInfo()}
+      </View>
+    );
+  }
+
+  // Renderizar versão mobile com mapa real
   return (
     <View style={[styles.container, style]}>
       <MapView
