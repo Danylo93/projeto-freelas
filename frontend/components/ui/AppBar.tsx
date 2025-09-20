@@ -6,8 +6,6 @@ import {
   ViewStyle,
   TextStyle,
   TouchableOpacity,
-  StatusBar,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -93,35 +91,11 @@ export const AppBar: React.FC<AppBarProps> = ({
 
     return baseStyle;
   };
-        break;
-    }
 
-    return baseStyle;
-  };
-
-  const getSubtitleStyle = (): TextStyle => {
-    return {
-      ...theme.typography.bodyMedium,
-      color: theme.colors.onSurfaceVariant,
-      marginTop: theme.spacing.xs,
-    };
-  };
-
-  const getIconStyle = (): ViewStyle => {
-    return {
-      padding: theme.spacing.sm,
-      borderRadius: theme.borderRadius.md,
-    };
-  };
-
-  const renderLeftContent = () => {
+  const renderLeftAction = () => {
     if (showBackButton) {
       return (
-        <TouchableOpacity
-          style={[getIconStyle(), iconStyle]}
-          onPress={onBackPress}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity onPress={onBackPress} style={[styles.iconButton, iconStyle]}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
       );
@@ -129,11 +103,7 @@ export const AppBar: React.FC<AppBarProps> = ({
 
     if (leftIcon) {
       return (
-        <TouchableOpacity
-          style={[getIconStyle(), iconStyle]}
-          onPress={onLeftIconPress}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity onPress={onLeftIconPress} style={[styles.iconButton, iconStyle]}>
           {leftIcon}
         </TouchableOpacity>
       );
@@ -142,14 +112,10 @@ export const AppBar: React.FC<AppBarProps> = ({
     return <View style={styles.placeholder} />;
   };
 
-  const renderRightContent = () => {
+  const renderRightAction = () => {
     if (rightIcon) {
       return (
-        <TouchableOpacity
-          style={[getIconStyle(), iconStyle]}
-          onPress={onRightIconPress}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity onPress={onRightIconPress} style={[styles.iconButton, iconStyle]}>
           {rightIcon}
         </TouchableOpacity>
       );
@@ -158,38 +124,27 @@ export const AppBar: React.FC<AppBarProps> = ({
     return <View style={styles.placeholder} />;
   };
 
-  const renderTitle = () => {
-    if (!title) return null;
-
-    return (
-      <View style={styles.titleContainer}>
-        <Text style={[getTitleStyle(), titleStyle]}>
-          {title}
-        </Text>
-        {subtitle && (
-          <Text style={[getSubtitleStyle(), subtitleStyle]}>
-            {subtitle}
-          </Text>
-        )}
-      </View>
-    );
-  };
-
   return (
-    <>
-      <StatusBar
-        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.colors.surface}
-        translucent={Platform.OS === 'android'}
-      />
-      <View style={[getAppBarStyle(), style]}>
-        <View style={styles.content}>
-          {renderLeftContent()}
-          {renderTitle()}
-          {renderRightContent()}
+    <View style={[getAppBarStyle(), style]}>
+      <View style={styles.content}>
+        {renderLeftAction()}
+        
+        <View style={styles.titleContainer}>
+          {title && (
+            <Text style={[getTitleStyle(), titleStyle]}>
+              {title}
+            </Text>
+          )}
+          {subtitle && (
+            <Text style={[styles.subtitle, subtitleStyle]}>
+              {subtitle}
+            </Text>
+          )}
         </View>
+
+        {renderRightAction()}
       </View>
-    </>
+    </View>
   );
 };
 
@@ -204,6 +159,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
   },
+  subtitle: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 4,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   backIcon: {
     fontSize: 20,
     fontWeight: '600',
@@ -215,123 +181,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// AppBar específico para telas principais
-export interface MainAppBarProps extends Omit<AppBarProps, 'title' | 'rightIcon'> {
-  user?: {
-    name: string;
-    avatar?: string;
-  };
-  notifications?: {
-    count: number;
-    onPress: () => void;
-  };
-  onProfilePress?: () => void;
-}
-
-export const MainAppBar: React.FC<MainAppBarProps> = ({
-  user,
-  notifications,
-  onProfilePress,
-  ...props
-}) => {
-  const renderProfileIcon = () => {
-    if (user?.avatar) {
-      return (
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatarText}>{user.avatar}</Text>
-        </View>
-      );
-    }
-    
-    return (
-      <TouchableOpacity 
-        style={styles.profileButton}
-        onPress={onProfilePress}
-      >
-        <Text style={styles.profileIcon}>👤</Text>
-      </TouchableOpacity>
-    );
-  };
-      );
-    }
-
-    return (
-      <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primaryContainer }]}>
-        <Text style={[styles.avatarText, { color: theme.colors.onPrimaryContainer }]}>
-          {user?.name?.charAt(0).toUpperCase() || 'U'}
-        </Text>
-      </View>
-    );
-  };
-
-  const renderNotificationIcon = () => {
-    if (!notifications) return null;
-
-    return (
-      <View style={styles.notificationContainer}>
-        <Text style={styles.notificationIcon}>🔔</Text>
-        {notifications.count > 0 && (
-          <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
-            <Text style={[styles.notificationCount, { color: theme.colors.onError }]}>
-              {notifications.count > 99 ? '99+' : notifications.count}
-            </Text>
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  return (
-    <AppBar
-      title={user?.name || 'Olá!'}
-      subtitle="Como posso ajudar?"
-      leftIcon={renderProfileIcon()}
-      rightIcon={renderNotificationIcon()}
-      onLeftIconPress={onProfilePress}
-      onRightIconPress={notifications?.onPress}
-      {...props}
-    />
-  );
-};
-
-const mainAppBarStyles = StyleSheet.create({
-  avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  notificationContainer: {
-    position: 'relative',
-    padding: 8,
-  },
-  notificationIcon: {
-    fontSize: 20,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationCount: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-});
+export default AppBar;
