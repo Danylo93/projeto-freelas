@@ -1,93 +1,151 @@
-import React, { createContext, useContext, useMemo } from 'react';
-import { Platform } from 'react-native';
-import axios from 'axios';
-import { STRIPE_PUBLISHABLE_KEY, PAYMENTS_API_URL } from '@/utils/config';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { Alert } from 'react-native';
 
-interface PaymentContextType {
-  startPayment: (amountInCents: number, metadata?: Record<string, any>) => Promise<boolean>;
+interface PaymentMethod {
+  id: string;
+  type: 'card' | 'pix' | 'money';
+  name: string;
+  details: string;
+  isDefault: boolean;
 }
 
-const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
+interface PaymentContextData {
+  paymentMethods: PaymentMethod[];
+  addPaymentMethod: (method: Omit<PaymentMethod, 'id'>) => void;
+  removePaymentMethod: (id: string) => void;
+  setDefaultPaymentMethod: (id: string) => void;
+  processPayment: (amount: number, methodId: string) => Promise<boolean>;
+  isProcessing: boolean;
+}
 
-export const usePayment = () => {
-  const ctx = useContext(PaymentContext);
-  if (!ctx) throw new Error('usePayment must be used within PaymentProvider');
-  return ctx;
-};
+const PaymentContext = createContext<PaymentContextData>({} as PaymentContextData);
 
-export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const startPayment = async (amountInCents: number, metadata?: Record<string, any>) => {
-    if (Platform.OS === 'web') {
-      console.warn('Payment not supported on web platform');
-      return false;
-    }
+export function usePayment(): PaymentContextData {
+  const context = useContext(PaymentContext);
+  if (!context) {
+    throw new Error('usePayment deve ser usado dentro de um PaymentProvider');
+  }
+  return context;
+}
 
-    if (!PAYMENTS_API_URL) {
-      console.warn('Payments API URL not configured.');
-      return false;
-    }
-    try {
-      const response = await axios.post(`${PAYMENTS_API_URL}/create-intent`, {
-        amount: amountInCents,
-        currency: 'brl',
-        metadata,
-      });
-      const clientSecret = response.data?.clientSecret;
-      if (!clientSecret) return false;
+interface PaymentProviderProps {
+  children: ReactNode;
+}
 
-      // Only import Stripe on native platforms
-      if (Platform.OS !== 'web') {
-        try {
-          const { initPaymentSheet, presentPaymentSheet } = require('@stripe/stripe-react-native');
-          const initResult = await initPaymentSheet({ paymentIntentClientSecret: clientSecret });
-          if (initResult.error) {
-            console.error('initPaymentSheet error', initResult.error);
-            return false;
-          }
-          const present = await presentPaymentSheet();
-          if (present.error) {
-            console.error('presentPaymentSheet error', present.error);
-            return false;
-          }
-        } catch (error) {
-          console.warn('Stripe not available:', error);
-          return false;
-        }
+export function PaymentProvider({ children }: PaymentProviderProps) {
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
+    {
+      id: '1',
+      type: 'money',
+      name: 'Dinheiro',
+      details: 'Pagamento em espécie',
+      isDefault: true,
+    },
+    {
+      id: '2',
+      type: 'pix',
+      name: 'PIX',
+      details: 'Pagamento instantâneo',
+      isDefault: false,
+    },
+  ]);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const addPaymentMethod = (method: Omit<PaymentMethod, 'id'>) => {
+    const newMethod: PaymentMethod = {
+      ...method,
+      id: Date.now().toString(),
+    };
+
+    setPaymentMethods(prev => {
+      // Se é o primeiro método ou foi marcado como padrão, desmarcar outros
+      if (newMethod.isDefault || prev.length === 0) {
+        return [
+          newMethod,
+          ...prev.map(m => ({ ...m, isDefault: false }))
+        ];
       }
+      return [newMethod, ...prev];
+    });
+  };
+
+  const removePaymentMethod = (id: string) => {
+    setPaymentMethods(prev => {
+      const filtered = prev.filter(method => method.id !== id);
+      
+      // Se removeu o método padrão, marcar o primeiro como padrão
+      const removedWasDefault = prev.find(m => m.id === id)?.isDefault;
+      if (removedWasDefault && filtered.length > 0) {
+        filtered[0].isDefault = true;
+      }
+      
+      return filtered;
+    });
+  };
+
+  const setDefaultPaymentMethod = (id: string) => {
+    setPaymentMethods(prev => 
+      prev.map(method => ({
+        ...method,
+        isDefault: method.id === id,
+      }))
+    );
+  };
+
+  const processPayment = async (amount: number, methodId: string): Promise<boolean> => {
+    try {
+      setIsProcessing(true);
+
+      const method = paymentMethods.find(m => m.id === methodId);
+      if (!method) {
+        Alert.alert('Erro', 'Método de pagamento não encontrado');
+        return false;
+      }
+
+      // Simular processamento do pagamento
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      switch (method.type) {
+        case 'card':
+          // TODO: Integrar com Stripe ou outro processador de cartão
+          console.log(`Processando pagamento de R$ ${amount} no cartão`);
+          break;
+        
+        case 'pix':
+          // TODO: Integrar com sistema PIX
+          console.log(`Processando pagamento de R$ ${amount} via PIX`);
+          break;
+        
+        case 'money':
+          // Pagamento em dinheiro - apenas registrar
+          console.log(`Pagamento de R$ ${amount} em dinheiro registrado`);
+          break;
+      }
+
+      Alert.alert('Sucesso', `Pagamento de R$ ${amount.toFixed(2)} processado com sucesso!`);
       return true;
-    } catch (e) {
-      console.error('startPayment error', e);
+
+    } catch (error) {
+      console.error('Erro ao processar pagamento:', error);
+      Alert.alert('Erro', 'Não foi possível processar o pagamento');
       return false;
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const value = useMemo<PaymentContextType>(() => ({ startPayment }), []);
-
-  if (!STRIPE_PUBLISHABLE_KEY) {
-    console.warn('Stripe publishable key not configured. Set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY.');
-  }
-
-  // Web fallback - just provide context without StripeProvider
-  if (Platform.OS === 'web') {
-    return (
-      <PaymentContext.Provider value={value}>{children}</PaymentContext.Provider>
-    );
-  }
-
-  // Native platforms - use StripeProvider
-  try {
-    const { StripeProvider } = require('@stripe/stripe-react-native');
-    return (
-      <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder'}>
-        <PaymentContext.Provider value={value}>{children}</PaymentContext.Provider>
-      </StripeProvider>
-    );
-  } catch (error) {
-    console.warn('Stripe not available, falling back to context only');
-    return (
-      <PaymentContext.Provider value={value}>{children}</PaymentContext.Provider>
-    );
-  }
-};
-
-
+  return (
+    <PaymentContext.Provider
+      value={{
+        paymentMethods,
+        addPaymentMethod,
+        removePaymentMethod,
+        setDefaultPaymentMethod,
+        processPayment,
+        isProcessing,
+      }}
+    >
+      {children}
+    </PaymentContext.Provider>
+  );
+}
