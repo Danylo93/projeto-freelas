@@ -50,7 +50,9 @@ export const UberStyleMap: React.FC<UberStyleMapProps> = ({
       const region = distanceService.calculateMapRegion(clientLocation, providerLocation, 0.02);
       
       setTimeout(() => {
-        mapRef.current?.animateToRegion(region, 1000);
+        if (Platform.OS !== 'web' && mapRef.current) {
+          mapRef.current.animateToRegion(region, 1000);
+        }
       }, 500);
 
       // Animar entrada das informações
