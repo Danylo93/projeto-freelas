@@ -110,3 +110,7 @@ android-sdk/ -e
 
 # Re-include env defaults for API v2 services
 !api-v2/services/common/**/.env
+-e 
+# Environment files
+*.env
+*.env.*
