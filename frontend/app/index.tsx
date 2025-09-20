@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import AuthScreen from './auth/index';
 import { useRouter } from 'expo-router';
 
-
 export default function Index() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
@@ -21,6 +20,7 @@ export default function Index() {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // TODOS OS HOOKS DEVEM ESTAR NO TOPO - ANTES DE QUALQUER RETURN
   useEffect(() => {
     // Se não está carregando e já temos dados de auth, esconder splash
     if (!isLoading) {
@@ -49,6 +49,15 @@ export default function Index() {
       ]).start();
     }
   }, [fadeAnim, scaleAnim, showSplash]);
+
+  // Hook para navegação - DEVE ESTAR NO TOPO
+  useEffect(() => {
+    if (isAuthenticated && user && !showSplash && !isLoading) {
+      console.log('➡️ [INDEX] Redirecionando para UberStyleApp');
+      console.log('🏠 [INDEX] Navegando para telas de home');
+      router.replace('/(tabs)');
+    }
+  }, [isAuthenticated, user, showSplash, isLoading, router]);
 
   const SplashScreen = () => {
     return (
@@ -85,50 +94,23 @@ export default function Index() {
 
   console.log('✅ [INDEX] Usuário autenticado:', user.name, 'Tipo:', user.user_type);
 
-  // Redirect to UberStyleApp for both user types
-  console.log('� [INDEX] Redirecionando para UberStyleApp');
-  // Navigate to tabs (home screens) for both user types
-  console.log('🏠 [INDEX] Navegando para telas de home');
-  useEffect(() => {
-    if (isAuthenticated && user && !showSplash) {
-      router.replace('/(tabs)');
-    }
-  }, [isAuthenticated, user, showSplash, router]);
-  
   // Show loading while navigating
   return <SplashScreen />;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   splashContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    alignItems: 'center',
+    backgroundColor: '#ffffff',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   logoContainer: {
+    marginBottom: 30,
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 120,
-    height: 120,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 60,
-    marginBottom: 40,
-    elevation: 10,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
   },
   textContainer: {
     alignItems: 'center',
-    marginBottom: 50,
   },
   appName: {
     fontSize: 32,
@@ -140,25 +122,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    paddingHorizontal: 40,
-    lineHeight: 22,
-  },
-  loadingDots: {
-    position: 'absolute',
-    bottom: 100,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#007AFF',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#F44336',
+    paddingHorizontal: 20,
   },
 });

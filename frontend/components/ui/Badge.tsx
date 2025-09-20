@@ -6,7 +6,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { useTheme } from '../../contexts/ThemeContextNew';
+import { useTheme } from '../../src/providers/ThemeProvider';
 import { componentColors } from '../../design/theme';
 
 export interface BadgeProps {

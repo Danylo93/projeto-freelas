@@ -7,7 +7,7 @@ import {
   TextStyle,
   TouchableOpacity,
 } from 'react-native';
-import { useTheme } from '../../contexts/ThemeContextNew';
+import { useTheme } from '../../src/providers/ThemeProvider';
 import { BlurView } from 'expo-blur';
 
 export interface MapOverlayProps {

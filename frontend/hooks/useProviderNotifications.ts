@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import { Alert, Vibration } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRealtime } from '@/contexts/ImprovedRealtimeContext';
+import { useFirebaseRealtime } from '@/contexts/FirebaseRealtimeContext';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 
 interface NotificationData {
@@ -27,7 +27,7 @@ export const useProviderNotifications = ({
   onRequestUpdate,
 }: UseProviderNotificationsProps) => {
   const { user } = useAuth();
-  const { isConnected } = useRealtime();
+  const { isConnected } = useFirebaseRealtime();
   const { sendLocalNotification } = usePushNotifications();
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();

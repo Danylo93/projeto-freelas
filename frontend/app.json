@@ -87,6 +87,14 @@
     "extra": {
       "googleSdkKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",
       "googleWebKey": "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",
+      "firebaseApiKey": "AIzaSyC7XUJDG7PXB3YUiSyh0WMbbqeiR81zNlg",
+      "firebaseAuthDomain": "uber-like-freelas.firebaseapp.com",
+      "firebaseDatabaseURL": "https://uber-like-freelas-default-rtdb.firebaseio.com",
+      "firebaseProjectId": "uber-like-freelas",
+      "firebaseStorageBucket": "uber-like-freelas.firebasestorage.app",
+      "firebaseMessagingSenderId": "901683796826",
+      "firebaseAppId": "1:901683796826:web:6db0585afabdf5e8383163",
+      "firebaseMeasurementId": "G-04R96TSGKK",
       "router": {
         "origin": false
       },

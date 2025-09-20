@@ -12,7 +12,7 @@ import {
   Dimensions,
   BackHandler,
 } from 'react-native';
-import { useTheme } from '../../contexts/ThemeContextNew';
+import { useTheme } from '../../src/providers/ThemeProvider';
 import { BlurView } from 'expo-blur';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');

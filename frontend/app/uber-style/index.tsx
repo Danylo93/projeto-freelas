@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { MatchingProvider } from '@/contexts/UberStyleMatchingContext';
-import { RealtimeProvider } from '@/contexts/ImprovedRealtimeContext';
+import { FirebaseRealtimeProvider } from '@/contexts/FirebaseRealtimeContext';
 import { ModernClientApp } from '@/components/modern/ModernClientApp';
 import { ModernProviderApp } from '@/components/modern/ModernProviderApp';
 
@@ -18,7 +18,7 @@ const UberStyleApp: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
-      <RealtimeProvider>
+      <FirebaseRealtimeProvider>
         <MatchingProvider>
           <View style={styles.content}>
           
@@ -29,7 +29,7 @@ const UberStyleApp: React.FC = () => {
             )}
           </View>
         </MatchingProvider>
-      </RealtimeProvider>
+      </FirebaseRealtimeProvider>
     </SafeAreaView>
   );
 };

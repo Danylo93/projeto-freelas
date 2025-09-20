@@ -26,4 +26,7 @@ config.maxWorkers = 2;
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
+// Support for Lottie animations
+config.resolver.assetExts.push('json');
+
 module.exports = config;

@@ -1,9 +1,0 @@
-{
-  "id": "req_test_encanador_999",
-  "client_id": "9ae70d35-9b6b-40c6-9aaa-7019cf0a5a0b",
-  "category": "Encanador",
-  "description": "TESTE - Preciso de um encanador urgente",
-  "client_latitude": -23.5505,
-  "client_longitude": -46.6333,
-  "price": 60
-}

@@ -10,3 +10,7 @@ aiokafka==0.10.0
 python-jose==3.3.0
 googlemaps==4.10.0
 pydantic==1.10.15
+
+# Firebase dependencies
+firebase-admin==6.4.0
+google-auth==2.23.4

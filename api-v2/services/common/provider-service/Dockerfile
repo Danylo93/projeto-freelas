@@ -14,8 +14,8 @@ COPY . .
 
 ENV PYTHONPATH=/app
 
-WORKDIR /app/provider-service
+WORKDIR /app
 
 EXPOSE 8011
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8011"]
+CMD ["uvicorn", "provider-service.main_ultra_simple:app", "--host", "0.0.0.0", "--port", "8012"]

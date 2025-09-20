@@ -1,5 +1,7 @@
+version: '3.8'
 
 services:
+  # Infraestrutura
   kafka:
     image: bitnami/kafka:3.7
     container_name: kafka
@@ -51,9 +53,132 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
 
-  # ----------------- NOSSOS SERVIÇOS -----------------
+  # Serviços Core
+  firebase-service:
+    build:
+      context: ./services/common
+      dockerfile: firebase-service/Dockerfile
+    container_name: firebase-service
+    networks: [core]
+    environment:
+      - FIREBASE_DATABASE_URL=https://uber-like-freelas-default-rtdb.firebaseio.com
+      - FIREBASE_CREDENTIALS_PATH=/app/firebase-credentials.json
+      - PYTHONPATH=/app
+    working_dir: /app/firebase-service
+    volumes:
+      - ./services/common:/app
+      - ./config/firebase-credentials.json:/app/firebase-credentials.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import firebase_admin; print(\"Firebase OK\")' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  auth-service:
+    build:
+      context: ./services/common
+      dockerfile: auth-service/Dockerfile
+    container_name: auth-service
+    ports: ["8010:8010"]
+    networks: [core]
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=freelas
+      - JWT_SECRET=dev-secret-key-change-in-production
+      - PYTHONPATH=/app
+    depends_on: [mongo]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8010/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  request-service:
+    build:
+      context: ./services/common
+      dockerfile: request-service/Dockerfile
+    container_name: request-service
+    ports: ["8011:8011"]
+    networks: [core]
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=freelas
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - FIREBASE_DATABASE_URL=https://uber-like-freelas-default-rtdb.firebaseio.com
+      - FIREBASE_CREDENTIALS_PATH=/app/firebase-credentials.json
+      - PYTHONPATH=/app
+    volumes:
+      - ./config/firebase-credentials.json:/app/firebase-credentials.json:ro
+    depends_on: [mongo, kafka, firebase-service]
+    command: ["python", "request-service/main_optimized.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8011/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  provider-service:
+    build:
+      context: ./services/common
+      dockerfile: provider-service/Dockerfile
+    container_name: provider-service
+    ports: ["8012:8012"]
+    networks: [core]
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=freelas
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - FIREBASE_DATABASE_URL=https://uber-like-freelas-default-rtdb.firebaseio.com
+      - FIREBASE_CREDENTIALS_PATH=/app/firebase-credentials.json
+      - PYTHONPATH=/app
+    volumes:
+      - ./config/firebase-credentials.json:/app/firebase-credentials.json:ro
+    depends_on: [mongo, kafka, firebase-service]
+    command: ["python", "provider-service/main_optimized.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8012/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  matching-service:
+    build:
+      context: ./services/common
+      dockerfile: matching-service/Dockerfile
+    container_name: matching-service
+    ports: ["8013:8013"]
+    networks: [core]
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=freelas
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONPATH=/app
+    depends_on: [mongo, kafka]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8013/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  notification-service:
+    build:
+      context: ./services/common
+      dockerfile: notification-service/Dockerfile
+    container_name: notification-service
+    ports: ["8014:8014"]
+    networks: [core]
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=freelas
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONPATH=/app
+    depends_on: [mongo, kafka]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8014/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   api-gateway:
     build:
@@ -62,197 +187,19 @@ services:
     container_name: api-gateway
     ports: ["8000:8000"]
     networks: [core]
-    depends_on:
-      - provider-service
-      - request-service
-      - auth-service
-      - matching-service
-      - payment-service
-      - admin-service
     environment:
-      - AUTH_SERVICE_URL=http://auth-service:8014
-      - PROVIDER_SERVICE_URL=http://provider-service:8011
-      - REQUEST_SERVICE_URL=http://request-service:8012
+      - AUTH_SERVICE_URL=http://auth-service:8010
+      - REQUEST_SERVICE_URL=http://request-service:8011
+      - PROVIDER_SERVICE_URL=http://provider-service:8012
       - MATCHING_SERVICE_URL=http://matching-service:8013
-      - PAYMENT_SERVICE_URL=http://payment-service:8016
-      - ADMIN_SERVICE_URL=http://admin-service:8017
-      - SOCKET_SERVICE_URL=http://socket-gateway:8015
-      - JWT_SECRET=your-secret-key-here-change-in-production
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/healthz || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
-  provider-service:
-    build:
-      context: ./services/common
-      dockerfile: provider-service/Dockerfile
-    container_name: provider-service
-    networks: [core]
-    depends_on:
-      mongo:
-        condition: service_started
-      redis:
-        condition: service_started
-      kafka:
-        condition: service_healthy
-    env_file:
-      - ./services/common/provider-service/.env
-    environment:
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8014
       - PYTHONPATH=/app
-    working_dir: /app/provider-service
-    volumes:
-      - ./services/common:/app
+    depends_on: [auth-service, request-service, provider-service, matching-service, notification-service]
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8011/healthz || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 10s
-      timeout: 3s
-      retries: 10
-
-
-  request-service:
-    build:
-      context: ./services/common
-      dockerfile: request-service/Dockerfile
-    container_name: request-service
-    networks: [core]
-    depends_on:
-      mongo:
-        condition: service_started
-      redis:
-        condition: service_started
-      kafka:
-        condition: service_healthy
-    env_file:
-      - ./services/common/request-service/.env
-    environment:
-      - PYTHONPATH=/app
-    working_dir: /app/request-service
-    volumes:
-      - ./services/common:/app
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8012/healthz || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-
-  matching-service:
-    build:
-      context: ./services/common
-      dockerfile: matching-service/Dockerfile
-    container_name: matching-service
-    networks: [core]
-    depends_on:
-      mongo:
-        condition: service_started
-      kafka:
-        condition: service_healthy
-    env_file:
-      - ./services/common/matching-service/.env
-    working_dir: /app/matching-service
-    volumes:
-      - ./services/common:/app
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8013/healthz || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-
-  auth-service:
-    build: ./services/common/auth-service
-    container_name: auth-service
-    networks: [core]
-    depends_on: [mongo]
-    env_file:
-      - ./services/common/auth-service/.env
-    volumes:
-      - ./services/common/auth-service:/app
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8014/healthz || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-
-  socket-gateway:
-    build:
-      context: ./services/common/socket-gateway
-      dockerfile: Dockerfile
-    container_name: socket-gateway
-    ports: ["8015:8015"]
-    networks: [core]
-    depends_on:
-      provider-service:
-        condition: service_healthy
-      request-service:
-        condition: service_healthy
-      auth-service:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    env_file:
-      - ./services/common/socket-gateway/.env
-    environment:
-      PYTHONPATH: /app
-      KAFKA_BOOTSTRAP: kafka:29092
-    working_dir: /app/socket-gateway
-    volumes:
-      - ./services/common:/app
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8015/healthz || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-
-  notification-service:
-    build:
-      context: ./services/common
-      dockerfile: notification-service/Dockerfile
-    container_name: notification-service
-    ports: ["8016:8016"]
-    networks: [core]
-    depends_on:
-      kafka:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
-    environment:
-      PYTHONPATH: /app
-      KAFKA_BOOTSTRAP: kafka:29092
-      MONGO_URL: mongodb://mongo:27017
-      DB_NAME: freelas
-    working_dir: /app/notification-service
-    volumes:
-      - ./services/common:/app
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8016/healthz || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-
-  payment-service:
-    build:
-      context: ./services/common
-      dockerfile: payment-service/Dockerfile
-    container_name: payment-service
-    networks: [core]
-    env_file:
-      - ./services/common/payment-service/.env
-    working_dir: /app/payment-service
-    volumes:
-      - ./services/common:/app
-
-  admin-service:
-    build:
-      context: ./services/common
-      dockerfile: admin-service/Dockerfile
-    container_name: admin-service
-    networks: [core]
-    env_file:
-      - ./services/common/admin-service/.env
-    working_dir: /app/admin-service
-    volumes:
-      - ./services/common:/app
+      timeout: 5s
+      retries: 3
 
 networks:
   core:

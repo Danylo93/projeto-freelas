@@ -9,7 +9,7 @@ import {
   StatusBar,
   Platform,
 } from 'react-native';
-import { useTheme } from '../../contexts/ThemeContextNew';
+import { useTheme } from '../../src/providers/ThemeProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface AppBarProps {
@@ -47,7 +47,7 @@ export const AppBar: React.FC<AppBarProps> = ({
   const insets = useSafeAreaInsets();
   
   // Verificação de segurança para o tema
-  if (!themeContext || !themeContext.theme) {
+  if (!themeContext) {
     console.error('❌ [APPBAR] Theme não disponível');
     return null;
   }
@@ -89,15 +89,15 @@ export const AppBar: React.FC<AppBarProps> = ({
     switch (variant) {
       case 'small':
         baseStyle.fontSize = theme.typography.titleLarge.fontSize;
-        baseStyle.lineHeight = theme.typography.titleLarge.lineHeight;
+        baseStyle.lineHeight = theme.typography.titleLarge.fontWeight;
         break;
       case 'medium':
         baseStyle.fontSize = theme.typography.headlineSmall.fontSize;
-        baseStyle.lineHeight = theme.typography.headlineSmall.lineHeight;
+        baseStyle.lineHeight = theme.typography.headlineSmall.fontWeight;
         break;
       case 'large':
         baseStyle.fontSize = theme.typography.headlineMedium.fontSize;
-        baseStyle.lineHeight = theme.typography.headlineMedium.lineHeight;
+        baseStyle.lineHeight = theme.typography.headlineMedium.fontWeight;
         break;
     }
 

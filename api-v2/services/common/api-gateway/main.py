@@ -631,6 +631,17 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check do API Gateway"""
+    return {
+        "status": "healthy",
+        "service": "api-gateway",
+        "kafka_available": KAFKA_AVAILABLE,
+        "services": list(SERVICES.keys())
+    }
+
 # WebSocket nativo implementado - não há mais proxy para Socket.IO
 
 if __name__ == "__main__":

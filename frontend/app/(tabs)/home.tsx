@@ -8,9 +8,9 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import { useTheme } from '../../contexts/ThemeContextNew';
+import { useTheme } from '../../src/providers/ThemeProvider';
 import { useAuth } from '../../contexts/AuthContext';
-import { useRealtime } from '../../contexts/RealtimeFallbackContext';
+import { useFirebaseRealtime } from '../../contexts/FirebaseRealtimeContext';
 import { useLocation } from '../../contexts/LocationContext';
 import { MainAppBar } from '../../components/ui/AppBar';
 import { AppBottomTabNavigation } from '../../components/ui/BottomTabNavigation';
@@ -29,9 +29,10 @@ const categories = [
 ];
 
 export default function HomeScreen() {
-  const { theme } = useTheme();
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
   const { user } = useAuth();
-  const { isConnected, connectionType } = useRealtime();
+  const { isConnected } = useFirebaseRealtime();
   const { location, requestLocationPermission } = useLocation();
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -76,7 +77,7 @@ export default function HomeScreen() {
   };
 
   const renderConnectionStatus = () => {
-    console.log('🔍 [HOME] Renderizando status de conexão, isConnected:', isConnected, 'connectionType:', connectionType);
+    console.log('🔍 [HOME] Renderizando status de conexão, isConnected:', isConnected);
     if (!isConnected) {
       return (
         <Card
@@ -91,7 +92,7 @@ export default function HomeScreen() {
     return (
       <Card
         title="Conexão"
-        content={`Conectado via ${connectionType === 'websocket' ? 'WebSocket' : 'Polling'}`}
+        content="Conectado via Firebase Realtime Database"
         variant="outlined"
         style={[styles.statusCard, { borderColor: theme.colors.success }]}
       />

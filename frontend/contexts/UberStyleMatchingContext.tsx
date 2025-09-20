@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { useRealtime } from './ImprovedRealtimeContext';
+import { useFirebaseRealtime } from './FirebaseRealtimeContext';
 import { Alert } from 'react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '@/utils/config';
@@ -89,7 +89,7 @@ export const useMatching = () => {
 
 export const MatchingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, getAuthHeaders, validateToken, refreshAuth } = useAuth();
-  const { isConnected, sendMessage, joinRoom, leaveRoom } = useRealtime();
+  const { isConnected, sendMessage, joinRoom, leaveRoom } = useFirebaseRealtime();
   
   const [currentRequest, setCurrentRequest] = useState<ServiceRequest | null>(null);
   const [assignedProvider, setAssignedProvider] = useState<Provider | null>(null);

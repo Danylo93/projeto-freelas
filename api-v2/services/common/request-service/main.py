@@ -6,6 +6,7 @@ from aiokafka import AIOKafkaProducer
 import os, asyncio
 from datetime import datetime
 from dotenv import load_dotenv
+import uuid
 
 from common.kafka import make_producer
 from common.events import (
@@ -25,6 +26,9 @@ from common import (
 from common.idempotency import ensure_idempotency, store_idempotent_result
 from common.ratelimit import RateLimiter
 from common.rbac import require_roles
+import sys
+sys.path.append('/app/firebase-service')
+from firebase_client import firebase_client
 
 load_dotenv()
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://mongo:27017")
@@ -35,395 +39,387 @@ LIFECYCLE_TOPIC = os.getenv("TOPIC_REQ_LIFECYCLE", TOPIC_REQ_LIFECYCLE)
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-app = FastAPI(title="request-service")
+app = FastAPI(title="request-service-optimized")
 producer: Optional[AIOKafkaProducer] = None
 rate_limiter = RateLimiter(max_requests=60, window_seconds=60)
 
+# Modelos integrados
 class ServiceRequest(BaseModel):
     id: str
     client_id: str
     provider_id: Optional[str] = None
     category: str
     description: str = ""
+    address: str
+    client_latitude: float
+    client_longitude: float
+    provider_latitude: Optional[float] = None
+    provider_longitude: Optional[float] = None
+    price: float
+    status: str = "pending"  # pending, offered, accepted, en_route, arrived, started, completed, cancelled
+    created_at: datetime
+    updated_at: datetime
+    estimated_duration: Optional[int] = None  # em minutos
+    distance: Optional[float] = None  # em km
+    rating: Optional[float] = None  # rating do serviço (1-5)
+    payment_status: str = "pending"  # pending, paid, refunded
+    payment_method: Optional[str] = None  # credit_card, pix, cash
+
+class RequestCreate(BaseModel):
+    client_id: str
+    category: str
+    description: str
+    address: str
     client_latitude: float
     client_longitude: float
     price: float
-    status: str = "pending"
+    estimated_duration: Optional[int] = None
 
+class RequestUpdate(BaseModel):
+    status: Optional[str] = None
+    provider_id: Optional[str] = None
+    provider_latitude: Optional[float] = None
+    provider_longitude: Optional[float] = None
+    estimated_duration: Optional[int] = None
+    distance: Optional[float] = None
+    rating: Optional[float] = None
+    payment_status: Optional[str] = None
+    payment_method: Optional[str] = None
 
-class StatusUpdate(BaseModel):
-    status: str
-
-
-class AcceptPayload(BaseModel):
+class RequestOffer(BaseModel):
     provider_id: str
+    price: float
+    estimated_duration: int
+    message: Optional[str] = None
 
+class PaymentInfo(BaseModel):
+    payment_method: str
+    amount: float
+    currency: str = "BRL"
+    description: str
+
+# Inicialização
 @app.on_event("startup")
-async def start():
+async def startup_event():
     global producer
     producer = await make_producer()
+    await firebase_client.initialize()
 
 @app.on_event("shutdown")
-async def stop():
+async def shutdown_event():
     if producer:
         await producer.stop()
-    client.close()
+    await firebase_client.cleanup()
 
-@app.get("/healthz")
-async def health():
-    return {"status":"ok","service":"request"}
-
-@app.post("/requests/{request_id}/accept")
-async def accept_request(
-    request_id: str,
-    provider_data: dict,
-    user=Depends(require_roles([1]))  # Apenas prestadores
+# Endpoints principais
+@app.post("/requests", response_model=ServiceRequest)
+@ensure_idempotency
+async def create_request(
+    request: RequestCreate,
+    idempotency_key: IdempotencyKey = Depends(),
+    authorization: str = Header(None)
 ):
-    """Prestador aceita uma solicitação"""
-    try:
-        provider_id = provider_data.get('provider_id')
-        user_id = user.get('sub')  # ID está no campo 'sub' do token
-
-        print(f"✅ [REQUEST] Prestador {user_id} aceitando solicitação {request_id}")
-
-        # Verificar se a solicitação existe e está disponível
-        request_doc = await db.requests.find_one({"id": request_id})
-        if not request_doc:
-            raise HTTPException(status_code=404, detail="Solicitação não encontrada")
-
-        if request_doc.get('status') != 'offered':
-            raise HTTPException(status_code=400, detail="Solicitação não está disponível para aceitar")
-
-        # Atualizar status da solicitação
-        await db.requests.update_one(
-            {"id": request_id},
-            {
-                "$set": {
-                    "status": "accepted",
-                    "provider_id": provider_id,
-                    "accepted_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                }
-            }
-        )
-
-        # Marcar prestador como ocupado
-        await db.providers.update_many(
-            {"user_id": user_id},
-            {"$set": {"status": "busy"}}
-        )
-
-        # Salvar decisão do prestador
-        decision_doc = {
-            "id": f"decision_{request_id}_{user_id}",
+    """Criar nova solicitação de serviço"""
+    await rate_limiter.check_rate_limit(authorization)
+    
+    request_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+    
+    service_request = ServiceRequest(
+        id=request_id,
+        client_id=request.client_id,
+        category=request.category,
+        description=request.description,
+        address=request.address,
+        client_latitude=request.client_latitude,
+        client_longitude=request.client_longitude,
+        price=request.price,
+        status="pending",
+        created_at=now,
+        updated_at=now,
+        estimated_duration=request.estimated_duration
+    )
+    
+    # Salvar no MongoDB
+    await db.requests.insert_one(service_request.dict())
+    
+    # Salvar no Firebase para tempo real
+    await firebase_client.create_request(request_id, service_request.dict())
+    
+    # Publicar evento Kafka
+    await producer.send(
+        LIFECYCLE_TOPIC,
+        {
+            "event": EV_REQUEST_CREATED,
             "request_id": request_id,
-            "provider_id": provider_id,
-            "user_id": user_id,
-            "decision": "accepted",
-            "decided_at": datetime.utcnow(),
-            "created_at": datetime.utcnow()
+            "client_id": request.client_id,
+            "category": request.category,
+            "price": request.price,
+            "location": {
+                "lat": request.client_latitude,
+                "lng": request.client_longitude
+            },
+            "timestamp": now.isoformat()
         }
-        await db.provider_decisions.insert_one(decision_doc)
-
-        print(f"✅ [REQUEST] Solicitação {request_id} aceita por {user_id}")
-
-        return {
-            "status": "success",
-            "request_id": request_id,
-            "provider_id": provider_id,
-            "decision": "accepted"
-        }
-
-    except Exception as e:
-        print(f"❌ [REQUEST] Erro ao aceitar solicitação: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/requests/{request_id}/decline")
-async def decline_request(
-    request_id: str,
-    provider_data: dict,
-    user=Depends(require_roles([1]))  # Apenas prestadores
-):
-    """Prestador recusa uma solicitação"""
-    try:
-        provider_id = provider_data.get('provider_id')
-        user_id = user.get('sub')  # ID está no campo 'sub' do token
-        reason = provider_data.get('reason', 'Não especificado')
-
-        print(f"❌ [REQUEST] Prestador {user_id} recusando solicitação {request_id}")
-
-        # Verificar se a solicitação existe
-        request_doc = await db.requests.find_one({"id": request_id})
-        if not request_doc:
-            raise HTTPException(status_code=404, detail="Solicitação não encontrada")
-
-        # Liberar prestador (voltar para available se estava online)
-        await db.providers.update_many(
-            {"user_id": user_id, "is_online": True},
-            {"$set": {"status": "available"}}
-        )
-
-        # Salvar decisão do prestador
-        decision_doc = {
-            "id": f"decision_{request_id}_{user_id}",
-            "request_id": request_id,
-            "provider_id": provider_id,
-            "user_id": user_id,
-            "decision": "declined",
-            "reason": reason,
-            "decided_at": datetime.utcnow(),
-            "created_at": datetime.utcnow()
-        }
-        await db.provider_decisions.insert_one(decision_doc)
-
-        print(f"❌ [REQUEST] Solicitação {request_id} recusada por {user_id}")
-
-        return {
-            "status": "success",
-            "request_id": request_id,
-            "provider_id": provider_id,
-            "decision": "declined",
-            "reason": reason
-        }
-
-    except Exception as e:
-        print(f"❌ [REQUEST] Erro ao recusar solicitação: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/providers/{user_id}/decisions")
-async def get_provider_decisions(
-    user_id: str,
-    user=Depends(require_roles([1]))  # Apenas prestadores
-):
-    """Obter histórico de decisões do prestador"""
-    try:
-        decisions_cursor = db.provider_decisions.find(
-            {"user_id": user_id},
-            {"_id": 0}
-        ).sort("decided_at", -1).limit(50)
-
-        decisions = await decisions_cursor.to_list(length=50)
-
-        return {
-            "status": "success",
-            "decisions": decisions,
-            "total": len(decisions)
-        }
-
-    except Exception as e:
-        print(f"❌ [REQUEST] Erro ao obter decisões: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    )
+    
+    await store_idempotent_result(idempotency_key, service_request.dict())
+    return service_request
 
 @app.get("/requests", response_model=List[ServiceRequest])
 async def list_requests(
     client_id: Optional[str] = None,
     provider_id: Optional[str] = None,
     status: Optional[str] = None,
-    pagination: PaginationParams = PaginationParams(),
-    sorting: SortParams = SortParams(),
-    user=Depends(require_roles([1,2,3])),
+    pagination: PaginationParams = Depends(),
+    sort: SortParams = Depends()
 ):
-    params = {
+    """Listar solicitações com filtros"""
+    filters = build_filters({
         "client_id": client_id,
         "provider_id": provider_id,
-        "status": status,
-    }
-    query = build_filters(params, ["client_id", "provider_id", "status"])
-    cur = db.requests.find(query, {"_id":0})
-    cur = apply_sort(cur, sorting)
-    cur = apply_pagination(cur, pagination)
-    return [doc async for doc in cur]
+        "status": status
+    })
+    
+    cursor = db.requests.find(filters)
+    cursor = apply_sort(cursor, sort)
+    cursor = apply_pagination(cursor, pagination)
+    
+    requests = []
+    async for doc in cursor:
+        requests.append(ServiceRequest(**doc))
+    
+    return requests
 
-@app.post("/requests", response_model=ServiceRequest)
-async def create_request(
-    req: ServiceRequest,
-    request: Request,
-    idempotency_key: str | None = Header(None, alias=IdempotencyKey.header_name),
-    user=Depends(require_roles([2])),
+@app.get("/requests/{request_id}", response_model=ServiceRequest)
+async def get_request(request_id: str):
+    """Obter solicitação específica"""
+    doc = await db.requests.find_one({"id": request_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    return ServiceRequest(**doc)
+
+@app.put("/requests/{request_id}", response_model=ServiceRequest)
+async def update_request(
+    request_id: str,
+    update: RequestUpdate,
+    authorization: str = Header(None)
 ):
-    rl_key = request.headers.get("X-Rate-Limit-Key") or request.client.host
-    if not rate_limiter.allow(f"create_request:{rl_key}"):
-        raise HTTPException(status_code=429, detail="rate limit exceeded")
-
-    cached = ensure_idempotency(idempotency_key)
-    if cached is not None:
-        return cached
-
-    await db.requests.insert_one(req.dict())
-    if producer:
-        await asyncio.gather(
-            producer.send_and_wait(REQ_TOPIC, req.dict()),
-            producer.send_and_wait(
-                LIFECYCLE_TOPIC,
-                {
-                    "type": EV_REQUEST_CREATED,
-                    "request_id": req.id,
-                    "client_id": req.client_id,
-                },
-            ),
+    """Atualizar solicitação"""
+    await rate_limiter.check_rate_limit(authorization)
+    
+    update_data = update.dict(exclude_unset=True)
+    update_data["updated_at"] = datetime.utcnow()
+    
+    result = await db.requests.update_one(
+        {"id": request_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Atualizar no Firebase
+    await firebase_client.update_request(request_id, update_data)
+    
+    # Publicar evento de mudança de status
+    if "status" in update_data:
+        await producer.send(
+            LIFECYCLE_TOPIC,
+            {
+                "event": EV_STATUS_CHANGED,
+                "request_id": request_id,
+                "status": update_data["status"],
+                "timestamp": update_data["updated_at"].isoformat()
+            }
         )
-    store_idempotent_result(idempotency_key, req)
-    return req
+    
+    # Retornar solicitação atualizada
+    doc = await db.requests.find_one({"id": request_id})
+    return ServiceRequest(**doc)
 
+@app.post("/requests/{request_id}/offers")
+async def create_offer(
+    request_id: str,
+    offer: RequestOffer,
+    authorization: str = Header(None)
+):
+    """Criar oferta para uma solicitação"""
+    await rate_limiter.check_rate_limit(authorization)
+    
+    # Verificar se a solicitação existe e está pendente
+    request_doc = await db.requests.find_one({"id": request_id})
+    if not request_doc:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    if request_doc["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Request is not available for offers")
+    
+    offer_data = {
+        "id": str(uuid.uuid4()),
+        "request_id": request_id,
+        "provider_id": offer.provider_id,
+        "price": offer.price,
+        "estimated_duration": offer.estimated_duration,
+        "message": offer.message,
+        "created_at": datetime.utcnow(),
+        "status": "pending"
+    }
+    
+    # Salvar oferta
+    await db.offers.insert_one(offer_data)
+    
+    # Atualizar status da solicitação
+    await db.requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": "offered", "updated_at": datetime.utcnow()}}
+    )
+    
+    # Atualizar no Firebase
+    await firebase_client.update_request(request_id, {"status": "offered"})
+    
+    # Publicar evento
+    await producer.send(
+        LIFECYCLE_TOPIC,
+        {
+            "event": EV_REQUEST_OFFERED,
+            "request_id": request_id,
+            "provider_id": offer.provider_id,
+            "price": offer.price,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
+    
+    return {"message": "Offer created successfully", "offer_id": offer_data["id"]}
 
-@app.put("/requests/{request_id}/accept")
+@app.post("/requests/{request_id}/accept")
 async def accept_request(
     request_id: str,
-    data: AcceptPayload,
-    idempotency_key: str | None = Header(None, alias=IdempotencyKey.header_name),
-    user=Depends(require_roles([1])),
+    provider_id: str,
+    authorization: str = Header(None)
 ):
-    cached = ensure_idempotency(idempotency_key)
-    if cached is not None:
-        return cached
-    res = await db.requests.update_one(
+    """Aceitar solicitação"""
+    await rate_limiter.check_rate_limit(authorization)
+    
+    # Atualizar solicitação
+    result = await db.requests.update_one(
         {"id": request_id},
-        {"$set": {"status": "accepted", "provider_id": data.provider_id}},
+        {
+            "$set": {
+                "provider_id": provider_id,
+                "status": "accepted",
+                "updated_at": datetime.utcnow()
+            }
+        }
     )
-    if res.matched_count == 0:
-        raise HTTPException(status_code=404, detail="request not found")
-    if producer:
-        await producer.send_and_wait(
-            LIFECYCLE_TOPIC,
-            {
-                "type": EV_REQUEST_ACCEPTED,
-                "request_id": request_id,
-                "provider_id": data.provider_id,
-            },
-        )
-    result = {"status": "accepted"}
-    store_idempotent_result(idempotency_key, result)
-    return result
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Atualizar no Firebase
+    await firebase_client.update_request(request_id, {
+        "provider_id": provider_id,
+        "status": "accepted"
+    })
+    
+    # Publicar evento
+    await producer.send(
+        LIFECYCLE_TOPIC,
+        {
+            "event": EV_REQUEST_ACCEPTED,
+            "request_id": request_id,
+            "provider_id": provider_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
+    
+    return {"message": "Request accepted successfully"}
 
-
-@app.put("/requests/{request_id}/status")
-async def update_request_status(
+@app.post("/requests/{request_id}/rate")
+async def rate_request(
     request_id: str,
-    data: StatusUpdate,
-    idempotency_key: str | None = Header(None, alias=IdempotencyKey.header_name),
-    user=Depends(require_roles([1,2])),
+    rating: float,
+    authorization: str = Header(None)
 ):
-    cached = ensure_idempotency(idempotency_key)
-    if cached is not None:
-        return cached
-    res = await db.requests.update_one(
+    """Avaliar solicitação (1-5 estrelas)"""
+    await rate_limiter.check_rate_limit(authorization)
+    
+    if not 1.0 <= rating <= 5.0:
+        raise HTTPException(status_code=400, detail="Rating must be between 1.0 and 5.0")
+    
+    result = await db.requests.update_one(
         {"id": request_id},
-        {"$set": {"status": data.status}},
+        {
+            "$set": {
+                "rating": rating,
+                "updated_at": datetime.utcnow()
+            }
+        }
     )
-    if res.matched_count == 0:
-        raise HTTPException(status_code=404, detail="request not found")
-    if producer:
-        await producer.send_and_wait(
-            LIFECYCLE_TOPIC,
-            {
-                "type": EV_STATUS_CHANGED,
-                "request_id": request_id,
-                "status": data.status,
-            },
-        )
-    result = {"status": data.status}
-    store_idempotent_result(idempotency_key, result)
-    return result
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Atualizar no Firebase
+    await firebase_client.update_request(request_id, {"rating": rating})
+    
+    return {"message": "Rating submitted successfully"}
 
-@app.post("/requests/{request_id}/client-accept")
-async def client_accept_offer(
+@app.post("/requests/{request_id}/payment")
+async def process_payment(
     request_id: str,
-    user=Depends(require_roles([2]))  # Apenas clientes
+    payment: PaymentInfo,
+    authorization: str = Header(None)
 ):
-    """Cliente aceita uma oferta de prestador"""
-    try:
-        user_id = user.get('sub')  # ID está no campo 'sub' do token
-        print(f"✅ [REQUEST] Cliente {user_id} aceitando oferta para solicitação {request_id}")
-        print(f"🔍 [DEBUG] User payload: {user}")
-
-        # Verificar se a solicitação existe e pertence ao cliente
-        request_doc = await db.requests.find_one({"id": request_id, "client_id": user_id})
-        print(f"🔍 [DEBUG] Request doc found: {request_doc is not None}")
-        if not request_doc:
-            raise HTTPException(status_code=404, detail="Solicitação não encontrada")
-
-        if request_doc.get('status') != 'offered':
-            raise HTTPException(status_code=400, detail="Não há oferta disponível para aceitar")
-
-        # Atualizar status da solicitação para aceita
-        await db.requests.update_one(
-            {"id": request_id},
-            {
-                "$set": {
-                    "status": "accepted",
-                    "client_accepted_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                }
+    """Processar pagamento"""
+    await rate_limiter.check_rate_limit(authorization)
+    
+    # Simular processamento de pagamento
+    payment_id = str(uuid.uuid4())
+    
+    # Atualizar status de pagamento
+    result = await db.requests.update_one(
+        {"id": request_id},
+        {
+            "$set": {
+                "payment_status": "paid",
+                "payment_method": payment.payment_method,
+                "updated_at": datetime.utcnow()
             }
-        )
-
-        print(f"✅ [REQUEST] Oferta aceita pelo cliente {user_id} para solicitação {request_id}")
-
-        return {
-            "status": "success",
-            "request_id": request_id,
-            "message": "Oferta aceita com sucesso"
         }
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Atualizar no Firebase
+    await firebase_client.update_request(request_id, {
+        "payment_status": "paid",
+        "payment_method": payment.payment_method
+    })
+    
+    return {
+        "message": "Payment processed successfully",
+        "payment_id": payment_id,
+        "status": "paid"
+    }
 
-    except Exception as e:
-        print(f"❌ [REQUEST] Erro ao aceitar oferta: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/requests/{request_id}/offers")
+async def list_offers(request_id: str):
+    """Listar ofertas de uma solicitação"""
+    offers = []
+    async for doc in db.offers.find({"request_id": request_id}):
+        offers.append(doc)
+    
+    return offers
 
-@app.post("/requests/{request_id}/client-decline")
-async def client_decline_offer(
-    request_id: str,
-    user=Depends(require_roles([2]))  # Apenas clientes
-):
-    """Cliente recusa uma oferta e busca outro prestador"""
-    try:
-        user_id = user.get('sub')  # ID está no campo 'sub' do token
-        print(f"🔄 [REQUEST] Cliente {user_id} recusando oferta para solicitação {request_id}")
-
-        # Verificar se a solicitação existe e pertence ao cliente
-        request_doc = await db.requests.find_one({"id": request_id, "client_id": user_id})
-        if not request_doc:
-            raise HTTPException(status_code=404, detail="Solicitação não encontrada")
-
-        if request_doc.get('status') != 'offered':
-            raise HTTPException(status_code=400, detail="Não há oferta disponível para recusar")
-
-        # Resetar a solicitação para buscar outro prestador
-        await db.requests.update_one(
-            {"id": request_id},
-            {
-                "$set": {
-                    "status": "searching",
-                    "provider_id": None,
-                    "client_declined_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                },
-                "$unset": {
-                    "offered_at": "",
-                    "price": ""
-                }
-            }
-        )
-
-        # Adicionar o prestador recusado à lista de excluídos
-        declined_provider = request_doc.get('provider_id')
-        if declined_provider:
-            await db.requests.update_one(
-                {"id": request_id},
-                {
-                    "$addToSet": {
-                        "declined_providers": declined_provider
-                    }
-                }
-            )
-
-        print(f"🔄 [REQUEST] Solicitação {request_id} resetada para buscar outro prestador")
-
-        return {
-            "status": "success",
-            "request_id": request_id,
-            "message": "Oferta recusada, buscando outro prestador"
-        }
-
-    except Exception as e:
-        print(f"❌ [REQUEST] Erro ao recusar oferta: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/health")
+async def health_check():
+    """Health check"""
+    return {
+        "status": "healthy",
+        "service": "request-service-optimized",
+        "timestamp": datetime.utcnow().isoformat(),
+        "firebase_connected": await firebase_client.is_connected()
+    }
