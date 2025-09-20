@@ -1,7 +1,11 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function TabLayout() {
+  const { isProvider } = useAuth();
+
   return (
     <Tabs
       screenOptions={{
@@ -21,9 +25,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Início',
+          title: isProvider ? 'Solicitações' : 'Início',
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="🏠" color={color} />
+            <Ionicons 
+              name={isProvider ? 'briefcase-outline' : 'home-outline'} 
+              size={size} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -32,7 +40,7 @@ export default function TabLayout() {
         options={{
           title: 'Histórico',
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="🕐" color={color} />
+            <Ionicons name="time-outline" size={size} color={color} />
           ),
         }}
       />
@@ -41,14 +49,10 @@ export default function TabLayout() {
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="👤" color={color} />
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
       />
     </Tabs>
   );
-}
-
-function TabIcon({ name, color }: { name: string; color: string }) {
-  return <span style={{ fontSize: 20, color }}>{name}</span>;
 }
