@@ -208,6 +208,43 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
+  webMapContainer: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  webMapPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webMapIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  webMapText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  webDistanceInfo: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  webDistanceText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
   distanceCard: {
     position: 'absolute',
     top: 60,
