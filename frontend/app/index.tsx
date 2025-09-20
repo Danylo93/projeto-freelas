@@ -12,29 +12,30 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  splashContainer: {
+  container: {
     flex: 1,
     backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
-  logoContainer: {
-    marginBottom: 30,
-    alignItems: 'center',
-  },
-  textContainer: {
-    alignItems: 'center',
-  },
-  appName: {
+  title: {
     fontSize: 32,
     fontWeight: 'bold',
     color: '#007AFF',
-    marginBottom: 8,
+    marginBottom: 16,
+    textAlign: 'center',
   },
-  tagline: {
-    fontSize: 16,
+  subtitle: {
+    fontSize: 18,
     color: '#666',
     textAlign: 'center',
-    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  status: {
+    fontSize: 16,
+    color: '#28a745',
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
