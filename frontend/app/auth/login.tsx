@@ -11,15 +11,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../../contexts/AuthContext';
-import { LinearGradient } from 'expo-linear-gradient';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login } = useAuth();
   const router = useRouter();
 
   async function handleLogin() {
@@ -30,20 +27,19 @@ export default function LoginScreen() {
 
     try {
       setIsLoading(true);
-      await login(email.trim(), password);
+      // Simular login por enquanto
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      Alert.alert('Sucesso', 'Login realizado com sucesso!');
       router.replace('/(tabs)');
-    } catch (error: any) {
-      Alert.alert('Erro no Login', error.message);
+    } catch (error) {
+      Alert.alert('Erro no Login', 'Erro ao fazer login');
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={styles.keyboardView}
@@ -103,13 +99,14 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#667eea',
   },
   keyboardView: {
     flex: 1,
@@ -196,6 +193,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
     fontWeight: '700',
-    
   },
 });
