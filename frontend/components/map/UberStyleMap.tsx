@@ -32,7 +32,7 @@ export const UberStyleMap: React.FC<UberStyleMapProps> = ({
   style,
   mapType = 'standard',
 }) => {
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const [distanceInfo, setDistanceInfo] = useState<DistanceInfo | null>(null);
   const [routeCoordinates, setRouteCoordinates] = useState<LocationCoords[]>([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
