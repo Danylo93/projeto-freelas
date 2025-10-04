@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { TabItem } from '../../components/ui/BottomTabNavigation';
 
 export default function TabLayout() {
   const { isProvider } = useAuth();

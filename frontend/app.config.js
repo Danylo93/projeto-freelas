@@ -1,0 +1,108 @@
+export default {
+  expo: {
+    name: "ServiçoApp",
+    slug: "servico-app",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    userInterfaceStyle: "light",
+    newArchEnabled: true,
+    splash: {
+      image: "./assets/images/splash-image.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff"
+    },
+    assetBundlePatterns: [
+      "**/*"
+    ],
+    ios: {
+      supportsTablet: true,
+      config: {
+        googleMapsApiKey: "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY"
+      },
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription: "Este app precisa da sua localização para encontrar prestadores próximos.",
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Este app precisa da sua localização para encontrar prestadores próximos.",
+        NSCameraUsageDescription: "Este app precisa da câmera para validar serviços concluídos.",
+        NSPhotoLibraryUsageDescription: "Este app precisa acessar suas fotos para validar serviços concluídos.",
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: true,
+          NSAllowsLocalNetworking: true,
+          NSExceptionDomains: {
+            localhost: {
+              NSExceptionAllowsInsecureHTTPLoads: true,
+              NSIncludesSubdomains: true
+            },
+            "127.0.0.1": {
+              NSExceptionAllowsInsecureHTTPLoads: true,
+              NSIncludesSubdomains: true
+            }
+          }
+        }
+      }
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/images/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      },
+      permissions: [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ],
+      usesCleartextTraffic: true,
+      config: {
+        googleMaps: {
+          apiKey: "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY"
+        }
+      }
+    },
+    web: {
+      favicon: "./assets/favicon.png",
+      bundler: "metro"
+    },
+    plugins: [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          locationWhenInUsePermission: "Este app precisa da sua localização para encontrar prestadores próximos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          photosPermission: "Este app precisa acessar suas fotos para validar serviços concluídos.",
+          cameraPermission: "Este app precisa da câmera para validar serviços concluídos."
+        }
+      ],
+      "expo-font",
+      "expo-web-browser"
+    ],
+    scheme: "servico-app",
+    extra: {
+      googleSdkKey: "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",
+      googleWebKey: "AIzaSyCBZOxsRUQIZXhaZ6M74VcMWIKx8RSNQVY",
+      firebaseApiKey: "AIzaSyC7XUJDG7PXB3YUiSyh0WMbbqeiR81zNlg",
+      firebaseAuthDomain: "uber-like-freelas.firebaseapp.com",
+      firebaseDatabaseURL: "https://uber-like-freelas-default-rtdb.firebaseio.com",
+      firebaseProjectId: "uber-like-freelas",
+      firebaseStorageBucket: "uber-like-freelas.firebasestorage.app",
+      firebaseMessagingSenderId: "901683796826",
+      firebaseAppId: "1:901683796826:web:6db0585afabdf5e8383163",
+      firebaseMeasurementId: "G-04R96TSGKK",
+      router: {
+        origin: false
+      },
+      eas: {
+        projectId: "ab536686-5f95-4eaf-bdfb-a80e4d7d9dec"
+      }
+    },
+    owner: "danylo.oliveira"
+  }
+};
+

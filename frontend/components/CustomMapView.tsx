@@ -6,11 +6,13 @@ import { Platform, View, Text, StyleSheet } from 'react-native';
 let MapView: any, Marker: any, MapViewDirections: any;
 if (Platform.OS !== 'web') {
   try {
-    MapView = require('react-native-maps').default;
-    Marker = require('react-native-maps').Marker;
-    // MapViewDirections removido por enquanto
+    const Maps = require('react-native-maps');
+    MapView = Maps.default || Maps;
+    Marker = Maps.Marker;
+    MapViewDirections = Maps.MapViewDirections;
+    console.log('✅ [MAPS] react-native-maps carregado com sucesso');
   } catch (error) {
-    console.warn('react-native-maps não disponível');
+    console.warn('❌ [MAPS] react-native-maps não disponível:', error);
   }
 }
 import Constants from 'expo-constants';
@@ -86,6 +88,26 @@ const CustomMapView: React.FC<Props> = ({
 
   const hasRoute = !!(o && d);
 
+  // Fallback when MapView is not available
+  if (!MapView) {
+    console.warn('❌ [MAPS] MapView não disponível, mostrando fallback');
+    return (
+      <View style={[styles.container, style, styles.fallbackContainer]}>
+        <Text style={styles.fallbackText}>🗺️ Carregando mapa...</Text>
+        <Text style={styles.fallbackSubtext}>
+          {Platform.OS === 'web' ? 'Mapa não suportado no navegador' : 'Instalando dependências do mapa...'}
+        </Text>
+        {!!err && (
+          <View style={styles.banner}><Text style={styles.bannerText}>{err}</Text></View>
+        )}
+      </View>
+    );
+  }
+
+  console.log('✅ [MAPS] Renderizando MapView com provider:', Platform.OS !== 'web' ? 'google' : undefined);
+  console.log('✅ [MAPS] Initial region:', initialRegion);
+  console.log('✅ [MAPS] Shows user location:', !!showsUserLocation);
+
   return (
     <View style={[styles.container, style]}>
       <MapView
@@ -95,6 +117,8 @@ const CustomMapView: React.FC<Props> = ({
         initialRegion={initialRegion}
         showsUserLocation={!!showsUserLocation}
         showsMyLocationButton={!!showsMyLocationButton}
+        onMapReady={() => console.log('✅ [MAPS] Mapa carregado com sucesso!')}
+        onError={(error) => console.error('❌ [MAPS] Erro no mapa:', error)}
       >
         {o && <Marker coordinate={o} title="Origem" />}
         {d && <Marker coordinate={d} title="Destino" />}
@@ -129,6 +153,24 @@ export default CustomMapView;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  fallbackContainer: { 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: '#f0f0f0' 
+  },
+  fallbackText: { 
+    fontSize: 18, 
+    color: '#333', 
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 8
+  },
+  fallbackSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20
+  },
   banner: { position: 'absolute', top: 12, left: 12, right: 12, backgroundColor: '#000', padding: 10, borderRadius: 10, opacity: 0.85 },
   bannerText: { color: '#fff', fontWeight: '600' }
 });

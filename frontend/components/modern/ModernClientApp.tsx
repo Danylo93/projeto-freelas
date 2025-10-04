@@ -13,6 +13,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMatching } from '@/contexts/UberStyleMatchingContext';
 import CustomMapView from '../CustomMapView';
+import { SimpleMapView } from '../SimpleMapView';
+import { MapViewComponent } from '../MapView';
+import { WorkingMap } from '../WorkingMap';
+import { SimpleMapFallback } from '../SimpleMapFallback';
+import { AdvancedMapFallback } from '../AdvancedMapFallback';
 import { UberStyleMap } from '../map/UberStyleMap';
 import { BottomSheet, BottomSheetContent } from './BottomSheet';
 import { distanceService } from '../../services/distanceService';
@@ -827,20 +832,12 @@ export const ModernClientApp: React.FC = () => {
           showDistanceInfo={true}
         />
       ) : (
-        <CustomMapView
+        <AdvancedMapFallback
           style={styles.map}
-          initialRegion={
-            userLocation
-              ? {
-                  latitude: userLocation.latitude,
-                  longitude: userLocation.longitude,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }
-              : undefined
-          }
-          showsUserLocation={true}
-          showsMyLocationButton={false}
+          latitude={userLocation?.latitude}
+          longitude={userLocation?.longitude}
+          latitudeDelta={0.01}
+          longitudeDelta={0.01}
         />
       )}
 

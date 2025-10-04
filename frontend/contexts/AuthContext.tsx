@@ -52,13 +52,14 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Carregar dados do usuário ao iniciar
   useEffect(() => {
     loadStoredAuth();
   }, []);
 
+  // Função para carregar token e usuário armazenados
   async function loadStoredAuth() {
     try {
       const storedToken = await AsyncStorage.getItem('@ServicoApp:token');
@@ -75,15 +76,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  // Função de login
   async function login(email: string, password: string) {
     try {
       setIsLoading(true);
       
-      // Por enquanto vou simular o login - depois conectarei com a API
+      // Simular o login - depois conecte com a API real
       const mockUser: User = {
         id: '1',
         name: 'Usuário Teste',
-        email: email,
+        email,
         phone: '(11) 99999-9999',
         user_type: 2, // Cliente por padrão
       };
@@ -97,20 +99,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setToken(mockToken);
       setUser(mockUser);
-
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro no login:', error);
-      throw new Error('Erro ao fazer login');
+      if (error instanceof Error) {
+        throw new Error(`Erro ao fazer login: ${error.message}`);
+      }
+      throw new Error('Erro desconhecido ao fazer login');
     } finally {
       setIsLoading(false);
     }
   }
 
+  // Função de registro
   async function register(userData: RegisterData) {
     try {
       setIsLoading(true);
       
-      // Simular registro - depois conectarei com a API
+      // Simular registro - depois conecte com a API real
       const newUser: User = {
         id: Date.now().toString(),
         name: userData.name,
@@ -128,29 +133,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setToken(newToken);
       setUser(newUser);
-
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro no registro:', error);
-      throw new Error('Erro ao criar conta');
+      if (error instanceof Error) {
+        throw new Error(`Erro ao criar conta: ${error.message}`);
+      }
+      throw new Error('Erro desconhecido ao criar conta');
     } finally {
       setIsLoading(false);
     }
   }
 
+  // Função de logout
   async function logout() {
     await clearAuth();
   }
 
+  // Limpar os dados de autenticação
   async function clearAuth() {
     await AsyncStorage.multiRemove([
       '@ServicoApp:token',
       '@ServicoApp:user',
     ]);
-    
+
     setToken(null);
     setUser(null);
   }
 
+  // Definir se o usuário é um provedor ou cliente
   const isProvider = user?.user_type === 1;
   const isClient = user?.user_type === 2;
 
