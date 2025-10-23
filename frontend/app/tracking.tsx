@@ -53,7 +53,12 @@ export default function TrackingScreen() {
   const [isCardVisible, setIsCardVisible] = useState(true);
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isOffRoute, setIsOffRoute] = useState(false);
-  const [mapRegion, setMapRegion] = useState(null);
+  const [mapRegion, setMapRegion] = useState<{
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  } | null>(null);
   const [showInitialAnimation, setShowInitialAnimation] = useState(true);
   const [isVehicleMoving, setIsVehicleMoving] = useState(false);
   
@@ -197,7 +202,7 @@ export default function TrackingScreen() {
     return route;
   };
 
-  const simulateVehicleMovement = (route) => {
+  const simulateVehicleMovement = (route: string | any[]) => {
     // Evitar múltiplas instâncias
     if (isVehicleMoving) {
       console.log('Veículo já está em movimento, ignorando nova chamada');
@@ -260,7 +265,7 @@ export default function TrackingScreen() {
     setTimeout(moveCar, 2000); // Primeiro movimento após 2 segundos
   };
 
-  const handleOffRoute = async (currentPosition, destination) => {
+  const handleOffRoute = async (currentPosition: {latitude: number; longitude: number}, destination: {latitude: number; longitude: number}) => {
     try {
       console.log('Buscando rota alternativa...');
       const alternativeRoute = await GeocodingService.getDirections(
@@ -294,7 +299,7 @@ export default function TrackingScreen() {
     }
   };
 
-  const calculateHeading = (from, to) => {
+  const calculateHeading = (from: { latitude: number; longitude: number; }, to: { latitude: number; longitude: number; }) => {
     const lat1 = from.latitude * Math.PI / 180;
     const lat2 = to.latitude * Math.PI / 180;
     const deltaLng = (to.longitude - from.longitude) * Math.PI / 180;
