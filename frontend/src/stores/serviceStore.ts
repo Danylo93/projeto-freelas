@@ -60,20 +60,22 @@ export const useServiceStore = create<ServiceStore>((set, get) => ({
         if (directions) {
           distance = directions.distanceValue / 1000; // converter para km
           estimatedTime = Math.round(directions.durationValue / 60); // converter para minutos
-          price = GeocodingService.calculatePrice(distance, category.basePrice);
+          // Calcular preço: valor fixo da categoria + (distância × R$ 2,50) + taxa de serviço
+          price = category.basePrice + (distance * 2.50) + 5.00;
           
           console.log('Valores calculados:', {
             distance,
             estimatedTime,
             price,
-            basePrice: category.basePrice
+            basePrice: category.basePrice,
+            distancePrice: distance * 2.50
           });
         } else {
           console.log('Usando valores padrão para simulação');
           // Usar valores padrão se não conseguir calcular
           distance = 5.0; // 5km padrão
           estimatedTime = 15; // 15 min padrão
-          price = GeocodingService.calculatePrice(distance, category.basePrice);
+          price = category.basePrice + (distance * 2.50) + 5.00;
         }
       }
       
@@ -257,29 +259,56 @@ export const useServiceStore = create<ServiceStore>((set, get) => ({
       const categories: ServiceCategory[] = [
         {
           id: '1',
-          name: 'freelas_pop',
-          displayName: 'Freelas Pop',
-          description: 'Serviço básico e econômico',
-          icon: 'car',
-          basePrice: 15.0,
+          name: 'manutencao',
+          displayName: 'Manutenção',
+          description: 'Serviços de manutenção geral',
+          icon: 'wrench',
+          basePrice: 120.0, // R$ 120,00 fixo + R$ 2,50/km
           isActive: true
         },
         {
           id: '2',
-          name: 'freelas_comfort',
-          displayName: 'Freelas Comfort',
-          description: 'Serviço confortável',
-          icon: 'car',
-          basePrice: 25.0,
+          name: 'limpeza',
+          displayName: 'Limpeza',
+          description: 'Serviços de limpeza',
+          icon: 'sparkles',
+          basePrice: 80.0, // R$ 80,00 fixo + R$ 2,50/km
           isActive: true
         },
         {
           id: '3',
-          name: 'freelas_premium',
-          displayName: 'Freelas Premium',
-          description: 'Serviço premium',
+          name: 'reparo',
+          displayName: 'Reparo',
+          description: 'Serviços de reparo',
+          icon: 'hammer',
+          basePrice: 150.0, // R$ 150,00 fixo + R$ 2,50/km
+          isActive: true
+        },
+        {
+          id: '4',
+          name: 'instalacao',
+          displayName: 'Instalação',
+          description: 'Serviços de instalação',
           icon: 'car',
-          basePrice: 35.0,
+          basePrice: 200.0, // R$ 200,00 fixo + R$ 2,50/km
+          isActive: true
+        },
+        {
+          id: '5',
+          name: 'consultoria',
+          displayName: 'Consultoria',
+          description: 'Serviços de consultoria técnica',
+          icon: 'lightbulb',
+          basePrice: 100.0, // R$ 100,00 fixo + R$ 2,50/km
+          isActive: true
+        },
+        {
+          id: '6',
+          name: 'emergencia',
+          displayName: 'Emergência',
+          description: 'Serviços de emergência 24h',
+          icon: 'alert',
+          basePrice: 300.0, // R$ 300,00 fixo + R$ 2,50/km
           isActive: true
         }
       ];
@@ -339,7 +368,7 @@ export const useServiceStore = create<ServiceStore>((set, get) => ({
             longitude: -46.6343,
             address: 'Av. Paulista, 1000 - São Paulo, SP'
           },
-          price: 45.50,
+          price: 125.75, // R$ 120,00 + (2,3km × R$ 2,50) + R$ 5,00
           distance: 2.3,
           estimatedTime: 25,
           status: ServiceStatus.COMPLETED,
@@ -369,7 +398,7 @@ export const useServiceStore = create<ServiceStore>((set, get) => ({
             longitude: -46.6343,
             address: 'Av. Paulista, 1000 - São Paulo, SP'
           },
-          price: 35.00,
+          price: 89.50, // R$ 80,00 + (1,8km × R$ 2,50) + R$ 5,00
           distance: 1.8,
           estimatedTime: 20,
           status: ServiceStatus.COMPLETED,
@@ -399,7 +428,7 @@ export const useServiceStore = create<ServiceStore>((set, get) => ({
             longitude: -46.6343,
             address: 'Av. Paulista, 1000 - São Paulo, SP'
           },
-          price: 55.00,
+          price: 163.00, // R$ 150,00 + (3,2km × R$ 2,50) + R$ 5,00
           distance: 3.2,
           estimatedTime: 35,
           status: ServiceStatus.CANCELLED,

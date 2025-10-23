@@ -198,9 +198,9 @@ export default function PaymentScreen() {
             
             {/* Detalhamento do preço */}
             <View style={styles.priceBreakdown}>
-              <Text style={styles.breakdownTitle}>Detalhamento:</Text>
+              <Text style={styles.breakdownTitle}>Detalhamento do Preço:</Text>
               <View style={styles.priceItem}>
-                <Text style={styles.priceLabel}>Taxa base ({currentService.category.displayName}):</Text>
+                <Text style={styles.priceLabel}>Taxa fixa ({currentService.category.displayName}):</Text>
                 <Text style={styles.priceValue}>R$ {currentService.category.basePrice.toFixed(2)}</Text>
               </View>
               {currentService.distance > 0 && (
@@ -209,6 +209,10 @@ export default function PaymentScreen() {
                   <Text style={styles.priceValue}>R$ {(currentService.distance * 2.50).toFixed(2)}</Text>
                 </View>
               )}
+              <View style={styles.priceItem}>
+                <Text style={styles.priceLabel}>Taxa de serviço:</Text>
+                <Text style={styles.priceValue}>R$ 5,00</Text>
+              </View>
             </View>
             
             <View style={[styles.summaryRow, styles.totalRow]}>

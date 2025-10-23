@@ -48,8 +48,6 @@ export default function ClientHomeScreen() {
   const [originPlace, setOriginPlace] = useState<LocationType | null>(null);
   const [destinationPlace, setDestinationPlace] = useState<LocationType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
-  
-  // Autocomplete states
   const [originSuggestions, setOriginSuggestions] = useState<PlaceResult[]>([]);
   const [destinationSuggestions, setDestinationSuggestions] = useState<PlaceResult[]>([]);
   const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
@@ -61,58 +59,46 @@ export default function ClientHomeScreen() {
   const [routeInfo, setRouteInfo] = useState<any>(null);
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Procurando melhor trajeto...');
-  
+
   // Animações
-  const mapOpacity = useSharedValue(0);
-  const cardTranslateY = useSharedValue(50);
   const inputFocus = useSharedValue(0);
+  const cardScale = useSharedValue(1);
+  const mapScale = useSharedValue(1);
+
+  const animatedInputStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + inputFocus.value * 0.02 }],
+    borderColor: inputFocus.value > 0 ? '#2196F3' : '#E0E0E0',
+  }));
+
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale.value }],
+  }));
+
+  const animatedMapStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: mapScale.value }],
+  }));
 
   useEffect(() => {
-    initializeScreen();
+    loadCategories();
+    loadPaymentMethods();
+    requestPermission();
+    getCurrentLocation();
   }, []);
 
   useEffect(() => {
     if (currentLocation) {
-      mapOpacity.value = withTiming(1, { duration: 1000 });
+      getCurrentLocation();
     }
   }, [currentLocation]);
 
-  useEffect(() => {
-    // Forçar atualização da localização a cada 5 segundos
-    const interval = setInterval(() => {
-      getCurrentLocation();
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  const initializeScreen = async () => {
-    try {
-      console.log('Inicializando tela...');
-      await Promise.all([
-        loadCategories(),
-        loadPaymentMethods(),
-        requestPermission(),
-        getCurrentLocation()
-      ]);
-      
-      console.log('Categorias carregadas:', availableCategories);
-      cardTranslateY.value = withSpring(0, { damping: 15 });
-    } catch (error) {
-      console.error('Erro ao inicializar tela:', error);
-    }
-  };
-
   const handleOriginChange = async (text: string) => {
     setOrigin(text);
-    setShowOriginSuggestions(text.length > 1);
+    setShowOriginSuggestions(text.length > 0);
     
-    if (text.length > 1) {
+    if (text.length > 0) {
       setIsLoadingOrigin(true);
       try {
-        console.log('Buscando sugestões para origem:', text);
         const suggestions = await GeocodingService.getPlacePredictions(text);
-        console.log('Sugestões encontradas:', suggestions);
         setOriginSuggestions(suggestions);
       } catch (error) {
         console.error('Erro ao buscar sugestões de origem:', error);
@@ -126,14 +112,12 @@ export default function ClientHomeScreen() {
 
   const handleDestinationChange = async (text: string) => {
     setDestination(text);
-    setShowDestinationSuggestions(text.length > 1);
+    setShowDestinationSuggestions(text.length > 0);
     
-    if (text.length > 1) {
+    if (text.length > 0) {
       setIsLoadingDestination(true);
       try {
-        console.log('Buscando sugestões para destino:', text);
         const suggestions = await GeocodingService.getPlacePredictions(text);
-        console.log('Sugestões encontradas:', suggestions);
         setDestinationSuggestions(suggestions);
       } catch (error) {
         console.error('Erro ao buscar sugestões de destino:', error);
@@ -148,10 +132,6 @@ export default function ClientHomeScreen() {
   const handleOriginSelect = async (suggestion: PlaceResult) => {
     setOrigin(suggestion.description);
     setShowOriginSuggestions(false);
-    inputFocus.value = withSequence(
-      withTiming(1, { duration: 200 }),
-      withTiming(0, { duration: 200 })
-    );
     
     try {
       const details = await GeocodingService.getPlaceDetails(suggestion.place_id);
@@ -164,6 +144,41 @@ export default function ClientHomeScreen() {
       }
     } catch (error) {
       console.error('Erro ao buscar detalhes da origem:', error);
+    }
+  };
+
+  const handleDestinationSelect = async (suggestion: PlaceResult) => {
+    setDestination(suggestion.description);
+    setShowDestinationSuggestions(false);
+    
+    try {
+      const details = await GeocodingService.getPlaceDetails(suggestion.place_id);
+      if (details) {
+        setDestinationPlace({
+          latitude: details.lat,
+          longitude: details.lng,
+          address: details.address
+        });
+        
+        // Calcular rota automaticamente quando selecionar destino
+        if (originPlace) {
+          await calculateAndShowRoute();
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do destino:', error);
+    }
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (currentLocation) {
+      setDestination('📍 Minha localização atual');
+      setDestinationPlace({
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        address: 'Minha localização atual'
+      });
+      setShowDestinationSuggestions(false);
     }
   };
 
@@ -220,52 +235,18 @@ export default function ClientHomeScreen() {
     }
   };
 
-  const handleDestinationSelect = async (suggestion: PlaceResult) => {
-    setDestination(suggestion.description);
-    setShowDestinationSuggestions(false);
-    inputFocus.value = withSequence(
-      withTiming(1, { duration: 200 }),
-      withTiming(0, { duration: 200 })
-    );
+  const generateSimulatedRoute = (start: LocationType, end: LocationType) => {
+    const steps = 20;
+    const route = [];
     
-    try {
-      const details = await GeocodingService.getPlaceDetails(suggestion.place_id);
-      if (details) {
-        setDestinationPlace({
-          latitude: details.lat,
-          longitude: details.lng,
-          address: details.address
-        });
-        
-        // Calcular rota automaticamente quando selecionar destino
-        if (originPlace) {
-          await calculateAndShowRoute();
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao buscar detalhes do destino:', error);
+    for (let i = 0; i <= steps; i++) {
+      const ratio = i / steps;
+      const lat = start.latitude + (end.latitude - start.latitude) * ratio;
+      const lng = start.longitude + (end.longitude - start.longitude) * ratio;
+      route.push({ latitude: lat, longitude: lng });
     }
-  };
-
-  const handleUseCurrentLocation = () => {
-    if (currentLocation) {
-      setDestination('📍 Minha localização atual');
-      setDestinationPlace({
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-        address: 'Minha localização atual'
-      });
-      setShowDestinationSuggestions(false);
-      inputFocus.value = withSequence(
-        withTiming(1, { duration: 200 }),
-        withTiming(1.02, { duration: 200 })
-      );
-    }
-  };
-
-  const handleCategorySelect = (category: ServiceCategory) => {
-    setSelectedCategory(category);
-    inputFocus.value = withSpring(1.05, { damping: 15 });
+    
+    return route;
   };
 
   const handleRequestService = async () => {
@@ -298,29 +279,6 @@ export default function ClientHomeScreen() {
     }
   };
 
-  const generateSimulatedRoute = (origin: any, destination: any) => {
-    const steps = 15;
-    const route = [];
-    
-    for (let i = 0; i <= steps; i++) {
-      const progress = i / steps;
-      const lat = origin.latitude + (destination.latitude - origin.latitude) * progress;
-      const lng = origin.longitude + (destination.longitude - origin.longitude) * progress;
-      
-      route.push({
-        latitude: lat,
-        longitude: lng,
-      });
-    }
-    
-    return route;
-  };
-
-  const animateMapToRoute = (origin: any, destination: any, route: any[]) => {
-    console.log('Rota calculada e exibida no mapa');
-    // Apenas mostrar a rota, sem animação complexa do mapa
-  };
-
   const handleLogout = () => {
     Alert.alert(
       'Sair',
@@ -330,23 +288,14 @@ export default function ClientHomeScreen() {
         { 
           text: 'Sair', 
           style: 'destructive',
-          onPress: logout
+          onPress: () => {
+            logout();
+            router.replace('/auth');
+          }
         }
       ]
     );
   };
-
-  const animatedMapStyle = useAnimatedStyle(() => ({
-    opacity: mapOpacity.value,
-  }));
-
-  const animatedCardStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: cardTranslateY.value }],
-  }));
-
-  const animatedInputStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: inputFocus.value }],
-  }));
 
   return (
     <ScrollView 
@@ -354,27 +303,42 @@ export default function ClientHomeScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 100 }}
     >
-      {/* Header */}
+      {/* Header Profissional */}
       <LinearGradient
         colors={['#2196F3', '#1976D2']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>Olá, {user?.name}</Text>
-            <Text style={styles.subtitle}>Como podemos ajudar?</Text>
+          <View style={styles.headerLeft}>
+            <View style={styles.userInfo}>
+              <Text style={styles.greeting}>Olá, {user?.name}</Text>
+              <Text style={styles.subtitle}>Como podemos ajudar hoje?</Text>
+            </View>
+            <View style={styles.statusIndicator}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>Online</Text>
+            </View>
           </View>
-        <TouchableOpacity onPress={() => router.push('/profile')} style={styles.profileButton}>
-          <Text style={styles.profileText}>👤</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Sair</Text>
-        </TouchableOpacity>
+          
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              onPress={() => router.push('/profile')} 
+              style={styles.profileButton}
+            >
+              <Text style={styles.profileText}>👤</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              onPress={handleLogout} 
+              style={styles.logoutButton}
+            >
+              <Text style={styles.logoutText}>Sair</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </LinearGradient>
 
-      {/* Mapa */}
+      {/* Mapa Interativo */}
       <Animated.View style={[styles.mapContainer, animatedMapStyle]}>
         <MapView
           provider={PROVIDER_GOOGLE}
@@ -423,15 +387,12 @@ export default function ClientHomeScreen() {
             </Marker>
           )}
           
-          {/* Linha da rota quando animação está ativa */}
-          {showRouteAnimation && routeCoordinates.length > 0 && (
+          {routeCoordinates.length > 0 && (
             <Polyline
               coordinates={routeCoordinates}
-              strokeColor="#000000"
-              strokeWidth={6}
+              strokeColor="#2196F3"
+              strokeWidth={4}
               lineDashPattern={[8, 4]}
-              lineCap="round"
-              lineJoin="round"
             />
           )}
         </MapView>
@@ -445,146 +406,194 @@ export default function ClientHomeScreen() {
             </View>
           </View>
         )}
-        
       </Animated.View>
 
-      {/* Campos de origem e destino */}
-      <Animated.View style={[styles.inputContainer, animatedCardStyle]}>
-        <View style={styles.inputWrapper}>
-          <Text style={styles.inputLabel}>De onde vem o prestador?</Text>
-          <Animated.View style={[styles.inputField, animatedInputStyle]}>
-            <TextInput
-              style={styles.input}
-              placeholder="📍 Digite o endereço do prestador"
-              value={origin}
-              onChangeText={handleOriginChange}
-              placeholderTextColor="#666666"
-              onFocus={() => setShowOriginSuggestions(origin.length > 1)}
-              selectionColor="#2196F3"
-              autoCorrect={false}
-              autoCapitalize="words"
-            />
-            {isLoadingOrigin && (
-              <ActivityIndicator size="small" color="#2196F3" style={styles.loadingIndicator} />
-            )}
-          </Animated.View>
-          
-          {showOriginSuggestions && originSuggestions.length > 0 && (
-            <View style={styles.suggestionsContainer}>
-              {originSuggestions.map((suggestion) => (
-                <TouchableOpacity
-                  key={suggestion.place_id}
-                  style={styles.suggestionItem}
-                  onPress={() => handleOriginSelect(suggestion)}
-                >
-                  <Text style={styles.suggestionText}>{suggestion.description}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+      {/* Seção de Solicitação */}
+      <View style={styles.requestSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Solicitar Serviço</Text>
+          <Text style={styles.sectionSubtitle}>Preencha os dados abaixo para encontrar o prestador ideal</Text>
         </View>
-        
-        <View style={styles.inputWrapper}>
-          <View style={styles.inputLabelContainer}>
-            <Text style={styles.inputLabel}>Para onde o prestador deve vir?</Text>
-            <TouchableOpacity 
-              style={styles.currentLocationButton}
-              onPress={handleUseCurrentLocation}
-            >
-              <Text style={styles.currentLocationText}>📍 Usar minha localização</Text>
-            </TouchableOpacity>
+
+        {/* Inputs de Origem e Destino */}
+        <View style={styles.inputsContainer}>
+          <View style={styles.inputGroup}>
+            <View style={styles.inputLabelContainer}>
+              <Text style={styles.inputLabel}>📍 De onde vem o prestador?</Text>
+              <Text style={styles.inputHelper}>Endereço de origem do serviço</Text>
+            </View>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Digite o endereço do prestador"
+                placeholderTextColor="#999999"
+                value={origin}
+                onChangeText={handleOriginChange}
+                onFocus={() => {
+                  inputFocus.value = withSequence(
+                    withTiming(1, { duration: 200 }),
+                    withTiming(1.02, { duration: 200 })
+                  );
+                }}
+                onBlur={() => {
+                  inputFocus.value = withTiming(0, { duration: 200 });
+                }}
+                selectionColor="#2196F3"
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              {isLoadingOrigin && (
+                <ActivityIndicator size="small" color="#2196F3" style={styles.inputLoader} />
+              )}
+            </View>
+            
+            {showOriginSuggestions && originSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                {originSuggestions.map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionItem}
+                    onPress={() => handleOriginSelect(suggestion)}
+                  >
+                    <Text style={styles.suggestionText}>{suggestion.description}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
-          <Animated.View style={[styles.inputField, animatedInputStyle]}>
-            <TextInput
-              style={styles.input}
-              placeholder="🎯 Digite seu endereço"
-              value={destination}
-              onChangeText={handleDestinationChange}
-              placeholderTextColor="#666666"
-              onFocus={() => setShowDestinationSuggestions(destination.length > 1)}
-              selectionColor="#2196F3"
-              autoCorrect={false}
-              autoCapitalize="words"
-            />
-            {isLoadingDestination && (
-              <ActivityIndicator size="small" color="#2196F3" style={styles.loadingIndicator} />
-            )}
-          </Animated.View>
-          
-          {showDestinationSuggestions && destinationSuggestions.length > 0 && (
-            <View style={styles.suggestionsContainer}>
-              {destinationSuggestions.map((suggestion) => (
-                <TouchableOpacity
-                  key={suggestion.place_id}
-                  style={styles.suggestionItem}
-                  onPress={() => handleDestinationSelect(suggestion)}
-                >
-                  <Text style={styles.suggestionText}>{suggestion.description}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-      </Animated.View>
 
-      {/* Cards de serviço */}
-      <Animated.View style={[styles.cardsContainer, animatedCardStyle]}>
-        <Text style={styles.categoriesTitle}>
-          Escolha o tipo de serviço: ({availableCategories.length} categorias)
-        </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.cardsScroll}
-        >
-          {availableCategories.length > 0 ? (
-            availableCategories.map((category) => (
+          <View style={styles.inputGroup}>
+            <View style={styles.inputLabelContainer}>
+              <Text style={styles.inputLabel}>🎯 Para onde o prestador deve vir?</Text>
+              <Text style={styles.inputHelper}>Seu endereço de destino</Text>
+            </View>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Digite seu endereço"
+                placeholderTextColor="#999999"
+                value={destination}
+                onChangeText={handleDestinationChange}
+                onFocus={() => {
+                  inputFocus.value = withSequence(
+                    withTiming(1, { duration: 200 }),
+                    withTiming(1.02, { duration: 200 })
+                  );
+                }}
+                onBlur={() => {
+                  inputFocus.value = withTiming(0, { duration: 200 });
+                }}
+                selectionColor="#2196F3"
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              {isLoadingDestination && (
+                <ActivityIndicator size="small" color="#2196F3" style={styles.inputLoader} />
+              )}
+              <TouchableOpacity 
+                style={styles.currentLocationButton}
+                onPress={handleUseCurrentLocation}
+              >
+                <Text style={styles.currentLocationIcon}>📍</Text>
+                <Text style={styles.currentLocationText}>Usar minha localização</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {showDestinationSuggestions && destinationSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                {destinationSuggestions.map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionItem}
+                    onPress={() => handleDestinationSelect(suggestion)}
+                  >
+                    <Text style={styles.suggestionText}>{suggestion.description}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Categorias de Serviços */}
+      <View style={styles.categoriesSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Categorias de Serviços</Text>
+          <Text style={styles.sectionSubtitle}>Escolha o tipo de serviço que você precisa</Text>
+        </View>
+        
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2196F3" />
+            <Text style={styles.loadingText}>Carregando categorias...</Text>
+          </View>
+        ) : (
+          <View style={styles.categoriesGrid}>
+            {availableCategories.map((category) => (
               <TouchableOpacity
                 key={category.id}
                 style={[
-                  styles.serviceCard,
-                  selectedCategory?.id === category.id && styles.serviceCardSelected
+                  styles.categoryCard,
+                  selectedCategory?.id === category.id && styles.categoryCardSelected
                 ]}
-                onPress={() => handleCategorySelect(category)}
+                onPress={() => setSelectedCategory(category)}
               >
-                <View style={styles.serviceCardContent}>
-                  <Text style={styles.serviceCardIcon}>🚗</Text>
-                  <Text style={styles.serviceCardTitle}>{category.displayName}</Text>
-                  <Text style={styles.serviceCardDescription}>{category.description}</Text>
-                  <Text style={styles.serviceCardPrice}>
-                    A partir de R$ {category.basePrice.toFixed(2)}
+                <View style={styles.categoryIcon}>
+                  <Text style={styles.categoryEmoji}>
+                    {category.icon === 'wrench' ? '🔧' :
+                     category.icon === 'sparkles' ? '✨' :
+                     category.icon === 'hammer' ? '🔨' :
+                     category.icon === 'car' ? '🚗' : '🔧'}
                   </Text>
                 </View>
+                <Text style={[
+                  styles.categoryName,
+                  selectedCategory?.id === category.id && styles.categoryNameSelected
+                ]}>
+                  {category.displayName}
+                </Text>
+                <Text style={[
+                  styles.categoryPrice,
+                  selectedCategory?.id === category.id && styles.categoryPriceSelected
+                ]}>
+                  R$ {category.basePrice.toFixed(2)}
+                </Text>
               </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.loadingCategories}>
-              <ActivityIndicator size="small" color="#2196F3" />
-              <Text style={styles.loadingText}>Carregando categorias...</Text>
-            </View>
-          )}
-        </ScrollView>
-      </Animated.View>
+            ))}
+          </View>
+        )}
+      </View>
 
-      {/* Botão de solicitar serviço */}
-      {selectedCategory && (
-        <Animated.View style={[styles.requestButtonContainer, animatedCardStyle]}>
-          <TouchableOpacity
-            style={[styles.requestButton, isLoading && styles.requestButtonDisabled]}
-            onPress={handleRequestService}
-            disabled={isLoading}
+      {/* Botão de Solicitar */}
+      <View style={styles.actionSection}>
+        <TouchableOpacity
+          style={[
+            styles.requestButton,
+            (!selectedCategory || !originPlace || !destinationPlace) && styles.requestButtonDisabled
+          ]}
+          onPress={handleRequestService}
+          disabled={!selectedCategory || !originPlace || !destinationPlace}
+        >
+          <LinearGradient
+            colors={(!selectedCategory || !originPlace || !destinationPlace) 
+              ? ['#E0E0E0', '#BDBDBD'] 
+              : ['#4CAF50', '#45A049']
+            }
+            style={styles.requestButtonGradient}
           >
-            <LinearGradient
-              colors={['#4CAF50', '#45A049']}
-              style={styles.requestButtonGradient}
-            >
-              <Text style={styles.requestButtonText}>
-                {isLoading ? 'Processando...' : 'Solicitar Serviço'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+            <Text style={[
+              styles.requestButtonText,
+              (!selectedCategory || !originPlace || !destinationPlace) && styles.requestButtonTextDisabled
+            ]}>
+              {!selectedCategory ? 'Selecione uma categoria' :
+               !originPlace ? 'Selecione a origem' :
+               !destinationPlace ? 'Selecione o destino' :
+               'Solicitar Serviço'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -604,15 +613,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  headerLeft: {
+    flex: 1,
+  },
+  userInfo: {
+    marginBottom: 8,
+  },
   greeting: {
     fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 4,
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   profileButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -633,6 +668,7 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     color: 'white',
+    fontSize: 14,
     fontWeight: '600',
   },
   mapContainer: {
@@ -640,266 +676,50 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    elevation: 8,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   map: {
     flex: 1,
   },
-  inputContainer: {
-    backgroundColor: 'white',
-    margin: 16,
-    borderRadius: 20,
-    padding: 24,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E3F2FD',
-  },
-  inputWrapper: {
-    marginBottom: 16,
-  },
-  inputLabelContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2196F3',
-  },
-  currentLocationButton: {
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#2196F3',
-  },
-  currentLocationText: {
-    fontSize: 12,
-    color: '#2196F3',
-    fontWeight: '500',
-  },
-  inputField: {
-    position: 'relative',
-  },
-  input: {
-    borderWidth: 3,
-    borderColor: '#2196F3',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 18,
-    backgroundColor: '#FFFFFF',
-    color: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-    minHeight: 55,
-    fontWeight: '600',
-  },
-  loadingIndicator: {
-    position: 'absolute',
-    right: 16,
-    top: 14,
-  },
-  suggestionsContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginTop: 8,
-    elevation: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    maxHeight: 200,
-    borderWidth: 2,
-    borderColor: '#2196F3',
-  },
-  suggestionItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-  },
-  suggestionText: {
-    fontSize: 16,
-    color: '#000000',
-    fontWeight: '600',
-  },
-  cardsContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  cardsScroll: {
-    paddingRight: 16,
-  },
-  categoriesTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 12,
-    marginLeft: 4,
-  },
-  loadingCategories: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#000000',
-  },
-  serviceCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginRight: 16,
-    width: width * 0.6,
-    elevation: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    borderWidth: 2,
-    borderColor: '#2196F3',
-  },
-  serviceCardSelected: {
-    borderColor: '#FF6B35',
-    borderWidth: 3,
-    backgroundColor: '#FFF3E0',
-    elevation: 12,
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-  },
-  serviceCardContent: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  serviceCardIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  serviceCardTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#000000',
-    marginBottom: 8,
-    textAlign: 'center',
-    textShadowColor: '#FFFFFF',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  serviceCardDescription: {
-    fontSize: 14,
-    color: '#000000',
-    marginBottom: 10,
-    lineHeight: 18,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  serviceCardPrice: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#FF6B35',
-    textAlign: 'center',
-    textShadowColor: '#FFFFFF',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  requestButtonContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-  requestButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  requestButtonDisabled: {
-    opacity: 0.6,
-  },
-  requestButtonGradient: {
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  requestButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  destinationMarker: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  destinationText: {
-    fontSize: 20,
-  },
   originMarker: {
+    backgroundColor: '#2196F3',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+    borderWidth: 3,
+    borderColor: 'white',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
   },
   originText: {
     fontSize: 20,
   },
-  routeLoadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  destinationMarker: {
+    backgroundColor: '#4CAF50',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  routeLoadingCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    marginHorizontal: 20,
-    elevation: 8,
+    borderWidth: 3,
+    borderColor: 'white',
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 2,
   },
-  routeLoadingTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  routeLoadingSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  routeFoundText: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-    marginTop: 8,
+  destinationText: {
+    fontSize: 20,
   },
   mapLoadingOverlay: {
     position: 'absolute',
@@ -907,27 +727,227 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   mapLoadingCard: {
     backgroundColor: 'white',
     padding: 20,
     borderRadius: 12,
     alignItems: 'center',
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-    minWidth: 200,
+    shadowRadius: 4,
   },
   mapLoadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  requestSection: {
+    backgroundColor: 'white',
+    margin: 16,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  sectionHeader: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  inputsContainer: {
+    gap: 16,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabelContainer: {
+    marginBottom: 8,
+  },
+  inputLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 2,
+  },
+  inputHelper: {
+    fontSize: 12,
+    color: '#666',
+  },
+  inputContainer: {
+    position: 'relative',
+  },
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#000000',
+    minHeight: 50,
+    fontWeight: '500',
+  },
+  inputLoader: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+  },
+  currentLocationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  currentLocationIcon: {
+    fontSize: 16,
+    marginRight: 4,
+  },
+  currentLocationText: {
+    fontSize: 12,
+    color: '#2196F3',
+    fontWeight: '600',
+  },
+  suggestionsContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginTop: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    maxHeight: 150,
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  categoriesSection: {
+    backgroundColor: 'white',
+    margin: 16,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
     marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  categoryCard: {
+    backgroundColor: '#F8F9FA',
+    width: (width - 80) / 2,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  categoryCardSelected: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#2196F3',
+    elevation: 2,
+    shadowOpacity: 0.1,
+  },
+  categoryIcon: {
+    marginBottom: 8,
+  },
+  categoryEmoji: {
+    fontSize: 24,
+  },
+  categoryName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
     textAlign: 'center',
+    marginBottom: 4,
+  },
+  categoryNameSelected: {
+    color: '#2196F3',
+  },
+  categoryPrice: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  categoryPriceSelected: {
+    color: '#2196F3',
+  },
+  actionSection: {
+    padding: 16,
+  },
+  requestButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  requestButtonDisabled: {
+    elevation: 1,
+    shadowOpacity: 0.1,
+  },
+  requestButtonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  requestButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  requestButtonTextDisabled: {
+    color: '#999',
   },
 });
