@@ -1,0 +1,55 @@
+export default {
+  expo: {
+    name: "FreelasApp",
+    slug: "freelas-app",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    userInterfaceStyle: "light",
+    splash: {
+      image: "./assets/images/splash-image.png",
+      resizeMode: "contain",
+      backgroundColor: "#2196F3"
+    },
+    assetBundlePatterns: [
+      "**/*"
+    ],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.freelas.app"
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/images/adaptive-icon.png",
+        backgroundColor: "#2196F3"
+      },
+      package: "com.freelas.app",
+      permissions: [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    web: {
+      favicon: "./assets/images/favicon.png"
+    },
+    plugins: [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission: "Este app precisa acessar sua localização para funcionar corretamente."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/images/notification-icon.png",
+          color: "#2196F3"
+        }
+      ]
+    ]
+  }
+};

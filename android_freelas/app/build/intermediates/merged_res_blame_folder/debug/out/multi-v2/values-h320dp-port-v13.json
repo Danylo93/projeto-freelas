@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.freelas.app-mergeDebugResources-92:/values-h320dp-port-v13/values-h320dp-port-v13.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\danylo-oliveira\\.gradle\\caches\\8.10\\transforms\\b357363f68cf87b5e81b3bcfd1abcc29\\transformed\\material-1.11.0\\res\\values-h320dp-port-v13\\values-h320dp-port-v13.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "63",
+                        "endOffsets": "114"
+                    }
+                }
+            ]
+        }
+    ]
+}

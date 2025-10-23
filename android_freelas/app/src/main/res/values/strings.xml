@@ -1,0 +1,114 @@
+<resources>
+    <string name="app_name">FreelasApp</string>
+    
+    <!-- Auth -->
+    <string name="login">Entrar</string>
+    <string name="register">Cadastrar</string>
+    <string name="email">Email</string>
+    <string name="password">Senha</string>
+    <string name="name">Nome</string>
+    <string name="phone">Telefone</string>
+    <string name="confirm_password">Confirmar Senha</string>
+    <string name="forgot_password">Esqueci minha senha</string>
+    <string name="login_success">Login realizado com sucesso!</string>
+    <string name="register_success">Cadastro realizado com sucesso!</string>
+    <string name="login_error">Erro ao fazer login</string>
+    <string name="register_error">Erro ao fazer cadastro</string>
+    
+    <!-- User Types -->
+    <string name="client">Cliente</string>
+    <string name="provider">Prestador</string>
+    <string name="select_user_type">Selecione o tipo de usuário</string>
+    
+    <!-- Client -->
+    <string name="where_are_we_going">Para onde vamos?</string>
+    <string name="confirm">Confirmar</string>
+    <string name="finding_provider">Procurando prestadores...</string>
+    <string name="provider_found">Prestador encontrado!</string>
+    <string name="service_in_progress">Serviço em andamento</string>
+    <string name="service_completed">Serviço concluído</string>
+    <string name="rate_service">Avaliar serviço</string>
+    <string name="make_offer">Fazer oferta</string>
+    <string name="accept_offer">Aceitar oferta</string>
+    <string name="reject_offer">Recusar oferta</string>
+    <string name="increase_offer">Aumentar oferta</string>
+    <string name="auto_accept_offers">Aceitar ofertas automaticamente</string>
+    
+    <!-- Provider -->
+    <string name="available">Disponível</string>
+    <string name="busy">Ocupado</string>
+    <string name="offline">Offline</string>
+    <string name="toggle_status">Alternar status</string>
+    <string name="new_request">Nova solicitação</string>
+    <string name="accept_request">Aceitar solicitação</string>
+    <string name="reject_request">Recusar solicitação</string>
+    <string name="counter_offer">Contra-oferta</string>
+    <string name="earnings">Ganhos</string>
+    <string name="active_services">Serviços ativos</string>
+    
+    <!-- Services -->
+    <string name="delivery">Entrega</string>
+    <string name="transport">Transporte</string>
+    <string name="cleaning">Limpeza</string>
+    <string name="maintenance">Manutenção</string>
+    <string name="consultation">Consultoria</string>
+    <string name="other">Outro</string>
+    
+    <!-- Map -->
+    <string name="current_location">Localização atual</string>
+    <string name="select_location">Selecionar localização</string>
+    <string name="route_deviation_prevention">Prevenção de desvio de rota está disponível</string>
+    <string name="various_advantages">São diversas vantagens</string>
+    <string name="be_partner_provider">Seja um prestador parceiro</string>
+    <string name="learn_more">SAIBA MAIS</string>
+    
+    <!-- Navigation -->
+    <string name="home">Início</string>
+    <string name="messages">Mensagens</string>
+    <string name="profile">Perfil</string>
+    <string name="settings">Configurações</string>
+    
+    <!-- General -->
+    <string name="loading">Carregando...</string>
+    <string name="error">Erro</string>
+    <string name="success">Sucesso</string>
+    <string name="cancel">Cancelar</string>
+    <string name="save">Salvar</string>
+    <string name="edit">Editar</string>
+    <string name="delete">Excluir</string>
+    <string name="ok">OK</string>
+    <string name="yes">Sim</string>
+    <string name="no">Não</string>
+    <string name="retry">Tentar novamente</string>
+    
+    <!-- Price -->
+    <string name="price">Preço</string>
+    <string name="estimated_time">Tempo estimado</string>
+    <string name="distance">Distância</string>
+    <string name="discount">DESCONTO</string>
+    <string name="suggest_price">Sugira seu preço</string>
+    
+    <!-- Payment -->
+    <string name="payment_method">Forma de pagamento</string>
+    <string name="money">Dinheiro</string>
+    <string name="credit_card">Cartão de crédito</string>
+    <string name="pix">PIX</string>
+    <string name="recurring">Recorrente</string>
+    
+    <!-- Notifications -->
+    <string name="notification_title">FreelasApp</string>
+    <string name="new_service_request">Nova solicitação de serviço</string>
+    <string name="service_accepted">Serviço aceito</string>
+    <string name="service_started">Serviço iniciado</string>
+    <string name="service_completed_notification">Serviço concluído</string>
+    
+    <!-- Errors -->
+    <string name="network_error">Erro de conexão</string>
+    <string name="location_error">Erro ao obter localização</string>
+    <string name="permission_denied">Permissão negada</string>
+    <string name="invalid_credentials">Credenciais inválidas</string>
+    <string name="user_not_found">Usuário não encontrado</string>
+    <string name="service_unavailable">Serviço indisponível</string>
+    
+</resources>
+

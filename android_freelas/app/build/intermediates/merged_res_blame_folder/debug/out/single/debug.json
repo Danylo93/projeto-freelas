@@ -1,0 +1,82 @@
+[
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\drawable_ic_launcher_background.xml.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\drawable\\ic_launcher_background.xml"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/drawable_splash_background.xml.flat",
+        "source": "com.freelas.app-main-96:/drawable/splash_background.xml"
+    },
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\mipmap-anydpi-v26\\ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\xml_backup_rules.xml.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\xml\\backup_rules.xml"
+    },
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\xml_data_extraction_rules.xml.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\xml\\data_extraction_rules.xml"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/xml_data_extraction_rules.xml.flat",
+        "source": "com.freelas.app-main-96:/xml/data_extraction_rules.xml"
+    },
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\drawable_splash_background.xml.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\drawable\\splash_background.xml"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/drawable_ic_launcher.xml.flat",
+        "source": "com.freelas.app-main-96:/drawable/ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\drawable_ic_launcher.xml.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\drawable\\ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\drawable_ic_notification.xml.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\drawable\\ic_notification.xml"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "com.freelas.app-main-96:/mipmap-hdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.freelas.app-main-96:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\mipmap-hdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\mipmap-hdpi\\ic_launcher.png"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.freelas.app-main-96:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/drawable_ic_launcher_background.xml.flat",
+        "source": "com.freelas.app-main-96:/drawable/ic_launcher_background.xml"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.freelas.app-main-96:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\drawable_ic_launcher_foreground.xml.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\drawable\\ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-merged_res-94:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\danylo-oliveira\\.gradle\\daemon\\8.10\\com.freelas.app-main-96:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/xml_backup_rules.xml.flat",
+        "source": "com.freelas.app-main-96:/xml/backup_rules.xml"
+    },
+    {
+        "merged": "com.freelas.app-merged_res-94:/drawable_ic_notification.xml.flat",
+        "source": "com.freelas.app-main-96:/drawable/ic_notification.xml"
+    }
+]
