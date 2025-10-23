@@ -45,6 +45,11 @@ export default function TrackingScreen() {
   
   const [hasArrived, setHasArrived] = useState(false);
   const [showRating, setShowRating] = useState(false);
+  const [showArrivalNotification, setShowArrivalNotification] = useState(false);
+  const [showServiceStart, setShowServiceStart] = useState(false);
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
+  const [showServiceComplete, setShowServiceComplete] = useState(false);
+  const [servicePhoto, setServicePhoto] = useState<string | null>(null);
   const [routeCoordinates, setRouteCoordinates] = useState<{latitude: number; longitude: number}[]>([]);
   const [currentVehiclePosition, setCurrentVehiclePosition] = useState<{latitude: number; longitude: number} | null>(null);
   const [vehicleHeading, setVehicleHeading] = useState(0);
@@ -99,10 +104,10 @@ export default function TrackingScreen() {
   };
 
   const startMapAnimation = () => {
-    if (!currentLocation || !currentService?.destination) return;
+    if (!currentService?.location || !currentService?.destination) return;
     
     // 1. Mostrar panorama geral (origem e destino)
-    const origin = currentLocation;
+    const origin = currentService.location;
     const destination = currentService.destination;
     
     // Calcular região que mostra origem e destino
@@ -141,24 +146,28 @@ export default function TrackingScreen() {
   };
 
   const loadRoute = async () => {
-    if (!currentLocation || !currentService?.destination) {
-      console.log('Localização ou destino não disponível');
+    if (!currentService?.location || !currentService?.destination) {
+      console.log('Origem ou destino do serviço não disponível');
       return;
     }
     
     console.log('Carregando rota...');
     setIsLoadingRoute(true);
     
+    // Usar a origem do serviço (endereço selecionado pelo usuário)
+    const serviceOrigin = currentService.location;
+    const serviceDestination = currentService.destination;
+    
     // Sempre gerar rota simulada primeiro para garantir que funcione
-    const simulatedRoute = generateSimulatedRoute(currentLocation, currentService.destination);
+    const simulatedRoute = generateSimulatedRoute(serviceOrigin, serviceDestination);
     setRouteCoordinates(simulatedRoute);
     setCurrentVehiclePosition(simulatedRoute[0]);
     
     // Tentar buscar rota real em paralelo
     try {
       const directions = await GeocodingService.getDirections(
-        { lat: currentLocation.latitude, lng: currentLocation.longitude },
-        { lat: currentService.destination.latitude, lng: currentService.destination.longitude }
+        { lat: serviceOrigin.latitude, lng: serviceOrigin.longitude },
+        { lat: serviceDestination.latitude, lng: serviceDestination.longitude }
       );
       
       if (directions && directions.polyline) {
@@ -251,6 +260,10 @@ export default function TrackingScreen() {
         if (currentIndex === totalSteps - 1) {
           setHasArrived(true);
           setIsVehicleMoving(false);
+          // Mostrar notificação de chegada
+          setTimeout(() => {
+            setShowArrivalNotification(true);
+          }, 1000);
           return;
         }
         
@@ -370,6 +383,27 @@ export default function TrackingScreen() {
     router.replace('/client');
   };
 
+  const handleArrivalConfirmed = () => {
+    setShowArrivalNotification(false);
+    setShowServiceStart(true);
+  };
+
+  const handleServiceStarted = () => {
+    setShowServiceStart(false);
+    setShowPhotoCapture(true);
+  };
+
+  const handlePhotoTaken = () => {
+    setServicePhoto('photo_placeholder.jpg'); // Simular foto
+    setShowPhotoCapture(false);
+    setShowServiceComplete(true);
+  };
+
+  const handleServiceCompleted = () => {
+    setShowServiceComplete(false);
+    setShowRating(true);
+  };
+
   const animatedCarStyle = useAnimatedStyle(() => ({
     transform: [{ scale: carPulse.value }],
   }));
@@ -381,6 +415,174 @@ export default function TrackingScreen() {
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${progressBar.value * 100}%`,
   }));
+
+  // Notificação de chegada
+  if (showArrivalNotification) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#4CAF50', '#45A049']}
+          style={styles.arrivalHeader}
+        >
+          <Text style={styles.arrivalTitle}>🎉 Prestador Chegou!</Text>
+        </LinearGradient>
+        
+        <View style={styles.arrivalContent}>
+          <Text style={styles.arrivalText}>
+            {driverInfo?.name} chegou ao seu local e está pronto para iniciar o serviço.
+          </Text>
+          
+          <View style={styles.arrivalInfo}>
+            <Text style={styles.arrivalInfoText}>📍 Seu endereço: {currentService?.destination?.address}</Text>
+            <Text style={styles.arrivalInfoText}>👨‍🔧 Prestador: {driverInfo?.name}</Text>
+            <Text style={styles.arrivalInfoText}>🚗 Veículo: {driverInfo?.vehicleModel}</Text>
+            <Text style={styles.arrivalInfoText}>📞 Telefone: {driverInfo?.phone}</Text>
+          </View>
+          
+          <View style={styles.arrivalActions}>
+            <TouchableOpacity
+              style={styles.callDriverButton}
+              onPress={handleCallDriver}
+            >
+              <Text style={styles.callDriverButtonText}>📞 Ligar para o Prestador</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={handleArrivalConfirmed}
+            >
+              <Text style={styles.confirmButtonText}>✓ Confirmar Chegada</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // Iniciar atendimento
+  if (showServiceStart) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#FF9800', '#F57C00']}
+          style={styles.serviceHeader}
+        >
+          <Text style={styles.serviceTitle}>🔧 Serviço Iniciado</Text>
+        </LinearGradient>
+        
+        <View style={styles.serviceContent}>
+          <Text style={styles.serviceText}>
+            {driverInfo?.name} iniciou o atendimento do seu serviço. Acompanhe o progresso abaixo.
+          </Text>
+          
+          <View style={styles.serviceInfo}>
+            <Text style={styles.serviceInfoText}>📋 Serviço: {currentService?.category?.displayName}</Text>
+            <Text style={styles.serviceInfoText}>💰 Valor: R$ {currentService?.price?.toFixed(2)}</Text>
+            <Text style={styles.serviceInfoText}>⏱️ Tempo estimado: {currentService?.estimatedTime} min</Text>
+            <Text style={styles.serviceInfoText}>👨‍🔧 Prestador: {driverInfo?.name}</Text>
+          </View>
+          
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressLabel}>Progresso do Serviço:</Text>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: '30%' }]} />
+            </View>
+            <Text style={styles.progressText}>Iniciando trabalho...</Text>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.startServiceButton}
+            onPress={handleServiceStarted}
+          >
+            <Text style={styles.startServiceButtonText}>Continuar Acompanhamento</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Captura de foto
+  if (showPhotoCapture) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#9C27B0', '#7B1FA2']}
+          style={styles.photoHeader}
+        >
+          <Text style={styles.photoTitle}>📸 Serviço Concluído</Text>
+        </LinearGradient>
+        
+        <View style={styles.photoContent}>
+          <Text style={styles.photoText}>
+            {driverInfo?.name} concluiu o serviço e enviou uma foto como evidência do trabalho realizado.
+          </Text>
+          
+          <View style={styles.photoPlaceholder}>
+            <Text style={styles.photoPlaceholderText}>📷</Text>
+            <Text style={styles.photoPlaceholderLabel}>Foto enviada pelo prestador</Text>
+            <Text style={styles.photoPlaceholderSubtext}>Evidência do serviço concluído</Text>
+          </View>
+          
+          <View style={styles.photoInfo}>
+            <Text style={styles.photoInfoText}>✅ Serviço finalizado com sucesso</Text>
+            <Text style={styles.photoInfoText}>📸 Evidência fotográfica enviada</Text>
+            <Text style={styles.photoInfoText}>👨‍🔧 Prestador: {driverInfo?.name}</Text>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={handlePhotoTaken}
+          >
+            <Text style={styles.captureButtonText}>Ver Evidência</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Conclusão do serviço
+  if (showServiceComplete) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#4CAF50', '#45A049']}
+          style={styles.completeHeader}
+        >
+          <Text style={styles.completeTitle}>✅ Serviço Finalizado</Text>
+        </LinearGradient>
+        
+        <View style={styles.completeContent}>
+          <Text style={styles.completeText}>
+            Seu serviço foi concluído com sucesso! Agora você pode avaliar a experiência com {driverInfo?.name}.
+          </Text>
+          
+          <View style={styles.completeInfo}>
+            <Text style={styles.completeInfoText}>✅ Serviço: {currentService?.category?.displayName}</Text>
+            <Text style={styles.completeInfoText}>📸 Evidência fotográfica: Enviada</Text>
+            <Text style={styles.completeInfoText}>💰 Valor: R$ {currentService?.price?.toFixed(2)}</Text>
+            <Text style={styles.completeInfoText}>👨‍🔧 Prestador: {driverInfo?.name}</Text>
+            <Text style={styles.completeInfoText}>⭐ Avaliação: Pendente</Text>
+          </View>
+          
+          <View style={styles.completeActions}>
+            <TouchableOpacity
+              style={styles.callDriverButton}
+              onPress={handleCallDriver}
+            >
+              <Text style={styles.callDriverButtonText}>📞 Ligar para o Prestador</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.finishButton}
+              onPress={handleServiceCompleted}
+            >
+              <Text style={styles.finishButtonText}>Avaliar Serviço</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   if (showRating) {
     return (
@@ -444,8 +646,8 @@ export default function TrackingScreen() {
           provider={PROVIDER_GOOGLE}
           style={styles.map}
           region={mapRegion || {
-            latitude: currentVehiclePosition?.latitude || currentLocation?.latitude || -23.5505,
-            longitude: currentVehiclePosition?.longitude || currentLocation?.longitude || -46.6333,
+            latitude: currentVehiclePosition?.latitude || currentService?.location?.latitude || -23.5505,
+            longitude: currentVehiclePosition?.longitude || currentService?.location?.longitude || -46.6333,
             latitudeDelta: 0.005,
             longitudeDelta: 0.005,
           }}
@@ -457,19 +659,19 @@ export default function TrackingScreen() {
           rotateEnabled={true}
         >
           
-          {/* Marcador do destino */}
+          {/* Marcador do destino (cliente) */}
           {currentService?.destination && (
             <Marker
               coordinate={{
                 latitude: currentService.destination.latitude,
                 longitude: currentService.destination.longitude,
               }}
-              title="Destino"
+              title="Cliente"
               pinColor="#4CAF50"
             >
               <View style={styles.destinationMarker}>
                 <View style={styles.destinationIconContainer}>
-                  <Text style={styles.destinationText}>🎯</Text>
+                  <Text style={styles.destinationText}>📍</Text>
                 </View>
                 {showInitialAnimation && (
                   <Animated.View style={[styles.markerPulse, styles.destinationPulse, { transform: [{ scale: markerPulse }] }]} />
@@ -482,12 +684,12 @@ export default function TrackingScreen() {
           {currentVehiclePosition && (
             <Marker
               coordinate={currentVehiclePosition}
-              title={isOffRoute ? "Veículo - Recalculando" : "Veículo"}
+              title={isOffRoute ? "Prestador - Recalculando" : "Prestador"}
               description={isOffRoute ? "Recalculando rota..." : `${driverInfo?.name} - ${driverInfo?.vehicleModel}`}
             >
               <Animated.View style={[styles.carMarker, animatedCarStyle]}>
                 <View style={styles.carIconContainer}>
-                  <Text style={styles.carIcon}>🚗</Text>
+                  <Text style={styles.carIcon}>👨‍🔧</Text>
                 </View>
                 {currentRouteIndex > 0 && !isOffRoute && (
                   <View style={styles.movingIndicator}>
@@ -582,7 +784,7 @@ export default function TrackingScreen() {
           </View>
           <Text style={styles.progressText}>
             {isOffRoute ? '🔄 Recalculando rota...' : 
-             currentRouteIndex > 0 ? `🚗 Em movimento - ${Math.round(progressBar.value * 100)}% concluído` : 
+             currentRouteIndex > 0 ? `👨‍🔧 Prestador em movimento - ${Math.round(progressBar.value * 100)}% concluído` : 
              '📍 Aguardando início...'}
           </Text>
         </View>
@@ -961,6 +1163,280 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   rateButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  // Estilos para notificação de chegada
+  arrivalHeader: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  arrivalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  arrivalContent: {
+    flex: 1,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrivalText: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 24,
+  },
+  arrivalInfo: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 30,
+    width: '100%',
+  },
+  arrivalInfoText: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  confirmButton: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 40,
+    paddingVertical: 15,
+    borderRadius: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  arrivalActions: {
+    width: '100%',
+    gap: 12,
+  },
+  callDriverButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  callDriverButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  progressLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  photoPlaceholderSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 5,
+  },
+  photoInfo: {
+    backgroundColor: '#F3E5F5',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    width: '100%',
+  },
+  photoInfoText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  completeActions: {
+    width: '100%',
+    gap: 12,
+  },
+  // Estilos para iniciar atendimento
+  serviceHeader: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  serviceTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  serviceContent: {
+    flex: 1,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serviceText: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 24,
+  },
+  serviceInfo: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 30,
+    width: '100%',
+  },
+  serviceInfoText: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  startServiceButton: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 40,
+    paddingVertical: 15,
+    borderRadius: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  startServiceButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  // Estilos para captura de foto
+  photoHeader: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  photoTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  photoContent: {
+    flex: 1,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoText: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 24,
+  },
+  photoPlaceholder: {
+    width: 200,
+    height: 200,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 30,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  photoPlaceholderText: {
+    fontSize: 48,
+    marginBottom: 10,
+  },
+  photoPlaceholderLabel: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  captureButton: {
+    backgroundColor: '#9C27B0',
+    paddingHorizontal: 40,
+    paddingVertical: 15,
+    borderRadius: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  captureButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  // Estilos para conclusão do serviço
+  completeHeader: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  completeTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  completeContent: {
+    flex: 1,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completeText: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 24,
+  },
+  completeInfo: {
+    backgroundColor: '#E8F5E8',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 30,
+    width: '100%',
+  },
+  completeInfoText: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  finishButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 40,
+    paddingVertical: 15,
+    borderRadius: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  finishButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',

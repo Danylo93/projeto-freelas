@@ -4,6 +4,7 @@ import { Service, ServiceStatus, ServiceCategory, Location } from '../types';
 interface ServiceState {
   currentService: Service | null;
   serviceHistory: Service[];
+  completedServices: Service[];
   availableCategories: ServiceCategory[];
   isLoading: boolean;
   error: string | null;
@@ -15,6 +16,7 @@ interface ServiceActions {
   cancelService: (serviceId: string) => Promise<void>;
   completeService: (serviceId: string) => Promise<void>;
   getServiceHistory: () => Promise<Service[]>;
+  loadCompletedServices: () => Promise<void>;
   loadCategories: () => Promise<void>;
   clearError: () => void;
   setCurrentService: (service: Service | null) => void;
@@ -26,6 +28,7 @@ export const useServiceStore = create<ServiceStore>((set, get) => ({
   // State
   currentService: null,
   serviceHistory: [],
+  completedServices: [],
   availableCategories: [],
   isLoading: false,
   error: null,
@@ -303,5 +306,121 @@ export const useServiceStore = create<ServiceStore>((set, get) => ({
 
   setCurrentService: (service: Service | null) => {
     set({ currentService: service });
+  },
+
+  loadCompletedServices: async () => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      // Simular delay de rede
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Dados simulados de serviços completados
+      const mockCompletedServices: Service[] = [
+        {
+          id: 'service_1',
+          clientId: 'current_user_id',
+          category: {
+            id: '1',
+            name: 'manutencao',
+            displayName: 'Manutenção',
+            description: 'Serviços de manutenção geral',
+            icon: 'wrench',
+            basePrice: 25.0,
+            isActive: true
+          },
+          location: {
+            latitude: -23.5505,
+            longitude: -46.6333,
+            address: 'Rua das Flores, 123 - São Paulo, SP'
+          },
+          destination: {
+            latitude: -23.5515,
+            longitude: -46.6343,
+            address: 'Av. Paulista, 1000 - São Paulo, SP'
+          },
+          price: 45.50,
+          distance: 2.3,
+          estimatedTime: 25,
+          status: ServiceStatus.COMPLETED,
+          createdAt: new Date('2024-01-15T10:30:00'),
+          updatedAt: new Date('2024-01-15T11:00:00'),
+          rating: 5
+        },
+        {
+          id: 'service_2',
+          clientId: 'current_user_id',
+          category: {
+            id: '2',
+            name: 'limpeza',
+            displayName: 'Limpeza',
+            description: 'Serviços de limpeza',
+            icon: 'sparkles',
+            basePrice: 20.0,
+            isActive: true
+          },
+          location: {
+            latitude: -23.5605,
+            longitude: -46.6433,
+            address: 'Rua Augusta, 456 - São Paulo, SP'
+          },
+          destination: {
+            latitude: -23.5515,
+            longitude: -46.6343,
+            address: 'Av. Paulista, 1000 - São Paulo, SP'
+          },
+          price: 35.00,
+          distance: 1.8,
+          estimatedTime: 20,
+          status: ServiceStatus.COMPLETED,
+          createdAt: new Date('2024-01-10T14:15:00'),
+          updatedAt: new Date('2024-01-10T14:45:00'),
+          rating: 4
+        },
+        {
+          id: 'service_3',
+          clientId: 'current_user_id',
+          category: {
+            id: '3',
+            name: 'reparo',
+            displayName: 'Reparo',
+            description: 'Serviços de reparo',
+            icon: 'hammer',
+            basePrice: 30.0,
+            isActive: true
+          },
+          location: {
+            latitude: -23.5705,
+            longitude: -46.6533,
+            address: 'Rua Consolação, 789 - São Paulo, SP'
+          },
+          destination: {
+            latitude: -23.5515,
+            longitude: -46.6343,
+            address: 'Av. Paulista, 1000 - São Paulo, SP'
+          },
+          price: 55.00,
+          distance: 3.2,
+          estimatedTime: 35,
+          status: ServiceStatus.CANCELLED,
+          createdAt: new Date('2024-01-05T09:00:00'),
+          updatedAt: new Date('2024-01-05T09:30:00')
+        }
+      ];
+      
+      set({
+        completedServices: mockCompletedServices,
+        isLoading: false,
+        error: null
+      });
+      
+    } catch (error) {
+      const errorMessage = 'Erro ao carregar histórico';
+      set({ 
+        isLoading: false, 
+        error: errorMessage
+      });
+      throw new Error(errorMessage);
+    }
   }
 }));

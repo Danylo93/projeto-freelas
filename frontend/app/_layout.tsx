@@ -27,6 +27,11 @@ export default function RootLayout() {
         <Stack.Screen name="payment" />
         <Stack.Screen name="tracking" />
         <Stack.Screen name="rating" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="history" />
+        <Stack.Screen name="payment-methods" />
+        <Stack.Screen name="help-support" />
+        <Stack.Screen name="settings" />
       </Stack>
     </>
   );

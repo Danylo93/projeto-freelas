@@ -74,8 +74,6 @@ export default function ClientHomeScreen() {
   useEffect(() => {
     if (currentLocation) {
       mapOpacity.value = withTiming(1, { duration: 1000 });
-      setOrigin('📍 Sua localização atual');
-      setOriginPlace(currentLocation);
     }
   }, [currentLocation]);
 
@@ -251,13 +249,13 @@ export default function ClientHomeScreen() {
 
   const handleUseCurrentLocation = () => {
     if (currentLocation) {
-      setOrigin('📍 Localização atual');
-      setOriginPlace({
+      setDestination('📍 Minha localização atual');
+      setDestinationPlace({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
-        address: 'Localização atual'
+        address: 'Minha localização atual'
       });
-      setShowOriginSuggestions(false);
+      setShowDestinationSuggestions(false);
       inputFocus.value = withSequence(
         withTiming(1, { duration: 200 }),
         withTiming(1.02, { duration: 200 })
@@ -366,9 +364,13 @@ export default function ClientHomeScreen() {
             <Text style={styles.greeting}>Olá, {user?.name}</Text>
             <Text style={styles.subtitle}>Como podemos ajudar?</Text>
           </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Text style={styles.logoutText}>Sair</Text>
-          </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/profile')} style={styles.profileButton}>
+          <Text style={styles.profileText}>👤</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <Text style={styles.logoutText}>Sair</Text>
+        </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -383,8 +385,8 @@ export default function ClientHomeScreen() {
             latitudeDelta: Math.abs((destinationPlace?.latitude || 0) - (originPlace?.latitude || 0)) * 1.5 || 0.01,
             longitudeDelta: Math.abs((destinationPlace?.longitude || 0) - (originPlace?.longitude || 0)) * 1.5 || 0.01,
           } : {
-            latitude: currentLocation?.latitude || -23.5505,
-            longitude: currentLocation?.longitude || -46.6333,
+            latitude: originPlace?.latitude || destinationPlace?.latitude || currentLocation?.latitude || -23.5505,
+            longitude: originPlace?.longitude || destinationPlace?.longitude || currentLocation?.longitude || -46.6333,
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }}
@@ -397,9 +399,13 @@ export default function ClientHomeScreen() {
                 latitude: originPlace.latitude,
                 longitude: originPlace.longitude,
               }}
-              title="Origem"
+              title="Prestador"
               pinColor="#2196F3"
-            />
+            >
+              <View style={styles.originMarker}>
+                <Text style={styles.originText}>👨‍🔧</Text>
+              </View>
+            </Marker>
           )}
           
           {destinationPlace && (
@@ -408,11 +414,11 @@ export default function ClientHomeScreen() {
                 latitude: destinationPlace.latitude,
                 longitude: destinationPlace.longitude,
               }}
-              title="Destino"
+              title="Você"
               pinColor="#4CAF50"
             >
               <View style={styles.destinationMarker}>
-                <Text style={styles.destinationText}>🎯</Text>
+                <Text style={styles.destinationText}>📍</Text>
               </View>
             </Marker>
           )}
@@ -445,19 +451,11 @@ export default function ClientHomeScreen() {
       {/* Campos de origem e destino */}
       <Animated.View style={[styles.inputContainer, animatedCardStyle]}>
         <View style={styles.inputWrapper}>
-          <View style={styles.inputLabelContainer}>
-            <Text style={styles.inputLabel}>Origem</Text>
-            <TouchableOpacity 
-              style={styles.currentLocationButton}
-              onPress={handleUseCurrentLocation}
-            >
-              <Text style={styles.currentLocationText}>📍 Usar localização atual</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.inputLabel}>De onde vem o prestador?</Text>
           <Animated.View style={[styles.inputField, animatedInputStyle]}>
             <TextInput
               style={styles.input}
-              placeholder="📍 Digite sua origem"
+              placeholder="📍 Digite o endereço do prestador"
               value={origin}
               onChangeText={handleOriginChange}
               placeholderTextColor="#666666"
@@ -487,11 +485,19 @@ export default function ClientHomeScreen() {
         </View>
         
         <View style={styles.inputWrapper}>
-          <Text style={styles.inputLabel}>Para onde vamos?</Text>
+          <View style={styles.inputLabelContainer}>
+            <Text style={styles.inputLabel}>Para onde o prestador deve vir?</Text>
+            <TouchableOpacity 
+              style={styles.currentLocationButton}
+              onPress={handleUseCurrentLocation}
+            >
+              <Text style={styles.currentLocationText}>📍 Usar minha localização</Text>
+            </TouchableOpacity>
+          </View>
           <Animated.View style={[styles.inputField, animatedInputStyle]}>
             <TextInput
               style={styles.input}
-              placeholder="🎯 Digite seu destino"
+              placeholder="🎯 Digite seu endereço"
               value={destination}
               onChangeText={handleDestinationChange}
               placeholderTextColor="#666666"
@@ -607,6 +613,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 4,
+  },
+  profileButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  profileText: {
+    color: 'white',
+    fontSize: 16,
   },
   logoutButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -834,6 +851,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   destinationText: {
+    fontSize: 20,
+  },
+  originMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  originText: {
     fontSize: 20,
   },
   routeLoadingOverlay: {
