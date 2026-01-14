@@ -1,3 +1,4 @@
+# runtime
 fastapi==0.110.1
 uvicorn==0.25.0
 python-socketio==5.13.0
@@ -5,17 +6,23 @@ python-engineio==4.12.2
 starlette==0.37.2
 anyio==4.6.2
 h11==0.14.0
+
 motor==3.3.1
 pymongo==4.5.0
 dnspython==2.6.1
+
 passlib==1.7.4
 bcrypt==4.1.2
 python-jose==3.3.0
 python-dotenv==1.0.1
+
 googlemaps==4.10.0
+
+# opcionais (presentes no seu código; sobem só se você configurar as envs)
 redis==5.0.4
 aiokafka==0.10.0
+
+# utilidades de dev (se quiser)
 black==24.8.0
 flake8==7.1.1
 pytest==8.2.2
-pydantic-settings
